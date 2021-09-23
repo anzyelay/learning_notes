@@ -1,0 +1,98 @@
+
+## Git 全局设置
+```sh
+git config --global user.name "leixa"
+git config --global user.email "leixa@jideos.com"
+git config --global core.editor "vim" //修改commit的编辑器
+```
+## 仓库的建立
+
+1. 创建一个新仓库
+```bash
+git clone git@192.168.16.198:leixa/test.git
+cd test
+touch README.md
+git add README.md
+git commit -m "add README"
+git push -u origin master
+```
+2. 推送现有文件夹
+```bash
+cd existing_folder
+git init
+git remote add origin git@192.168.16.198:leixa/test.git
+git add .
+git commit -m "Initial commit"
+git push -u origin master
+```
+3. 推送现有的 Git 仓库
+```bash
+cd existing_repo
+git remote rename origin old-origin
+git remote add origin git@192.168.16.198:leixa/test.git
+git push -u origin --all
+git push -u origin --tags
+```
+
+---
+
+## commit 
+1. Git合并多个 commit，保持历史简洁: `git rebase` 
+```sh
+# 从HEAD版本开始往过去数3个版本(--interactive:弹出交互式的界面进行编辑合并)
+$ git rebase -i HEAD~3
+# 合并当前到指定版本号间的COMMIT（不包含此版本）
+$ git rebase -i [commitid]
+# 撤销修改
+$ git rebase --abort
+```
+- 说明：
+```sh
+ # 命令:
+ # p, pick <提交> = 使用提交
+ # r, reword <提交> = 使用提交，但修改提交说明
+ # e, edit <提交> = 使用提交，进入 shell 以便进行提交修补
+ # s, squash <提交> = 使用提交，但融合到前一个提交
+ # f, fixup <提交> = 类似于 "squash"，但丢弃提交说明日志
+ # x, exec <命令> = 使用 shell 运行命令（此行剩余部分）
+ # b, break = 在此处停止（使用 'git rebase --continue' 继续变基）
+ # d, drop <提交> = 删除提交
+ # l, label <label> = 为当前 HEAD 打上标记
+ # t, reset <label> = 重置 HEAD 到该标记
+ # m, merge [-C <commit> | -c <commit>] <label> [# <oneline>]
+ # .       创建一个合并提交，并使用原始的合并提交说明（如果没有指定
+ # .       原始提交，使用注释部分的 oneline 作为提交说明）。使用
+ # .       -c <提交> 可以编辑提交说明。
+ #
+ # 可以对这些行重新排序，将从上至下执行。 (commit的排列也是按历史从上到下排列)
+ # 如果您在这里删除一行，对应的提交将会丢失。
+ # 然而，如果您删除全部内容，变基操作将会终止。
+ # 注意空提交已被注释掉  
+```
+- 合并步骤
+  - 查看 log 记录，使用git rebase -i 选择要合并的commit之后的一个commit
+  - 编辑要合并的版本信息，保存提交(多条合并会出现多次,可能会出现冲突)
+  - 修改注释信息后，保存提交(多条合并会出现多次)
+  - 推送远程仓库或合并到主干分支
+
+---
+## 标签
+1. 显示所有tag标签
+```sh
+git tag [--list]
+```
+2. 删除标签
+```sh
+git tag -d tagname
+```
+3. 删除远程tag
+```sh
+git push origin :refs/tags/tagname
+```
+4. 删除所有tag
+```sh
+#delete locale
+git tag | xargs git tag -d 
+#delete remote
+git tag | xargs git push origin :refs/tags/  
+```
