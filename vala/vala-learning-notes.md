@@ -9,6 +9,9 @@
   - [网络](#网络)
     - [NetworkMonitor 参见appcenter](#networkmonitor-参见appcenter)
   - [文件](#文件)
+  - [进程相关](#进程相关)
+  - [command line args](#command-line-args)
+  - [信号事件](#信号事件)
 ## 一 窗口属性
 ### CSS相关
 ```css
@@ -33,7 +36,7 @@ var logo_text = new Gtk.Label ("<b>Jide Os</b>") {
 };
 //logo_text.set_name("settings_restore") //无效，对控件id操作命名与name无关
 ```
-- way2. derectly use:｀logo_text.set_markup ("<span weight='bold' color='white' font_desc='16'>Jide OS</span>")｀
+- way2. derectly use:｀logo_text.set_markup ("\<span weight='bold' color='white' font_desc='16'>Jide OS\</span>")｀
 - way3. use #id: `logo_text.get_style_context ().add_provider(xx,xx)`;
 - way4. tyle class：   `logo_text.get_style_context ().add_class ("class_name")`;
 
@@ -194,7 +197,7 @@ public override void open (File[] files, string hint) {
     }  
 ```
 6. shut down
-```
+```vala
 [DBus (name = "org.freedesktop.login1.Manager")]
 public interface About.LoginInterface : Object {
     public abstract void reboot (bool interactive) throws GLib.Error;
@@ -250,7 +253,7 @@ public class About.LoginManager : Object {
 7. async function
 
 - 有返回值的，无的话直接调用begin就行。    
-```
+```vala
 async typeRet funcA(typeArg args...){
     ...
 }   
@@ -266,7 +269,7 @@ async typeRet funcA(typeArg args...){
 ```
 
 8. 连接按键不能切换页面的问题
-```
+```vala
 stack.visible_child = software_grid;//显示 1
 update_button.clicked.connect (() => {
     stack.visible_child = hbox_checking;//显示2
@@ -287,7 +290,7 @@ private async bool check_for_updates () {
 
 ```
 9. list dir
-```
+```vala
 async void list_dir () {
     var dir = File.new_for_path (Environment.get_home_dir ());
     try {
@@ -313,7 +316,7 @@ async void list_dir () {
  - get_content_area ().add (default_label); // 显示信息
  - add_button (btn, response_id);
  - response(response_id): button的回应 
-```
+```vala
 public class AppCenter.Widgets.NetworkInfoBar : Gtk.InfoBar {
     public NetworkInfoBar () {
         Object (
@@ -378,7 +381,7 @@ public static unowned T get_default () {
 `unowned SwitchboardApp app = (SwitchboardApp) GLib.Application.get_default ();`
 
 15. 延时处理
-```
+```vala
 //使用定时器
 async void delay(int usec) {
     Timeout.add (usec, ()=>{
@@ -434,3 +437,57 @@ return startup_dir;
 `GLib.FileUtils.set_contents (path, keyfile.to_data ());`
 
 - 一般文件的读写：Posix.open/read/fcntl/  监控文件的变化使用 IOChannel.unix_new(fd).add_watch
+3. GLib.Filename 获取文件basename, display_name
+4. 获取文件类型
+```vala
+    private string get_mime_type (string uri) {
+    try {
+        return ContentType.guess (Filename.from_uri (uri), null, null);
+    } catch (ConvertError e) {
+        warning ("Error converting filename '%s' while guessing mime type: %s", uri, e.message);
+        return "";
+    }
+}
+```
+5. 获取/etc/passwd信息
+```vala
+public uid_t getuid () ;
+public unowned Passwd? getpwuid (uid_t uid);
+
+public class Passwd {
+    public string pw_dir
+    public string pw_gecos
+    public gid_t pw_gid
+    public string pw_name
+    public string pw_passwd
+    public string pw_shell
+    public uid_t pw_uid 
+}
+```
+
+## 进程相关
+1. `Posix.getuid ()`
+2. 
+
+
+## command line args
+GLib.OptionContext
+
+## 信号事件
+1. 属性是可以被监听的
+  - 定义： 
+    ```vala
+    public bool clock_show_seconds { get; set; }
+    ```
+      **能被监听的属性必须是public类型, 命名时用下划线分隔**
+
+   - 属性的监听: 
+        ```vala
+        clock_settings.bind ("clock-show-seconds", this, "clock-show-seconds", SettingsBindFlags.DEFAULT);
+
+        notify["clock-show-seconds"].connect (() => {
+            add_timeout ();
+        });
+        ```
+
+       **在信号连接中属性名中的所有的下划线 "_" 都要替换成 "-"**

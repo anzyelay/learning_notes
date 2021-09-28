@@ -1,8 +1,11 @@
 - [命令](#命令)
 - [路径和名称](#路径和名称)
 - [资源文件的引入](#资源文件的引入)
-- [Config.vala 文件自动生成](#configvala-文件自动生成)
 - [翻译](#翻译)
+  - [构成目录](#构成目录)
+  - [命令](#命令-1)
+  - [i18n模块介绍](#i18n模块介绍)
+  - [工程翻译步骤](#工程翻译步骤)
 ## 命令
 1. 查看当前配置状态 (build为构建目录)
 `meson configure build`
@@ -23,6 +26,45 @@ i18n.merge_file(
 1. 源代码root路径： `meson.source_root() `
 1. 当前路径 :   `meson.current_source_dir()`
 1. 安装路径： `install_dir: join_paths('dir', 'sub', 'low')` 合成为"/dir/sub/low/"
+
+```vala
+//icon install
+install_data(
+    'wingpanel.svg',
+    rename: meson.project_name() + '.svg',
+    install_dir: join_paths(get_option('datadir'), 'icons', 'hicolor', 'scalable', 'apps')
+)
+//autostart .desktop install
+install_data(
+    'autostart.desktop',
+    rename: meson.project_name() + '.desktop',
+    install_dir: join_paths(get_option('sysconfdir'), 'xdg', 'autostart')
+)
+// .desktop install
+i18n.merge_file(
+    input: 'wingpanel.desktop.in',
+    output: meson.project_name() + '.desktop',
+    po_dir: join_paths(meson.source_root(), 'po', 'extra'),
+    type: 'desktop',
+    install: true,
+    install_dir: join_paths(get_option('datadir'), 'applications')
+)
+// appdata.xml install
+i18n.merge_file(
+    input: 'wingpanel.appdata.xml.in',
+    output: meson.project_name() + '.appdata.xml',
+    po_dir: join_paths(meson.source_root(), 'po', 'extra'),
+    type: 'xml',
+    install: true,
+    install_dir: join_paths(get_option('datadir'), 'metainfo'),
+)
+// gschema.xml install
+install_data(
+    'io.elementary.switchboard.locale.gschema.xml',
+    install_dir: join_paths(datadir, 'glib-2.0', 'schemas')
+)
+
+```
 1. 工程名： `meson.project_name()`
 
 ## 资源文件的引入
@@ -47,6 +89,31 @@ shared_module(
     'test.vala',
     plug_resources,
 )
+
+## 添加schemas
+ - 在工程schemas或data目录中添加*.gschema.xml文件
+ - 在gschema.xml同层的meson.build中加入如下内容,安装到系统指定schemas目录中
+```meson
+install_data(
+    'io.elementary.switchboard.locale.gschema.xml',
+    install_dir: join_paths(datadir, 'glib-2.0', 'schemas')
+)
+```
+ - 新建meson目录，创建编译脚本post_install.py
+```python
+#!/usr/bin/env python3
+
+import os
+import subprocess
+
+schemadir = os.path.join(os.environ['MESON_INSTALL_PREFIX'], 'share', 'glib-2.0', 'schemas')
+
+if not os.environ.get('DESTDIR'):
+    print('Compiling gsettings schemas...')
+    subprocess.call(['glib-compile-schemas', schemadir])
+
+```
+- 在主meson.build中添加`meson.add_install_script('meson/post_install.py')`,执行编译脚本,使之生效
 
 
 ```
@@ -89,68 +156,135 @@ GLib.Intl.bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
 GLib.Intl.bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 ```
 
+
 ## 翻译
-- step 1 : 在工程的./meson.build 中 import i18n
+### 构成目录
+```sh
+project
+|--meson.build
+|--data
+    |--meson.build
+    |--各种待翻译的资源文件(eg:*.appdata.xml.in,*.desktop.in)
+|--po
+    |--meson.build
+    |--POTFILES
+    |--LINGUAS
+    |--extra
+        |--meson.build
+        |--POTFILES
+        |--LINGUAS
+```
+   - POTFILES: 内容为要翻译的所有源文件路径名，换行符分隔
+   - LINGUAS:  它应该包含您要为其提供翻译的所有语言的两个字母的语言代码，换行符分隔
+   - extra下一般为不需安装的翻译,故meson.build中i18n.gettext的install字段为false
+  
+### 命令
+ - ninja \*-pot : 从POTFILES获取所有待翻译的文档，生成译文模板文档 "\*.pot"
+ - ninja \*-update-po  : 生成LINGUAS所列的所有语言的翻译文档 "\*.po"
+ - ninja \*-gmo : 编译"\*.po"成"\*.mo"
+
+    **注意，要在构建目录中运行**, 上面的“*”为传递给gettext()方法的第一个字符参数。
+###  [i18n](https://mesonbuild.com/i18n-module.html)模块介绍
+该模块提供国际化和本地化功能, 在meson中引入该模块的方法： `i18n = import('i18n')` , 前面一个i18n为对象名，可任意命名，
+提供的方法有：
+- i18n.gettext(): 设置gettext本地化，以便在工程**安装期间**构建翻译并安装翻译到合适的位置
+```sh
+i18n.gettext(
+    gettext_name, #生成的pot名称的参数, 也是传递给 *-pot/update-po/-gmo 命令的参数
+    args: '--directory=' + meson.source_root(), # 当前POTFILE中文件的相对路径(猜测,未证实)
+    preset: 'glib', # 当前只有此项
+    install: true, # 此为默认值
+    install_dir: get_option('localedir') # 此为默认值
+    languages : 'zh', # 可选项，不填则读取 LINGUAS的值
+)
+
+```
+- i18n.merge_file() : 将翻译合并到一个文本文件中并输出output
+```bash
+i18n.merge_file(
+    input: # 待翻译的文件
+    output: # 加入翻译后的输出文件名
+    po_dir: meson.source_root() / 'po', #包含po翻译文件的目录,  将input文件同时添加到当前po_dir下的POTFILES中
+    type: 'desktop', # 当前可选项只有desktop, xml(默认此值)
+    install: true, 
+    install_dir: get_option('datadir') / 'applications'
+)
+```
+
+### 工程翻译步骤
+
+- step 1 : 在工程的./meson.build 中 引入 i18n 模块
     ```sh
     # Include the translations module
     i18n = import('i18n')
-    gettext_name = meson.project_name() # 其它也行，生成模板时使用此名
-    # Set our translation domain
-    add_global_arguments('-DGETTEXT_PACKAGE="@0@"'.format (gettext_name, language:'c')
 
-    subdir('data')
+    # 设置翻译文件名称，此处取工程名，也可设置其它值，用于传递给i18n.gettext()的参数， 生成模板时使用此名(eg: ninja gettext_name-pot)
+    gettext_name = meson.project_name() 
+    # Set our translation domain, 设置使用的翻译文件名称 gettext_name.mo
+    add_global_arguments('-DGETTEXT_PACKAGE="@0@"'.format (gettext_name, language:'c')
+    # 或者 add_project_arguments( '-DGETTEXT_PACKAGE="@0@"'.format(gettext_name), language:'c')
+
+    # 具体翻译子工程在data,po中
+    subdir('data') 
+    subdir('po')
+    ```
+    也可在vala代码中设置使用翻译文件
+    ```vala
+    GLib.Intl.bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
+    GLib.Intl.bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8")
     ```
 
-- step 2 : 在./data/meson.build 中 merge_file desktop和appdata文件
+- step 2 : 在./data/meson.build 中 merge_file .desktop和appdata.xml文件
     
-    merge_file 翻译和安装，可替代install_data
+    merge_file方法翻译和安装，可替代install_data
     ```sh
     #Translate and install our .desktop file
     i18n.merge_file(
         input: 'data' / 'hello-again.desktop.in',
         output: meson.project_name() + '.desktop',
-        po_dir: meson.source_root() / 'po',
+        po_dir: meson.source_root() / 'po', # hello-again.desktop.in添加到此目录下的POTFILES
         type: 'desktop',
         install: true,
         install_dir: get_option('datadir') / 'applications'
     )
-
     #Translate and install our .appdata file
     i18n.merge_file(
         input: 'data' / 'hello-again.appdata.xml.in',
-        output: meson.project_name() + '.appdata.xml',
-        po_dir: meson.source_root() / 'po',
+        output: meson.project_name() + '.appdata.xml', 
+        po_dir: meson.source_root() / 'po', # hello-again.appdata.xml.in添加到此目录下的POTFILES
         install: true,
         install_dir: get_option('datadir') / 'metainfo'
     )
 
     ```
     **.appdata.xml 文件中要指定使用的翻译文件名需与gettext_name一致** 
-
-- step 3 :  在工程root目录下创建po,并引入po下的meson.build
-
-    ```sh
-    subdir('po')
+    ```xml
+    <translation type="gettext">gettext_name</translation>
     ```
-    ./po/meson.build
+
+- step 3 :  在工程root目录下创建po,po下的meson.build如下
     ```sh
-    i18n.gettext(gettext_name,
-        args: '--directory=' + meson.source_root(),
+    i18n.gettext(gettext_name, #生成的pot名称
+        args: '--directory=' + meson.source_root(), 
         preset: 'glib'
     )
     ```
+
 - step 4 : 完善目录po下的文件
    -  创建 POTFILES ： 包含要翻译的所有文件
    -  创建 LINGUAS  ： 它应该包含您要为其提供翻译的所有语言的两个字母的语言代码
-   -  返回构建目录并运行命令行生成翻译模板：
+   -  返回构建目录并运行命令行生成翻译模板, 运行后会在po下产生一个包含所有待翻译字符串的文档
         ```
-        ninja translate-file-pot
+        ninja gettext_name-pot
         ``` 
-        运行后会在po下产生一个包含所有待翻译字符串的文档
 
    - 在构建目录中运行命令生成LINGUAS所列的所有语言的翻译文档
         ```sh
-        ninja translate-file-update-po
+        ninja gettext_name-update-po
         ```
+        gettext_name替换为具体翻译文件名称
 
-- step 5 : 每次更新改变待翻译字串后都需要在构建目录下运行`ninja *-pot` 和 `ninja *-update-po`两条指令
+- step 5 : 每次源代码中更新改变待翻译字串后都需要在构建目录下运行`ninja *-pot` 和 `ninja *-update-po`两条指令
+
+
+
