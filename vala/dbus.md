@@ -1,11 +1,99 @@
-- [dbus 信号的监听](#dbus-信号的监听)
-- [dbus 方法的引用](#dbus-方法的引用)
-- [dbus 属性的监听](#dbus-属性的监听)
-- [直接使用](#直接使用)
+- [前提概要](#前提概要)
+  - [vala中的概念](#vala中的概念)
+  - [Type Table](#type-table)
+- [client](#client)
+  - [编写 Vala D-Bus 接口的规则](#编写-vala-d-bus-接口的规则)
+  - [dbus 信号的监听](#dbus-信号的监听)
+  - [dbus 方法的引用](#dbus-方法的引用)
+  - [dbus 属性的监听](#dbus-属性的监听)
+  - [直接使用](#直接使用)
+- [server](#server)
+  - [编写规则和步骤](#编写规则和步骤)
+- [参考](#参考)
+# 前提概要
+## vala中的概念
+用D-Feet工具查看的对应结构如下：
+```
+Address:
+Name: bus name
+Unique name:
+|--Match rules
+|--Statistics
+|--Object path1
+|   |--Interfaces
+|       |--interface name1
+|       |   |--Methods
+|       |   |   |--method name1
+|       |   |   |--method name2
+|       |   |   |--..
+|       |   |   |--method nameN
+|       |   |--Signals
+|       |   |   |--[signal name1]
+|       |   |   |--signal name2
+|       |   |   |--..
+|       |   |   |--signal nameN
+|       |   |--Properties
+|       |   |   |--[property name1]
+|       |   |   |--property name2
+|       |   |   |--...
+|       |   |   |--property nameN
+|       |--interface name2
+|       |--...
+|       |--inteface nameN
+|--Object path2
+|--...
+|--Object pathN
+
+```
+- Bus名： Bus Name (点分隔， eg: org.freedesktop.login1 )
+- 对象路径：Object Path (反斜杠分隔， eg: /org/freedesktop/login1 )
+- 接口名：interface name （点分隔，eg: org.freedesktop.login1.Manager ）
+- 方法名：method name (eg: LockSession (String arg_0) ↦ (), 箭头后面的括号表示返回值和返回类型,前面的括号表示参数类型)
+
+在D-Feet中也可双点方法名在弹出窗口查看上述值, 双击属性得到当前值， 以上四个未说明均是大小写敏感
+## Type Table
+
+|D-Bus | Vala | Description | Example |
+|:-:|:-:|:-:|-|
+b | bool | Boolean |
+y|uint8 |	Byte |
+i | int | Integer |
+u | uint | Unsigned Integer |
+n | int16 | 16-bit Integer |
+q | uint16 | Unsigned 16-bit Integer |
+x| int64| 64-bit Integer |
+t| uint64| Unsigned 64-bit Integer |
+d| double| Double|
+s| string| String|
+v| GLib.Variant| Variant|
+o| GLib.ObjectPath| Object Path|
+a| []| Array| ai maps to int[]
+a{}| GLib.HashTable<,>| Dictionary| a{sv} maps to HashTable<string, Variant>
+()| a struct type| Struct| a(ii) maps to Foo[] where Foo might be defined as struct Foo { public int a; public int b }; A struct representing a(tsav) might look like struct Bar { public uint64 a; public string b; public Variant[] c;} |
+
+*注：vala中定义struct type后，在使用时不要再加struct修饰符* eg:
+```vala
+struct DemoStruct {
+    string a;
+    int b;
+    bool c;
+}
+
+DemoStruct object;
+```
+
+# client
+## 编写 Vala D-Bus 接口的规则
+- 用 [DBus (name = "...")] 注释接口， name 为 interface name
+- 将 DBusCamelCaseNames 转换为 vala_lower_case_names ，（注意连续的大写字母，eg: GetCurrentIM--> get_current_i_m）
+- 方法如果要取别名，须在方法上用 [DBus (name = "...")] 注释原DBus中的方法名，（eg: name = "GetCurrentIM"）
+- 为每个接口方法添加 throws GLib.Error 或 throws GLib.DBusError, GLib.IOError,信号属性则不用
+- 方法，属性，信号必须是public
+
 ## dbus 信号的监听
 - 申明
     ```vala
-    [DBus (name = "org.freedesktop.login1.Manager")]
+    [DBus (name = "org.freedesktop.login1.Manager")] //interface name
     interface Manager : Object {
         public signal void prepare_for_sleep (bool sleeping);
     }
@@ -29,8 +117,9 @@
 ## dbus 方法的引用
 - 申明
   ```vala
-    [DBus (name = "org.freedesktop.Accounts")]
+    [DBus (name = "org.freedesktop.Accounts")] // interface name
     interface FDO.Accounts : Object {
+        [DBus (name = "FindUserByName")] // Method name ,可要可不要，当需要取别名时必须要
         public abstract string find_user_by_name (string username) throws GLib.Error;
     }
   ```
@@ -83,3 +172,42 @@ private void on_unwatch (DBusConnection conn) {
 // Listen for the D-BUS server that controls time settings
 Bus.watch_name (BusType.SYSTEM, "org.freedesktop.timedate1", BusNameWatcherFlags.NONE, on_watch, on_unwatch);
 ```
+# server
+## 编写规则和步骤
+1. 定义一个dbus服务类
+  - 在类名前加上[DBus (name = "...")] 注明接口名，由于历史遗留原因沿用name
+  - 只有修饰为public的属性，信号，方法可导出dbus接口
+  - 方法中的GLib.BusName sender形参可在此方法中获取dbus发送者的信息，但在dbus导出接口中不可见
+2. 注册一个服务实例，并启动main loop
+  
+```vala
+void on_bus_aquired (DBusConnection conn) {
+    try {
+        // start service and register it as dbus object
+        var service = new DemoService();
+        conn.register_object ("/org/example/demo", service);
+    } catch (IOError e) {
+        stderr.printf ("Could not register service: %s\n", e.message);
+    }
+}
+
+void main () {
+    // try to register service name in session bus
+    Bus.own_name (BusType.SESSION, "org.example.DemoService", /* name to register */
+                  BusNameOwnerFlags.NONE, /* flags */
+                  on_bus_aquired, /* callback function on registration succeeded */
+                  () => {}, /* callback on name register succeeded */
+                  () => stderr.printf ("Could not acquire name\n"));
+                                                     /* callback on name lost */
+
+    // start main loop
+    new MainLoop ().run ();
+}
+```
+
+
+# 参考
+1. [Waiting for a DBus service to become available (outdated example)](https://wiki.gnome.org/Projects/Vala/DBusClientSamples/Waiting)
+2. [Vala D-Bus Client Examples](https://wiki.gnome.org/Projects/Vala/DBusClientSamples#Waiting_for_a_service_to_become_available_.28outdated_example.29)
+3. [DBusServerSample](https://wiki.gnome.org/Projects/Vala/DBusServerSample)
+4. [D-Bus_Integration](https://wiki.gnome.org/Projects/Vala/Tutorial#D-Bus_Integration)
