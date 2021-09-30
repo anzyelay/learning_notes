@@ -1,4 +1,35 @@
+# 语法
+## 类型定义
+- vala中的enum, struct申明和c/c++相同，但没有typedef一说，使用时无需加enum,struct修饰符
+  ```vala
+    public struct LoginDisplay {
+        string session;
+        GLib.ObjectPath objectpath;
+    }
+
+    [DBus (name = "org.freedesktop.login1.User")]
+    interface LoginUserManager : Object {
+        public abstract LoginDisplay? display { owned get; }
+    }
+
+    [CCode (type_signature = "u")]
+    enum PresenceStatus {
+        AVAILABLE = 0,
+        INVISIBLE = 1,
+        BUSY = 2,
+        IDLE = 3
+    }
+
+    [DBus (name = "org.gnome.SessionManager.Presence")]
+    interface SessionPresence : Object {
+        public abstract PresenceStatus status { get; }
+        public signal void status_changed (PresenceStatus new_status);
+    }
+  ```
+
 # Gtk 
+- [语法](#语法)
+  - [类型定义](#类型定义)
 - [Gtk](#gtk)
   - [一 窗口属性](#一-窗口属性)
     - [CSS相关](#css相关)
@@ -462,6 +493,18 @@ public class Passwd {
     public string pw_passwd
     public string pw_shell
     public uid_t pw_uid 
+}
+```
+6. file monitor
+```vala
+var file = File.new_for_path (filename);
+try {
+    var monitor = file.monitor (FileMonitorFlags.NONE, null);
+    monitor.changed.connect (() => {
+        file_changed (filename);
+    });
+} catch (Error e) {
+    warning ("Failed to monitor %s: %s", filename, e.message);
 }
 ```
 

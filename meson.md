@@ -9,18 +9,7 @@
 ## 命令
 1. 查看当前配置状态 (build为构建目录)
 `meson configure build`
-
-2. 译文安装
-```sh 
-i18n.merge_file(
-    input: 'sound.appdata.xml.in',
-    output: 'com.patapua.settingboard.sound.appdata.xml',
-    po_dir: join_paths(meson.source_root(), 'po', 'extra'),
-    type: 'xml',
-    install: true,
-    install_dir: join_paths(datadir, 'metainfo'),
-)
-```
+2. 添加lib `dependency('libcanberra')`
 
 ## 路径和名称
 1. 源代码root路径： `meson.source_root() `
