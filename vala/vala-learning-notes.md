@@ -1,3 +1,18 @@
+- [语法](#语法)
+  - [类型定义](#类型定义)
+- [Gtk](#gtk)
+  - [一 窗口属性](#一-窗口属性)
+    - [CSS相关](#css相关)
+    - [其它](#其它)
+  - [二 对象](#二-对象)
+  - [调试](#调试)
+    - [运行时使能调试输出](#运行时使能调试输出)
+  - [网络](#网络)
+    - [NetworkMonitor 参见appcenter](#networkmonitor-参见appcenter)
+  - [文件](#文件)
+  - [进程相关](#进程相关)
+  - [command line args](#command-line-args)
+  - [信号事件](#信号事件)
 # 语法
 ## 类型定义
 - vala中的enum, struct申明和c/c++相同，但没有typedef一说，使用时无需加enum,struct修饰符
@@ -28,21 +43,6 @@
   ```
 
 # Gtk 
-- [语法](#语法)
-  - [类型定义](#类型定义)
-- [Gtk](#gtk)
-  - [一 窗口属性](#一-窗口属性)
-    - [CSS相关](#css相关)
-    - [其它](#其它)
-  - [二 对象](#二-对象)
-  - [调试](#调试)
-    - [运行时使能调试输出](#运行时使能调试输出)
-  - [网络](#网络)
-    - [NetworkMonitor 参见appcenter](#networkmonitor-参见appcenter)
-  - [文件](#文件)
-  - [进程相关](#进程相关)
-  - [command line args](#command-line-args)
-  - [信号事件](#信号事件)
 ## 一 窗口属性
 ### CSS相关
 ```css
@@ -437,6 +437,7 @@ async void delay(int usec) {
 ## 调试
 ### 运行时使能调试输出
 `G_MESSAGES_DEBUG=all io.elementary.appcenter`
+
 `GLib.Environment.get_variable ("G_MESSAGES_DEBUG");`
 
 ## 网络
@@ -506,6 +507,13 @@ try {
 } catch (Error e) {
     warning ("Failed to monitor %s: %s", filename, e.message);
 }
+```
+7. 文件前后缀名判断
+```vala
+string filename;
+filename.has_suffix (".xml")
+filename.has_prefix ("file://")
+
 ```
 
 ## 进程相关

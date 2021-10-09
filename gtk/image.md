@@ -20,3 +20,16 @@ try {
     warning (e.message);
 }
 ```
+
+## Actor设置图形
+```vala
+  Gdk.Pixbuf pixbuf = Gala.Utils.get_icon_for_window (window, icon_size, scale);
+  try {
+      var image = new Clutter.Image ();
+      Cogl.PixelFormat pixel_format = (pixbuf.get_has_alpha () ? Cogl.PixelFormat.RGBA_8888 : Cogl.PixelFormat.RGB_888);
+      image.set_data (pixbuf.get_pixels (), pixel_format, pixbuf.width, pixbuf.height, pixbuf.rowstride);
+      Clutter.Actor actor = new Clutter.Actor()
+      actor.set_content (image);
+      actor.set_size(pixbuf.width, pixbuf.height);
+  } catch (Error e) {
+```
