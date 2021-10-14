@@ -1,6 +1,8 @@
 - [命令](#命令)
 - [路径和名称](#路径和名称)
 - [资源文件的引入](#资源文件的引入)
+- [添加schemas](#添加schemas)
+- [Config.vala 文件自动生成](#configvala-文件自动生成)
 - [翻译](#翻译)
   - [构成目录](#构成目录)
   - [命令](#命令-1)
@@ -78,6 +80,7 @@ shared_module(
     'test.vala',
     plug_resources,
 )
+```
 
 ## 添加schemas
  - 在工程schemas或data目录中添加*.gschema.xml文件
@@ -105,9 +108,8 @@ if not os.environ.get('DESTDIR'):
 - 在主meson.build中添加`meson.add_install_script('meson/post_install.py')`,执行编译脚本,使之生效
 
 
-```
-
 ## Config.vala 文件自动生成
+
 - 在目录“src”下创建“Config.vala.in”文件 , 内容如下：
 ```vala
 public const string GETTEXT_PACKAGE = @GETTEXT_PACKAGE@;
@@ -119,6 +121,7 @@ public const string LOCALEDIR = @LOCALEDIR@;
 config_data = configuration_data()
 config_data.set_quoted('LOCALEDIR', join_paths(get_option('prefix'), get_option('localedir')))
 config_data.set_quoted('GETTEXT_PACKAGE', meson.project_name() + '-plug')
+# config_data.set('GETTEXT_PACKAGE', meson.project_name() + '-plug') 此方法在vala中需要加上“”号，如 ”@LOCALEDIR@“
 
 # step 2: 引入模式文件
 config_file = configure_file(
@@ -217,11 +220,13 @@ i18n.merge_file(
     subdir('data') 
     subdir('po')
     ```
-    也可在vala代码中设置使用翻译文件
+
+    也可在vala代码中设置使用翻译文件, 宏的引入参考[Config.vala 文件自动生成](#configvala-文件自动生成)
     ```vala
     GLib.Intl.bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
     GLib.Intl.bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8")
     ```
+
 
 - step 2 : 在./data/meson.build 中 merge_file .desktop和appdata.xml文件
     
