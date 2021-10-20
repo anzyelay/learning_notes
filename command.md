@@ -10,7 +10,7 @@
 grep "patapus" . -rl --exclude=*{po,pot} | xargs sed -i "s/patapus/patapua/g"
 ```
 
-4. vi 替换
+5. vi 替换
 ```bash
 :%s/search/repl/flags
 ``` 
@@ -22,4 +22,8 @@ flags:
   - y:replace
   - n:skip
 - i: ignore case
-- 
+
+6. grep 多词搜索
+```sh
+grep -E "elementary|switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot}
+```

@@ -13,6 +13,7 @@
   - [进程相关](#进程相关)
   - [command line args](#command-line-args)
   - [信号事件](#信号事件)
+  - [apt 安装(参考语言插件中的aptd-client.vala)](#apt-安装参考语言插件中的aptd-clientvala)
 # 语法
 ## 类型定义
 - vala中的enum, struct申明和c/c++相同，但没有typedef一说，使用时无需加enum,struct修饰符
@@ -175,33 +176,7 @@ public override void open (File[] files, string hint) {
             
             ```
             
-            
         
-4. GLib.Subprocess执行system命令行
-```vala
-    private async string get_partition_name () {
-        string df_stdout;
-        string partition = "";
-        try {
-            var subprocess = new GLib.Subprocess (GLib.SubprocessFlags.STDOUT_PIPE, "df", "/");
-            yield subprocess.communicate_utf8_async (null, null, out df_stdout, null);
-            string[] output = df_stdout.split ("\n");
-            foreach (string line in output) {
-                if (line.has_prefix ("/dev/")) {
-                    int idx = line.index_of (" ");
-                    if (idx != -1) {
-                        partition = line.substring (0, idx);
-                        return partition;
-                    }
-                }
-            }
-        } catch (Error e) {
-            warning (e.message);
-        }
-
-        return partition;
-    }  
-```
 5. download_file
 ```
     private async string? download_file (Fwupd.Device device, string uri) {
@@ -518,7 +493,51 @@ filename.has_prefix ("file://")
 
 ## 进程相关
 1. `Posix.getuid ()`
-2. 
+2. 执行进程
+   ```vala
+   private const string LANGUAGE_CHECKER = "/usr/bin/check-language-support"
+    private string[]? get_remaining_packages_for_language (string langcode) {
+        string output;
+        int status;
+        try {
+            Process.spawn_sync (null,
+                {LANGUAGE_CHECKER, "-l", langcode.substring (0, 2) , null},
+                Environ.get (), SpawnFlags.SEARCH_PATH, null,
+                out output,
+                null,
+                out status);
+        } catch (Error e) {
+            warning ("Could not get remaining language packages for %s", langcode);
+        }
+
+        return output.strip ().split (" ");
+    }
+   ```
+3. GLib.Subprocess执行system命令行
+    ```vala
+    private async string get_partition_name () {
+        string df_stdout;
+        string partition = "";
+        try {
+            var subprocess = new GLib.Subprocess (GLib.SubprocessFlags.STDOUT_PIPE, "df", "/");
+            yield subprocess.communicate_utf8_async (null, null, out df_stdout, null);
+            string[] output = df_stdout.split ("\n");
+            foreach (string line in output) {
+                if (line.has_prefix ("/dev/")) {
+                    int idx = line.index_of (" ");
+                    if (idx != -1) {
+                        partition = line.substring (0, idx);
+                        return partition;
+                    }
+                }
+            }
+        } catch (Error e) {
+            warning (e.message);
+        }
+
+        return partition;
+    }  
+    ```
 
 
 ## command line args
@@ -542,3 +561,119 @@ GLib.OptionContext
         ```
 
        **在信号连接中属性名中的所有的下划线 "_" 都要替换成 "-"**
+
+## apt 安装(参考语言插件中的aptd-client.vala)
+```vala
+const string APTD_DBUS_NAME = "org.debian.apt";
+const string APTD_DBUS_PATH = "/org/debian/apt";
+
+/**
+* Expose a subset of org.debian.apt interfaces -- only what's needed by applications lens.
+*/
+[DBus (name = "org.debian.apt")]
+public interface AptdService : GLib.Object {
+    public abstract async string install_packages (string[] packages) throws GLib.Error;
+    public abstract async string remove_packages (string[] packages) throws GLib.Error;
+    public abstract async void quit () throws GLib.Error;
+}
+
+[DBus (name = "org.debian.apt.transaction")]
+public interface AptdTransactionService : GLib.Object {
+    public abstract void run () throws GLib.Error;
+    public abstract void simulate () throws GLib.Error;
+    public abstract void cancel () throws GLib.Error;
+    public signal void finished (string exit_state);
+    public signal void property_changed (string property, Variant val);
+}
+
+public class AptdProxy : GLib.Object {
+    private AptdService _aptd_service;
+
+    public void connect_to_aptd () throws GLib.Error {
+        _aptd_service = Bus.get_proxy_sync (BusType.SYSTEM, APTD_DBUS_NAME, APTD_DBUS_PATH);
+    }
+
+    public async string install_packages (string[] packages) throws GLib.Error {
+        string res = yield _aptd_service.install_packages (packages);
+        return res;
+    }
+
+    public async string remove_packages (string[] packages) throws GLib.Error {
+        string res = yield _aptd_service.remove_packages (packages);
+        return res;
+    }
+
+    public async void quit () throws GLib.Error {
+        yield _aptd_service.quit ();
+    }
+}
+
+public class AptdTransactionProxy : GLib.Object {
+    public signal void finished (string transaction_id);
+    public signal void property_changed (string property, Variant variant);
+
+    private AptdTransactionService _aptd_service;
+
+    public void connect_to_aptd (string transaction_id) throws GLib.Error {
+        _aptd_service = Bus.get_proxy_sync (BusType.SYSTEM, APTD_DBUS_NAME, transaction_id);
+        _aptd_service.finished.connect ((exit_state) => {
+            debug ("aptd transaction finished: %s\n", exit_state);
+            finished (transaction_id);
+        });
+        _aptd_service.property_changed.connect ((prop, variant) => {
+            property_changed (prop, variant);
+        });
+    }
+
+    public void simulate () throws GLib.Error {
+        _aptd_service.simulate ();
+    }
+
+    public void run () throws GLib.Error {
+        _aptd_service.run ();
+    }
+
+    public void cancel () throws GLib.Error {
+        _aptd_service.cancel ();
+    }
+}
+
+// use like this
+    aptd = new AptdProxy ();
+    try {
+        aptd.connect_to_aptd ();
+    } catch (Error e) {
+        warning ("Could not connect to APT daemon");
+    }
+
+    aptd.install_packages.begin (packages, (obj, res) => {
+        try {
+            var transaction_id = aptd.install_packages.end (res);
+
+            proxy = new AptdTransactionProxy ();
+            proxy.finished.connect (() => {
+                // 下载完成
+            });
+            proxy.property_changed.connect ((prop, val) => {
+                if (prop == "Progress") {
+                    //下载进度 progress_changed ((int) val.get_int32 ());
+                }
+                if (prop == "Cancellable") {
+                    //取消下载 install_cancellable = val.get_boolean ();
+                }
+            });
+
+            try {
+                proxy.connect_to_aptd (transaction_id);
+                proxy.simulate ();
+                proxy.run ();
+            } catch (Error e) {
+                warning ("Could no run transaction: %s", e.message);
+            }
+
+        } catch (Error e) {
+            warning ("Could not queue downloads: %s", e.message);
+        }
+    });
+
+```

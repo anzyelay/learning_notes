@@ -1,0 +1,130 @@
+#!/bin/bash
+profile_build(){
+	export PREFIX=/mnt/eos1/usr
+	export PKG_CONFIG_PATH=/mnt/eos1/usr/lib/x86_64-linux-gnu/pkgconfig 
+	export CMAKE_PREFIX_PATH=/mnt/eos1/usr
+}
+profile_usr(){
+	export LD_LIBRARY_PATH=/mnt/eos1/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
+	export XDG_DATA_DIRS=/mnt/eos1/usr/share:$XDG_DATA_DIRS
+	export LANGUAGE=zh_CN
+	export GDM_LANG=zh_CN
+	export LANG=zh_CN.UTF-8
+	export PATH=/mnt/eos1/usr/bin:$PATH
+}
+#---------- innner function --------------
+build_install(){
+	if [ ! -e build ]; then
+		[ ! -e meson.build ] && return 1 # not meson project
+		mkdir build
+		. profile_build
+		meson build --prefix=$PREFIX --cmake-prefix-path=$CMAKE_PREFIX_PATH --pkg-config-path=$PKG_CONFIG_PATH
+	fi
+	ninja -C build -j4  > ./.tmp.log
+	if [ $? -eq 1 ];then
+		echo "ninja failure" 
+		return 1
+	fi
+	local ret=$(grep "ninja: no work to do" ./.tmp.log | grep -v grep )
+	rm ./.tmp.log
+	if [ "_$ret" = "_" ];then 
+		ninja -C build install >> /dev/null
+	fi
+	return 0
+
+}
+#func help	:show help information
+help(){
+	echo -e "========help======\tuse cmd like this --> `basename $0` func"
+	grep ^#func $0 | grep -v grep  
+	echo "========end======="
+}
+# -----------  extern function bellow --------------
+#extern function prefix is extern_
+#you can use ln -s $0 pre_func to call a extern_func()
+#func set	:run settingboard
+extern_set(){
+	build_install || return 1
+	. profile_usr
+	com.patapua.settingboard
+}
+#func win	:run wingpanel
+extern_win(){
+	build_install || return 1
+	. profile_usr
+	io.elementary.wingpanel
+}
+#func dtar	: tar  a deb package and remove the tared files
+extern_dtar(){
+	if [ "_$1" = "_" ];then
+		pkgname="tmp"
+	else
+		pkgname=$1
+	fi
+
+	tar cvf $pkgname.tar *.ddeb \
+		*.buildinfo \
+		*.changes \
+		*.deb \
+		*.tar.xz \
+		*.dsc 
+	[ $? -ne 0 ] && return 1
+
+	tar tf $pkgname.tar  | xargs rm 
+}
+#func dbuild	: build deb package
+extern_dbuild(){
+	[ -d debian ] || return 1
+	dpkg-buildpackage -rfakeroot -tc --no-sign
+}
+#func rename	: rename project for patapua
+extern_rename(){
+	grep "io\.elementary\.switchboard" . -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/io\.elementary\.switchboard/com.patapua.settingboard/"
+	grep "io\/elementary\/switchboard" . -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/io\/elementary\/switchboard/com\/patapua\/settingboard/"
+	grep "io.elementary.switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot} 
+	for file in `find . -name io.elementary.switchboard* `;do
+		newfile=${file/io.elementary.switchboard/com.patapua.settingboard}
+		#echo "$file --> $newfile"
+		mv $file $newfile
+	done
+	for file in `find . -name io.elementary.switchboard* `;do
+		newfile=${file/io.elementary.switchboard/com.patapua.settingboard}
+		#echo "$file --> $newfile"
+		mv $file $newfile
+	done
+	echo "-----------end--------checking as follow cmd-------"
+	echo "find . -name io.elementary.switchboard*"
+	echo 'grep -E "switchboard|elementary" . -rni --exclude-dir={build,.git,.github} --exclude=*.{po,pot}'
+
+}
+
+APP=""
+
+case $# in
+	0)
+		APP=$(basename $0)
+		APP=extern_${APP#*_} # replace prefix_ with extern_
+		;;
+	1)
+		APP=extern_$1
+		shift 1
+		;;
+	*)
+		APP=extern_$1
+		shift 1
+		;;
+esac
+
+APP=$(grep ^$APP.*"(){$" $0 | grep -v grep)
+if [ $? -eq 0 ];then
+	APP=${APP%%()*} # remove longest suffix 
+	echo willing to run $APP
+	$APP $@
+else
+	help
+fi
+
+exit 0
+
+
+

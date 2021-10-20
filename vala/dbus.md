@@ -9,6 +9,7 @@
   - [直接使用](#直接使用)
 - [server](#server)
   - [编写规则和步骤](#编写规则和步骤)
+  - [查找一个dbus服务所在](#查找一个dbus服务所在)
 - [参考](#参考)
 # 前提概要
 ## vala中的概念
@@ -205,6 +206,10 @@ void main () {
 }
 ```
 
+## 查找一个dbus服务所在
+1. 用D-Feet工具搜索到相应的dbus服务，查看进程pid
+2. 查看该进程的执行文件
+3. 找出源码包：`dpkg -S  执行文件`
 
 # 参考
 1. [Waiting for a DBus service to become available (outdated example)](https://wiki.gnome.org/Projects/Vala/DBusClientSamples/Waiting)

@@ -1,12 +1,91 @@
+- [参考](#参考)
+- [环境变量](#环境变量)
 - [打包命令](#打包命令)
+  - [1. 生成debian目录](#1-生成debian目录)
+  - [2. 修改changelog文件](#2-修改changelog文件)
+  - [3. 修改control文件](#3-修改control文件)
+  - [4. 打包文件](#4-打包文件)
 - [help](#help)
 - [关于deb包的常用命令](#关于deb包的常用命令)
 - [dpkg-buildpackage error信息](#dpkg-buildpackage-error信息)
+## 参考
+- [第 4 章 debian 目录中的必需内容](https://www.debian.org/doc/manuals/maint-guide/dreq.zh-cn.html)
+
+## 环境变量
+- 设置 dh_make的邮箱，名称
+    ```sh
+    $ cat >>~/.bashrc <<EOF
+    DEBEMAIL="your.email.address@example.org"
+    DEBFULLNAME="Firstname Lastname"
+    export DEBEMAIL DEBFULLNAME
+    EOF
+    $ . ~/.bashrc
+    ```
 ## 打包命令
+### 1. 生成debian目录 
 ```sh
 dh_make  --copyright gpl3 --email leixa@jideos.com --createorig -s
-dpkg-buildpackage -rfakeroot -tc --no-sign
+dh_make  --copyright gpl3 --email leixa@jideos.com --createorig -l
 ```
+> s:代表单一二进制包， i:代表独立于体系结构的软件包， m:代表多个二进制包， l:代表共享库文件包，k:代表内核模块包， n:代表内核补丁包， b:代表 cdbs 软件包
+### 2. 修改changelog文件
+```sh
+debchange  # 添加说明，修改版本号
+```
+### 3. 修改control文件
+1. 查找依赖添加到Build-Depends中
+   - 自动(有configure文件)
+        ```sh
+        $ dpkg-depcheck -d ./configure
+        ```
+   - 手工
+     - 查看依赖 ： `objdump -p /usr/bin/foo | grep NEEDED`
+     - 依据库名找包名 ： `dpkg -S libfoo.so`
+     - 将找出的包名的-dev版本放入Build-Depends中
+2. 修改软件包关系
+   - keywords:
+      - Pre-Depends:
+      此项中的依赖强于 Depends 项。软件包仅在预依赖的软件包已经安装并且 正确配置 后才可以正常安装。在使用此项时应 非常慎重，仅当在 debian-devel@lists.debian.org 邮件列表讨论后才能使用。记住：根本就不要用这项。 :-)
+
+      - Depends: 
+      此软件包仅当它依赖的软件包均已安装后才可以安装。此处请写明你的程序所必须的软件包，如果没有要求的软件包该软件便不能正常运行（或严重抛锚）的话。 一般添加"${shlibs:Depends}, ${misc:Depends}"即可
+
+      - Recommends:
+      这项中的软件包不是严格意义上必须安装才可以保证程序运行。当用户安装软件包时，所有前端工具都会询问是否要安装这些推荐的软件包。aptitude 和 apt-get 会在安装你的软件包的时候**自动安装推荐**的软件包(用户可以禁用这个默认行为)。dpkg 则会忽略此项。
+
+      - Suggests:
+      此项中的软件包可以和本程序更好地协同工作，但不是必须的。当用户安装程序时，所有的前端程序可能不会询问是否安装建议的软件包。aptitude 可以被配置为安装软件时自动安装建议的软件包，但这不是默认。dpkg 和 apt-get 将忽略此项。
+
+      - Conflicts:
+      仅当所有冲突的软件包都已经删除后此软件包才可以安装。当程序在某些特定软件包存在的情况下根本无法运行或存在严重问题时使用此项。
+
+      - Replaces:
+      当你的程序要替换其他软件包的某些文件，或是完全地替换另一个软件包(与 Conflicts 一起使用)。列出的软件包中的某些文件会被你软件包中的文件所覆盖。
+
+      - Breaks:
+      此软件包安装后列出的软件包将会受到损坏。通常 Breaks 要附带一个“版本号小于多少”的说明。这样，软件包管理工具将会选择升级被损坏的特定版本的软件包作为解决方案。
+
+      - Provides:
+      某些类型的软件包会定义有多个备用的虚拟名称。你可以在 virtual-package-names-list.txt.gz文件中找到完整的列表。如果你的程序提供了某个已存在的虚拟软件包的功能则使用此项。
+
+    - 包版本限定：<<、<=、=、>= 和 >>，分别代表严格小于、小于或等于、严格等于、大于或等于以及严格大于,eg如下
+        ```sh
+        Depends: foo (>= 1.2), libbar1 (= 1.3.4)
+        Conflicts: baz
+        Recommends: libbaz4 (>> 4.0.7)
+        Suggests: quux
+        Replaces: quux (<< 5), quux-foo (<= 7.6)
+        ```
+
+
+
+
+
+
+### 4. 打包文件
+- 打包 ：  `dpkg-buildpackage -rfakeroot -tc --no-sign`
+
+
 ## help
 ```
 man deb-control
