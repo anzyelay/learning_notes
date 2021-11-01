@@ -207,6 +207,9 @@ void main () {
 ```
 
 ## 查找一个dbus服务所在
+### 找服务脚本
+/usr/share/dbus-1/services/
+### 找服务进程
 1. 用D-Feet工具搜索到相应的dbus服务，查看进程pid
 2. 查看该进程的执行文件
 3. 找出源码包：`dpkg -S  执行文件`

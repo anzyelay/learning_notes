@@ -1,7 +1,9 @@
 - [语法](#语法)
   - [类型定义](#类型定义)
+  - [属性的定义](#属性的定义)
 - [Gtk](#gtk)
   - [一 窗口属性](#一-窗口属性)
+    - [label & Granite.Widget.AlerView](#label--granitewidgetalerview)
     - [CSS相关](#css相关)
     - [其它](#其它)
   - [二 对象](#二-对象)
@@ -42,13 +44,28 @@
         public signal void status_changed (PresenceStatus new_status);
     }
   ```
+## 属性的定义
+- set,get
+    ```vala
+    public string description {
+        get {
+            return description;
+        }
+        set {
+            description = value; // value是关键字，代表传进来的设置值，可以先判断是否为空
+        }
+    }
+    ```
 
 # Gtk 
 ## 一 窗口属性
+### label & Granite.Widget.AlerView
+    在AlerView中的title和description的label如果不设置width_request，即使wrap=true了，高度依然会非常高。
+
 ### CSS相关
 ```css
 .class_name{ 
-    color:red; 
+    color:red;
 }
 button#settings_restore {
    color:red; 
@@ -107,6 +124,22 @@ image {
   animation-iteration-count: infinite;
 }
 ```
+6. css中变量的定义和引用
+   ```CSS
+    # 变量名定义
+    @define-color COLOR_NAME color_value
+    .class_name{ 
+        color: @COLOR_NAME;
+    }
+
+   ```
+   ```vala
+            var provider = new Gtk.CssProvider ();
+            var colored_css = "@define-color COLOR_NAME red";
+            provider.load_from_data (colored_css, colored_css.length);
+            context.add_provider (provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            context.add_class ("class_name");
+   ```
 
 ### 其它
 1. pass_through：输入事件可否过滤到下层窗口

@@ -12,6 +12,8 @@ context_menu.show_all ();
 // 3. popup somewhere
 context_menu.popup_at_pointer (null);
 ```
+
+
 ## comboxbox 
 ### model-view-read/write
 ```vala
@@ -42,4 +44,31 @@ context_menu.popup_at_pointer (null);
     format_store.get (iter, 1, out format);
     printf(format);
 
+```
+- 多层级显示
+```vala
+    Gtk.TreeIter iter;
+    Gtk.TreeIter parent_iter;
+    resolution_tree_store.append (out parent_iter, null);
+    resolution_tree_store.set (parent_iter, ResolutionColumns.NAME, _("Other…"),
+        ResolutionColumns.WIDTH, -1,
+        ResolutionColumns.HEIGHT, -1
+    );
+
+    foreach (var resolution in other_resolutions) {
+        resolution_tree_store.append (out iter, parent_iter);
+        resolution_tree_store.set (iter,
+            ResolutionColumns.NAME, Display.MonitorMode.get_resolution_string (resolution.width, resolution.height, true),
+            ResolutionColumns.WIDTH, resolution.width,
+            ResolutionColumns.HEIGHT, resolution.height
+        );
+    }
+```
+下拉显示如下
+```
+ |AAxBB
+ |CCxDD
+ |Other...  -> //移动鼠标到此显示下面
+    |EExFF(a:b)
+    |GGxHH(c:d)
 ```

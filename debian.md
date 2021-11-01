@@ -101,7 +101,7 @@ man deb-changelog
         $ dpkg -L debname # 安装后根据包名查看
     ```
 
-1. 安装deb包
+1. 安装deb包,还可指明安装路径
     ```
         $ dpkg -i xxx.deb
     ```

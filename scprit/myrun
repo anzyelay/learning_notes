@@ -81,12 +81,8 @@ extern_dbuild(){
 extern_rename(){
 	grep "io\.elementary\.switchboard" . -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/io\.elementary\.switchboard/com.patapua.settingboard/"
 	grep "io\/elementary\/switchboard" . -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/io\/elementary\/switchboard/com\/patapua\/settingboard/"
-	grep "io.elementary.switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot} 
-	for file in `find . -name io.elementary.switchboard* `;do
-		newfile=${file/io.elementary.switchboard/com.patapua.settingboard}
-		#echo "$file --> $newfile"
-		mv $file $newfile
-	done
+	grep "libswitchboard-2.0" . -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/libswitchboard-2.0/libsettingboard-1.0/"
+	#grep "io.elementary.switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot} 
 	for file in `find . -name io.elementary.switchboard* `;do
 		newfile=${file/io.elementary.switchboard/com.patapua.settingboard}
 		#echo "$file --> $newfile"
@@ -95,7 +91,6 @@ extern_rename(){
 	echo "-----------end--------checking as follow cmd-------"
 	echo "find . -name io.elementary.switchboard*"
 	echo 'grep -E "switchboard|elementary" . -rni --exclude-dir={build,.git,.github} --exclude=*.{po,pot}'
-
 }
 
 APP=""

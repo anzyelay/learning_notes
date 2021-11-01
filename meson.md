@@ -12,10 +12,60 @@
 1. 查看当前配置状态 (build为构建目录)
 `meson configure build`
 2. 添加lib `dependency('libcanberra')`
+3. 获取参数值：`get_option('prefix')`
+4. foreach
+   ```meson.build
+    schemas = [ '...', '...' ]
+    generated_schemas = []                                                                                     
+    foreach schema: schemas
+        generated_schemas += configure_file(
+            output: schema,
+            input: schema + '.in',
+            configuration: conf,
+        )
+    endforeach
+
+    install_data(generated_schemas, install_dir: schemasdir)
+
+   ```
+5. custom target
+   ```meson.build
+    custom_proc = find_program('xsltproc', required: false)
+    assert(custom_proc.found(), 'xsltproc is required to build documentation')
+    custom_proc_cmd = [
+        custom_proc,
+        '--output', '@OUTPUT@',
+        '...',
+        '@INPUT@'
+    ]
+    output = meson.project_name() + '.1'
+    custom_target(
+        target_name, #工程名
+        input : 输入,
+        output : 输出,
+        command : custom_proc_cmd, # 执行的命令
+        install : true,
+        install_dir : join_paths(control_center_mandir, 'man1')
+    )
+
+   ```
+6. 工程
+   ```
+   executable(
+        meson.project_name(),
+        sources,
+        include_directories : include_directories('.'),
+        dependencies : shell_deps,
+        c_args : cflags,
+        link_with : panels_libs,
+        install : true
+    )
+   ```
 
 ## 路径和名称
 1. 源代码root路径： `meson.source_root() `
 1. 当前路径 :   `meson.current_source_dir()`
+1. 包含include目录: `include_directories('.')`
 1. 安装路径： `install_dir: join_paths('dir', 'sub', 'low')` 合成为"/dir/sub/low/"
 
 ```vala
