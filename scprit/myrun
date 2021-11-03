@@ -67,9 +67,15 @@ extern_dtar(){
 		*.changes \
 		*.deb \
 		*.tar.xz \
+		*.tar.gz \
 		*.dsc 
-	[ $? -ne 0 ] && return 1
 
+	if [ $? -ne 0 ] ;then 
+		read -p "not delete ? (y)es/(n)o : " 
+		if [ "$REPLY" = "y" -o "$REPLY" = "yes" ];then
+			return 1
+		fi
+	fi
 	tar tf $pkgname.tar  | xargs rm 
 }
 #func dbuild	: build deb package
@@ -77,17 +83,52 @@ extern_dbuild(){
 	[ -d debian ] || return 1
 	dpkg-buildpackage -rfakeroot -tc --no-sign
 }
-#func rename	: rename project for patapua
+#func rename [path]	: rename project for patapua
 extern_rename(){
-	grep "io\.elementary\.switchboard" . -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/io\.elementary\.switchboard/com.patapua.settingboard/"
-	grep "io\/elementary\/switchboard" . -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/io\/elementary\/switchboard/com\/patapua\/settingboard/"
-	grep "libswitchboard-2.0" . -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/libswitchboard-2.0/libsettingboard-1.0/"
-	#grep "io.elementary.switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot} 
-	for file in `find . -name io.elementary.switchboard* `;do
-		newfile=${file/io.elementary.switchboard/com.patapua.settingboard}
-		#echo "$file --> $newfile"
-		mv $file $newfile
+	if [ $# -gt 0 ];then
+		pathdir=$1
+	else
+		pathdir=`pwd`
+	fi
+	# replace pattern==> 'source:replace'
+	change_patterns=(
+		'"io\.elementary\.switchboard":"com.patapua.settingboard"'
+		'"io\/elementary\/switchboard":"com\/patapua\/settingboard"'
+		'libswitchboard-2.0:libsettingboard-1.0'
+		'io\.elementary\.stylesheet:com\.patapua\.stylesheet'
+		'elementary-icon-theme:patapua-icon-theme'
+		'elementary-default-settings:patapua-default-settings'
+		'elementary OS:patapua OS'
+		'gtk-icon-theme-name = elementary:gtk-icon-theme-name = patapua'
+		'gtk-sound-theme-name = elementary:gtk-sound-theme-name = patapua'
+		'\/usr\/share\/icons\/elementary:\/usr\/share\/icons\/patapua'
+	)
+	for change_pattern in "${change_patterns[@]}"
+	do
+		OLDIFS=${IFS};IFS=':'
+		pat=(${change_pattern[@]})
+		IFS=${OLDIFS}
+		# echo "${pat[0]} --> ${pat[1]}"
+		grep ${pat[0]} ${pathdir} -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/${pat[0]}/${pat[1]}/" 
 	done
+	#grep "io.elementary.switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot} 
+	# rename files
+	rename_patterns=(
+		'io.elementary.switchboard:com.patapua.settingboard'
+	)
+	for name in "${rename_patterns[@]}"
+	do
+		OLDIFS=${IFS};IFS=':'
+		var=(${name[@]})
+		IFS=${OLDIFS}
+		# echo "${var[0]} --> ${var[1]}"
+		for file in `find ${pathdir} -name ${var[0]}* `;do
+			newfile=${file/var[0]/var[1]}
+			#echo "$file --> $newfile"
+			mv $file $newfile
+		done
+	done
+
 	echo "-----------end--------checking as follow cmd-------"
 	echo "find . -name io.elementary.switchboard*"
 	echo 'grep -E "switchboard|elementary" . -rni --exclude-dir={build,.git,.github} --exclude=*.{po,pot}'
@@ -99,10 +140,6 @@ case $# in
 	0)
 		APP=$(basename $0)
 		APP=extern_${APP#*_} # replace prefix_ with extern_
-		;;
-	1)
-		APP=extern_$1
-		shift 1
 		;;
 	*)
 		APP=extern_$1

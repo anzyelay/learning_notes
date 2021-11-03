@@ -61,6 +61,17 @@
         install : true
     )
    ```
+7. run_command
+    ```
+    ls = find_program('ls')
+    result = run_command(ls, join_paths(meson.source_root (), directory, size))
+    if (result.returncode() == 0)
+        message ('success')
+    else
+        message ('failed')
+    endif
+
+    ```
 
 ## 路径和名称
 1. 源代码root路径： `meson.source_root() `

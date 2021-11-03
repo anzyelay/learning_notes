@@ -4,7 +4,6 @@
 - [Gtk](#gtk)
   - [一 窗口属性](#一-窗口属性)
     - [label & Granite.Widget.AlerView](#label--granitewidgetalerview)
-    - [CSS相关](#css相关)
     - [其它](#其它)
   - [二 对象](#二-对象)
   - [调试](#调试)
@@ -62,85 +61,6 @@
 ### label & Granite.Widget.AlerView
     在AlerView中的title和description的label如果不设置width_request，即使wrap=true了，高度依然会非常高。
 
-### CSS相关
-```css
-.class_name{ 
-    color:red;
-}
-button#settings_restore {
-   color:red; 
-}
-
-```
-1. Gtk.StyleContext.add_provider_for_screen:为整个窗口设置CSS,然后使用方法 .add_class("class_name") 使用CSS中的某个类名域下的规则。
-2. 方法add_provider:为单独一个widget设置CSS
-3. 使用markup
-
-示例：
-- way1. label设置支持markup才能使用css标签如：
-```vala
-var logo_text = new Gtk.Label ("<b>Jide Os</b>") {
-    use_markup = true,
-    name = "settings_restore"
-};
-//logo_text.set_name("settings_restore") //无效，对控件id操作命名与name无关
-```
-- way2. derectly use:｀logo_text.set_markup ("\<span weight='bold' color='white' font_desc='16'>Jide OS\</span>")｀
-- way3. use #id: `logo_text.get_style_context ().add_provider(xx,xx)`;
-- way4. tyle class：   `logo_text.get_style_context ().add_class ("class_name")`;
-
-
-4. #id:CSS中id为控件的name，而`set_name`，`get_name`是对控件id的操作命名,与name无关。
-```vala
-var settings_restore_button = new Gtk.Button.with_label (_("Restore Default Settings")){
-    name = "settings_restore"
-};
-settings_restore_button.set_name("id_name");
-critical (settings_restore_button.get_name ()); // printf out  id_name
-```
-settings_restore_button等同如下效果的按钮
-```XML
-<interface>
-  <requires lib="gtk+" version="3.24"/>
-    <object class="GtkButton" id="id_name">
-      <property name="label" translatable="yes">Restore Default Settings</property>
-      <property name="name">settings_restore</property>
-      <property name="visible">True</property>
-      <property name="can-focus">True</property>
-      <property name="receives-default">True</property>
-    </object>
-</interface>
-```
-5. 旋转
-```CSS
-@keyframes spin {
-  to { -gtk-icon-transform: rotate(1turn); }
-}
-
-image {
-  animation-name: spin;
-  animation-duration: 1s;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-```
-6. css中变量的定义和引用
-   ```CSS
-    # 变量名定义
-    @define-color COLOR_NAME color_value
-    .class_name{ 
-        color: @COLOR_NAME;
-    }
-
-   ```
-   ```vala
-            var provider = new Gtk.CssProvider ();
-            var colored_css = "@define-color COLOR_NAME red";
-            provider.load_from_data (colored_css, colored_css.length);
-            context.add_provider (provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-            context.add_class ("class_name");
-   ```
-
 ### 其它
 1. pass_through：输入事件可否过滤到下层窗口
 
@@ -171,10 +91,12 @@ main_window.set_default_size(800, 600);//先改变默认值,只能比resize的�
 main_window.resize(800, 600);//
 ```
 
+**重载get_prefered_width等等可以控制窗体大小**
+
+
 3. 控件在布局容器中自适应填充扩大的解决方法，设置下align属性，默认为Align.FILL,所以会填充满
 4. 获取焦点：`grab_focus()`
 5. 拖动信号: `drag_data_received`
-
     
     
 ## 二 对象
