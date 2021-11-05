@@ -144,7 +144,7 @@ man deb-changelog
     settingboard-plug-network_1.0.0-1_amd64.deb
 
     ```
-    resoled: 新工程中用到了旧工程同名的翻译文件，检测翻译文件名**GETTEXT_PACKAGE**, **GLib.Intl.bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR)** 使用到的名称，如同确实雷同，则考虑在control中添加 Conlicts: uninstall-package,uninstall-package在本包安装时先被remove掉，避免冲突
+    resoled: 新工程中用到了旧工程同名的翻译文件，检测翻译文件名**GETTEXT_PACKAGE**, **GLib.Intl.bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR)** 使用到的名称，如同确实雷同，则考虑在control中添加 Conlicts: uninstall-package,uninstall-package在本包安装时先被remove掉，避免冲突， 否则使用`dpkg -i --force-overwrite`强制安装
 
 
 1.  error: can't build with source format '3.0 (quilt)'
