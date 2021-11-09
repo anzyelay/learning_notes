@@ -92,8 +92,8 @@ extern_rename(){
 	fi
 	# replace pattern==> 'source:replace'
 	change_patterns=(
-		'"io\.elementary\.switchboard":"com.patapua.settingboard"'
-		'"io\/elementary\/switchboard":"com\/patapua\/settingboard"'
+		'io\.elementary\.switchboard:com\.patapua\.settingboard'
+		'io\/elementary\/switchboard:com\/patapua\/settingboard'
 		'libswitchboard-2.0:libsettingboard-1.0'
 		'io\.elementary\.stylesheet:com\.patapua\.stylesheet'
 		'elementary-icon-theme:patapua-icon-theme'
@@ -102,6 +102,13 @@ extern_rename(){
 		'gtk-icon-theme-name = elementary:gtk-icon-theme-name = patapua'
 		'gtk-sound-theme-name = elementary:gtk-sound-theme-name = patapua'
 		'\/usr\/share\/icons\/elementary:\/usr\/share\/icons\/patapua'
+		'io\.elementary\.greeter:com\.patapua\.greeter'
+		'io\/elementary\/greeter:com\/patapua\/greeter'
+		'io\.elementary\.installer:com\.patapua\.installer'
+		'io\/elementary\/installer:com\/patapua\/installer'
+		'io\.elementary\.InstallerDaemon:com\.patapua\.InstallerDaemon'
+		'io\/elementary\/InstallerDaemon:com\/patapua\/InstallerDaemon'
+		'io\.elementary\.sound-theme:com\.patapua\.sound-theme'
 	)
 	for change_pattern in "${change_patterns[@]}"
 	do
@@ -109,12 +116,21 @@ extern_rename(){
 		pat=(${change_pattern[@]})
 		IFS=${OLDIFS}
 		# echo "${pat[0]} --> ${pat[1]}"
-		grep ${pat[0]} ${pathdir} -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/${pat[0]}/${pat[1]}/" 
+		grep "${pat[0]}" ${pathdir} -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot}  > /dev/null
+		if [ $? -eq 0 ];then
+			# echo "is here:" ${pat[0]}
+			grep "${pat[0]}" ${pathdir} -rl --exclude-dir={build,.git,.github} --exclude=*.{po,pot} | xargs sed -i "s/${pat[0]}/${pat[1]}/g" 
+		# else
+		# 	echo "no found: " ${pat[0]}
+		fi
 	done
 	#grep "io.elementary.switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot} 
 	# rename files
 	rename_patterns=(
 		'io.elementary.switchboard:com.patapua.settingboard'
+		'io.elementary.greeter:com.patapua.greeter'
+		'io.elementary.installer:com.patapua.installer'
+		'io.elementary.InstallerDaemon:com.patapua.InstallerDaemon'
 	)
 	for name in "${rename_patterns[@]}"
 	do
@@ -122,9 +138,9 @@ extern_rename(){
 		var=(${name[@]})
 		IFS=${OLDIFS}
 		# echo "${var[0]} --> ${var[1]}"
-		for file in `find ${pathdir} -name ${var[0]}* `;do
-			newfile=${file/var[0]/var[1]}
-			#echo "$file --> $newfile"
+		for file in `find ${pathdir} -name *${var[0]}* `;do
+			newfile=${file/${var[0]}/${var[1]}}
+			# echo "$file --> $newfile"
 			mv $file $newfile
 		done
 	done

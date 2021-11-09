@@ -5,6 +5,8 @@
   - [2. 修改changelog文件](#2-修改changelog文件)
   - [3. 修改control文件](#3-修改control文件)
   - [4. 打包文件](#4-打包文件)
+- [包改名](#包改名)
+  - [过渡包方法:](#过渡包方法)
 - [help](#help)
 - [关于deb包的常用命令](#关于deb包的常用命令)
 - [dpkg-buildpackage error信息](#dpkg-buildpackage-error信息)
@@ -85,6 +87,25 @@ debchange  # 添加说明，修改版本号
 ### 4. 打包文件
 - 打包 ：  `dpkg-buildpackage -rfakeroot -tc --no-sign`
 
+## [包改名](https://wiki.debian.org/RenamingPackages)
+### 过渡包方法: 
+在新包的控制文件中定义一个与旧包同名的二进制虚拟包, 假设旧包“oldname”的最后一个上游版本是 1.5，并且包被重命名为 2.0 版的“newname”,过滤包定义如下：
+```debian
+Package: oldname
+Depends: newname, ${misc:Depends}
+Architecture: all
+Priority: optional
+Section: oldlibs
+Description: transitional package
+This is a transitional package. It can safely be removed.
+```
+新包定义时如下：
+```debian
+ Package: newname
+ Replaces: oldname (<< 2.0-1~)
+ Breaks: oldname (<< 2.0-1~)
+ …
+```
 
 ## help
 ```
@@ -96,34 +117,44 @@ man deb-changelog
 
 ## 关于deb包的常用命令
 1. 查看deb包含有哪些文件
-    ```
+    ```sh
         $ dpkg -c xxx.deb # 安装前根据deb文件查看
         $ dpkg -L debname # 安装后根据包名查看
     ```
 
 1. 安装deb包,还可指明安装路径
-    ```
+    ```sh
         $ dpkg -i xxx.deb
     ```
 1. 查看某个文件属于哪个deb包
-    ```
+    ```sh
         $ dpkg -S filefullpath
     ```
 1. 卸载deb包
-    ```
+    ```sh
         $ dpkg -r debname
         $ dpkg -P debname # 完全卸载deb包（包含配置文件)
     ```
 1. 下载源码包
-    ```
+    ```sh
         $ apt-get source packagename
     ```
 
 1. 根据软件包名模糊检索
-    ```
+    ```sh
         $ dpkg -l|grep xxx #在已安装的软件包列表中搜索
         $ apt-cache search xxx #在源中的所有软件包列表中搜索
     ```
+1. 修改添加源
+   ```sh
+    apt edit-source [xxx.list]
+    apt-add-repository url
+   ```
+1. 找依赖
+   ```sh
+    apt depends name.deb
+    apt rdepends name.deb
+   ```
 
 
 ## dpkg-buildpackage error信息

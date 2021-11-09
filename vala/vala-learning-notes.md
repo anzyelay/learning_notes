@@ -102,267 +102,267 @@ main_window.resize(800, 600);//
 ## 二 对象
 1. Gtk.Overlay： 是一个容器，它包含一个主子项，它可以在其上放置“覆盖”小部件。（相当于背景与前景）
 2. GLib.DesktopAppInfo,AppInfo:lanch方法启动程序
+    ```vala
+    var initial_setup = AppInfo.create_from_commandline ("io.elementary.initial-setup", null, GLib.AppInfoCreateFlags.NONE);
+    initial_setup.launch (null, null);
+    ```
 3. GLib.Application.open: 
-```vala        
-public override void open (File[] files, string hint) {
-    var file = files[0];
-    if (file == null) {
-        return;
-    }
-    warning ("open file --> %s ,and hint:%s", file.get_uri (), hint);
-
-    if (file.get_uri_scheme () == "settings") {
-        link = file.get_uri ().replace ("settings://", "");
-        if (link.has_suffix ("/")) {
-            link = link.substring (0, link.last_index_of_char ('/'));
+    ```vala        
+    public override void open (File[] files, string hint) {
+        var file = files[0];
+        if (file == null) {
+            return;
         }
-    } else {
-        critical ("Calling Switchboard directly is unsupported, please use the settings:// scheme instead");
-    }
+        warning ("open file --> %s ,and hint:%s", file.get_uri (), hint);
 
-    activate ();
-}
-```
-如何触发open信号？？如下
-- 方法一、通用Gtk.LinkButton：
-            ```var kb_settings_label = new Accessibility.Widgets.LinkLabel (_("Keyboard settings…"), "settings://input/keyboard/behavior");```
-- 方法二、AppInfo.launch_default_for_uri ("settings://input/keyboard/layout", null);
-            ``` 
-            
-            ```
+        if (file.get_uri_scheme () == "settings") {
+            link = file.get_uri ().replace ("settings://", "");
+            if (link.has_suffix ("/")) {
+                link = link.substring (0, link.last_index_of_char ('/'));
+            }
+        } else {
+            critical ("Calling Switchboard directly is unsupported, please use the settings:// scheme instead");
+        }
+
+        activate ();
+    }
+    ```
+    如何触发open信号？？如下
+    - 方法一、通用Gtk.LinkButton：
+                ```var kb_settings_label = new Accessibility.Widgets.LinkLabel (_("Keyboard settings…"), "settings://input/keyboard/behavior");```
+    - 方法二、AppInfo.launch_default_for_uri ("settings://input/keyboard/layout", null);
             
         
 5. download_file
-```
-    private async string? download_file (Fwupd.Device device, string uri) {
-        var server_file = File.new_for_uri (uri);
-        var path = Path.build_filename (Environment.get_tmp_dir (), server_file.get_basename ());
-        var local_file = File.new_for_path (path);
+    ```vala
+        private async string? download_file (Fwupd.Device device, string uri) {
+            var server_file = File.new_for_uri (uri);
+            var path = Path.build_filename (Environment.get_tmp_dir (), server_file.get_basename ());
+            var local_file = File.new_for_path (path);
 
-        bool result;
-        try {
-            result = yield server_file.copy_async (local_file, FileCopyFlags.OVERWRITE, Priority.DEFAULT, null, (current_num_bytes, total_num_bytes) => {
-            // TODO: provide useful information for user
-            });
-        } catch (Error e) {
-            show_error_dialog (device, "Could not download file: %s".printf (e.message));
-            return null;
-        }
+            bool result;
+            try {
+                result = yield server_file.copy_async (local_file, FileCopyFlags.OVERWRITE, Priority.DEFAULT, null, (current_num_bytes, total_num_bytes) => {
+                // TODO: provide useful information for user
+                });
+            } catch (Error e) {
+                show_error_dialog (device, "Could not download file: %s".printf (e.message));
+                return null;
+            }
 
-        if (!result) {
-            show_error_dialog (device, "Download of %s was not succesfull".printf (uri));
-            return null;
-        }
+            if (!result) {
+                show_error_dialog (device, "Download of %s was not succesfull".printf (uri));
+                return null;
+            }
 
-        return path;
-    }  
-```
+            return path;
+        }  
+    ```
 6. shut down
-```vala
-[DBus (name = "org.freedesktop.login1.Manager")]
-public interface About.LoginInterface : Object {
-    public abstract void reboot (bool interactive) throws GLib.Error;
-    public abstract void power_off (bool interactive) throws GLib.Error;
-}
-
-public class About.LoginManager : Object {
-    private LoginInterface interface;
-
-    static LoginManager? instance = null;
-    public static LoginManager get_instance () {
-        if (instance == null) {
-            instance = new LoginManager ();
-        }
-
-        return instance;
+    ```vala
+    [DBus (name = "org.freedesktop.login1.Manager")]
+    public interface About.LoginInterface : Object {
+        public abstract void reboot (bool interactive) throws GLib.Error;
+        public abstract void power_off (bool interactive) throws GLib.Error;
     }
 
-    private LoginManager () {}
+    public class About.LoginManager : Object {
+        private LoginInterface interface;
 
-    construct {
-        try {
-            interface = Bus.get_proxy_sync (BusType.SYSTEM, "org.freedesktop.login1", "/org/freedesktop/login1");
-        } catch (Error e) {
-            warning ("Could not connect to login interface: %s", e.message);
-        }
-    }
+        static LoginManager? instance = null;
+        public static LoginManager get_instance () {
+            if (instance == null) {
+                instance = new LoginManager ();
+            }
 
-    public bool shutdown () {
-        try {
-            interface.power_off (true);
-        } catch (Error e) {
-            warning ("Could not connect to login interface: %s", e.message);
-            return false;
+            return instance;
         }
 
-        return true;
-    }
+        private LoginManager () {}
 
-    public bool reboot () {
-        try {
-            interface.reboot (true);
-        } catch (Error e) {
-            warning ("Could not connect to login interface: %s", e.message);
-            return false;
+        construct {
+            try {
+                interface = Bus.get_proxy_sync (BusType.SYSTEM, "org.freedesktop.login1", "/org/freedesktop/login1");
+            } catch (Error e) {
+                warning ("Could not connect to login interface: %s", e.message);
+            }
         }
 
-        return true;
-    }
-}  
-```
+        public bool shutdown () {
+            try {
+                interface.power_off (true);
+            } catch (Error e) {
+                warning ("Could not connect to login interface: %s", e.message);
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool reboot () {
+            try {
+                interface.reboot (true);
+            } catch (Error e) {
+                warning ("Could not connect to login interface: %s", e.message);
+                return false;
+            }
+
+            return true;
+        }
+    }  
+    ```
 
 7. async function
 
-- 有返回值的，无的话直接调用begin就行。    
-```vala
-async typeRet funcA(typeArg args...){
-    ...
-}   
-//call as bellow:
-    funcA.begin(typeArg args... , (obj, res) => {
-        typeRet ret = funcA.end(res);
-        //judge ret 
-            ...
-        
+    - 有返回值的，无的话直接调用begin就行。    
+    ```vala
+    async typeRet funcA(typeArg args...){
+        ...
+    }   
+    //call as bellow:
+        funcA.begin(typeArg args... , (obj, res) => {
+            typeRet ret = funcA.end(res);
+            //judge ret 
+                ...
+            
 
-    })；
- 
-```
+        })；
+    
+    ```
 
 8. 连接按键不能切换页面的问题
-```vala
-stack.visible_child = software_grid;//显示 1
-update_button.clicked.connect (() => {
-    stack.visible_child = hbox_checking;//显示2
-    Timeout.add (100, ()=>{ //如果不用timeout，虽也会进来，但不显示2页面
-        check_for_updates.begin((obj, res)=>{
-            var result = check_for_updates.end (res);//check_for_updates完成后进入，
-            if(result){
-                 stack.visible_child = software_grid;//切换回 1
-            }
-        });
-        return false;// 不重复调用
-    } );
-});  
-private async bool check_for_updates () {
-    GLib.Thread.usleep(100000);
-    return true;
-}
-
-```
-9. list dir
-```vala
-async void list_dir () {
-    var dir = File.new_for_path (Environment.get_home_dir ());
-    try {
-        var e = yield dir.enumerate_children_async (GLib.FileAttribute.STANDARD_NAME, 0);
-        while (true) {
-            var files = yield e.next_files_async (10, Priority.DEFAULT, null);
-            if (files == null) {
-                break;
-            }
-            foreach (var info in files) {
-                print ("%s\n", info.get_name ());
-            }
-        }
-    } catch (GLib.Error err) {
-        warning ("Error: %s\n", err.message);
+    ```vala
+    stack.visible_child = software_grid;//显示 1
+    update_button.clicked.connect (() => {
+        stack.visible_child = hbox_checking;//显示2
+        Timeout.add (100, ()=>{ //如果不用timeout，虽也会进来，但不显示2页面
+            check_for_updates.begin((obj, res)=>{
+                var result = check_for_updates.end (res);//check_for_updates完成后进入，
+                if(result){
+                    stack.visible_child = software_grid;//切换回 1
+                }
+            });
+            return false;// 不重复调用
+        } );
+    });  
+    private async bool check_for_updates () {
+        GLib.Thread.usleep(100000);
+        return true;
     }
-}
-```
+
+    ```
+9. list dir
+    ```vala
+    async void list_dir () {
+        var dir = File.new_for_path (Environment.get_home_dir ());
+        try {
+            var e = yield dir.enumerate_children_async (GLib.FileAttribute.STANDARD_NAME, 0);
+            while (true) {
+                var files = yield e.next_files_async (10, Priority.DEFAULT, null);
+                if (files == null) {
+                    break;
+                }
+                foreach (var info in files) {
+                    print ("%s\n", info.get_name ());
+                }
+            }
+        } catch (GLib.Error err) {
+            warning ("Error: %s\n", err.message);
+        }
+    }
+    ```
 
 10. Gtk.InfoBar
- - message_type : 消息类型:info,waring,question,error,other
- - revealed: 显示与否
- - get_content_area ().add (default_label); // 显示信息
- - add_button (btn, response_id);
- - response(response_id): button的回应 
-```vala
-public class AppCenter.Widgets.NetworkInfoBar : Gtk.InfoBar {
-    public NetworkInfoBar () {
-        Object (
-            message_type: Gtk.MessageType.WARNING
-        );
-    }
+    - message_type : 消息类型:info,waring,question,error,other
+    - revealed: 显示与否
+    - get_content_area ().add (default_label); // 显示信息
+    - add_button (btn, response_id);
+    - response(response_id): button的回应 
+    ```vala
+    public class AppCenter.Widgets.NetworkInfoBar : Gtk.InfoBar {
+        public NetworkInfoBar () {
+            Object (
+                message_type: Gtk.MessageType.WARNING
+            );
+        }
 
-    construct {
-        string title = _("Network Not Available.");
-        string details = _("Connect to the Internet to browse and install apps.");
+        construct {
+            string title = _("Network Not Available.");
+            string details = _("Connect to the Internet to browse and install apps.");
 
-        var default_label = new Gtk.Label ("<b>%s</b> %s".printf (title, details));
-        default_label.use_markup = true;
-        default_label.wrap = true;
+            var default_label = new Gtk.Label ("<b>%s</b> %s".printf (title, details));
+            default_label.use_markup = true;
+            default_label.wrap = true;
 
-        get_content_area ().add (default_label);
-        // TRANSLATORS: Includes an ellipsis (…) in English to signify the action will be performed in a new window
-        add_button (_("Network Settings…"), Gtk.ResponseType.ACCEPT);
+            get_content_area ().add (default_label);
+            // TRANSLATORS: Includes an ellipsis (…) in English to signify the action will be performed in a new window
+            add_button (_("Network Settings…"), Gtk.ResponseType.ACCEPT);
 
-        try_set_revealed ();
-
-        response.connect ((response_id) => {
-            switch (response_id) {
-                case Gtk.ResponseType.ACCEPT:
-                    try {
-                        AppInfo.launch_default_for_uri ("settings://network", null);
-                    } catch (GLib.Error e) {
-                        critical (e.message);
-                    }
-                    break;
-                default:
-                    assert_not_reached ();
-            }
-        });
-
-        var network_monitor = NetworkMonitor.get_default ();
-        network_monitor.network_changed.connect (() => {
             try_set_revealed ();
-        });
+
+            response.connect ((response_id) => {
+                switch (response_id) {
+                    case Gtk.ResponseType.ACCEPT:
+                        try {
+                            AppInfo.launch_default_for_uri ("settings://network", null);
+                        } catch (GLib.Error e) {
+                            critical (e.message);
+                        }
+                        break;
+                    default:
+                        assert_not_reached ();
+                }
+            });
+
+            var network_monitor = NetworkMonitor.get_default ();
+            network_monitor.network_changed.connect (() => {
+                try_set_revealed ();
+            });
+        }
+
+        private void try_set_revealed (bool? reveal = true) {
+            var network_available = NetworkMonitor.get_default ().get_network_available ();
+            revealed = reveal && !network_available;
+        }
+    }  
+    ```
+1. Gtk.Revealer:显示容器，控制子部件是否显示
+
+1. 单例模式
+    ```
+    private static GLib.Once<T> instance;
+    public static unowned T get_default () {
+        return instance.once (() => { return new T (); });
+    }  
+    ```
+1. 默认程序设置 ：GLib.AppInfo  
+    - set_as_default_for_type(MINE-TYPE); 
+    - get_default_for_type(mine-type)
+
+1. 获取Application
+    `unowned SwitchboardApp app = (SwitchboardApp) GLib.Application.get_default ();`
+
+1. 延时处理
+    ```vala
+    //使用定时器
+    async void delay(int usec) {
+        Timeout.add (usec, ()=>{
+            delay.callback;//
+            return false;
+        }); 
+        yield;//delay until callback be called
     }
-
-    private void try_set_revealed (bool? reveal = true) {
-        var network_available = NetworkMonitor.get_default ().get_network_available ();
-        revealed = reveal && !network_available;
+    //使用线程
+    async void delay(int usec) {
+        new Thread<void>(()=>{
+            Thread.usleep(usec);
+            delay.callback;//
+            return;
+        }); 
+        yield;//delay until callback be called
     }
-}  
-```
-11. Gtk.Revealer:显示容器，控制子部件是否显示
-
-12. 单例模式
-```
-private static GLib.Once<T> instance;
-public static unowned T get_default () {
-    return instance.once (() => { return new T (); });
-}  
-```
-13. 默认程序设置 ：GLib.AppInfo  
-- set_as_default_for_type(MINE-TYPE); 
-- get_default_for_type(mine-type)
-
-14. 获取Application
-`unowned SwitchboardApp app = (SwitchboardApp) GLib.Application.get_default ();`
-
-15. 延时处理
-```vala
-//使用定时器
-async void delay(int usec) {
-    Timeout.add (usec, ()=>{
-        delay.callback;//
-        return false;
-    }); 
-    yield;//delay until callback be called
-}
-//使用线程
-async void delay(int usec) {
-    new Thread<void>(()=>{
-        Thread.usleep(usec);
-        delay.callback;//
-        return;
-    }); 
-    yield;//delay until callback be called
-}
-  
     
-```
+    ```
 
 ## 调试
 ### 运行时使能调试输出
