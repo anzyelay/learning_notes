@@ -25,4 +25,6 @@
     ```
 5. lsof:查看进程打开的文件
 6. fuser:查看打开文件的进程
-7. 
+7. ssh 
+    - 远客机首先安装有openssh-server
+    - 可以运行界面的ssh连接 `DISPLAY=:0 ssh -X username@ip`

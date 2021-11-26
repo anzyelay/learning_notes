@@ -1,4 +1,5 @@
 #!/bin/bash
+# set -x # debug mode
 profile_build(){
 	export PREFIX=/mnt/eos1/usr
 	export PKG_CONFIG_PATH=/mnt/eos1/usr/lib/x86_64-linux-gnu/pkgconfig 
@@ -19,6 +20,8 @@ build_install(){
 		mkdir build
 		. profile_build
 		meson build --prefix=$PREFIX --cmake-prefix-path=$CMAKE_PREFIX_PATH --pkg-config-path=$PKG_CONFIG_PATH
+	# else
+	# 	ninja -C build clean
 	fi
 	ninja -C build -j4  > ./.tmp.log
 	if [ $? -eq 1 ];then
@@ -46,6 +49,7 @@ help(){
 extern_set(){
 	build_install || return 1
 	. profile_usr
+	# G_MESSAGES_DEBUG=all 
 	com.patapua.settingboard
 }
 #func win	:run wingpanel
@@ -148,6 +152,63 @@ extern_rename(){
 	echo "-----------end--------checking as follow cmd-------"
 	echo "find . -name io.elementary.switchboard*"
 	echo 'grep -E "switchboard|elementary" . -rni --exclude-dir={build,.git,.github} --exclude=*.{po,pot}'
+}
+# args: path
+# return git_dirs
+find_git_reposity(){
+	if [ ! -d $1 ];then
+		return 1
+	fi
+	if [ -d $1/.git ];then
+		git_dirs+=($1)
+		return 0
+	else
+		for dir in `ls $1`;do
+			find_git_reposity $1/$dir
+		done
+	fi
+}
+#func git_numstat path from to : get all git reposity  number statistic in path between [from] and [to] date
+extern_git_numstat(){
+	git_dirs=()
+	find_git_reposity $1
+	shift
+	# echo ${git_dirs[@]}
+	# 创建统计表
+	local dir_list=${git_dirs[@]}
+	local commit_file="/tmp/commit.txt";
+	if [ -f $commit_file ]; then
+		rm $commit_file
+	fi
+	touch $commit_file
+
+	# 循环目录
+	for dir in ${dir_list[@]}
+	do
+		# echo "project:$dir"
+		cd $dir
+		if [ $? -eq 0 ]; then
+			# 同步代码
+			# git pull >/dev/null
+			# 统计代码信息
+			git log --pretty=format:%H,%ai,%an,%s --no-merges --since=$1 --until=$2 --numstat \
+			 | awk -F, 'BEGIN{hash="";author=""; date="";comment="";}
+			 {if (NF>=4) {gsub(/ /,"_",$0);hash=$1; date=substr($2,1,19); author=$3; comment=$4;} 
+			 else if (NF>0) print hash"\t" date "\t" author"\t" comment "\t" $0;}' \
+			 | awk '{hash[$1] = $1; author[$1] = $3; date[$1] = $2; comment[$1] = $4; file[$1] += 1; add[$1] += $5; del[$1] += $6; fileName[$1] = fileName[$1]","$7}
+			  END{for (i in hash) {printf "%s \t %s \t %s \t %s \t %d \t %d \t %d \n",hash[i],author[i],comment[i],date[i],add[i],del[i],file[i]}}' >> $commit_file;
+
+			#返回上级目录
+			cd ..
+		fi
+	done
+
+	# 输出结果
+	echo "-----------------------------------"
+	awk 'BEGIN{printf "开发者\t\t提交次数\t新增代码行数\t删除代码行数\t改动文件数\n"}' 
+	awk '{author[$2] = $2; commit[$2] += 1; add[$2] += $5; del[$2] += $6; file[$2] += $7;} 
+	END{for (i in author){ printf "%s\t\t%d\t%d\t%d\t%d\n",author[i],commit[i],add[i],del[i],file[i]}}' \
+	 $commit_file | sort -k 2 -n -r ;
 }
 
 APP=""

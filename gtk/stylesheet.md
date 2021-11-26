@@ -7,7 +7,13 @@
   - [直接使用markup标签表达式](#直接使用markup标签表达式)
   - [关于css stylesheet中的类名和ID问题](#关于css-stylesheet中的类名和id问题)
   - [旋转](#旋转)
-  - [css中变量的定义和引用](#css中变量的定义和引用)
+  - [color](#color)
+- [GTK.CSS](#gtkcss)
+  - [文件功能](#文件功能)
+  - [scss](#scss)
+  - [分类](#分类)
+    - [状态](#状态)
+    - [属性](#属性)
 
 ## GTK CSS STYLE 概念介绍
 ### StyleContext
@@ -146,7 +152,27 @@ image {
   animation-iteration-count: infinite;
 }
 ```
-### css中变量的定义和引用
+### color
+- 颜色值的指定方式：
+  ```text
+  〈color〉 = currentColor | transparent | 〈color name〉 | 〈rgb color〉 | 〈rgba color〉 | 〈hex color〉 | 〈gtk color〉
+
+  〈rgb color〉 = rgb( 〈number〉, 〈number〉, 〈number〉 ) | rgb( 〈percentage〉, 〈percentage〉, 〈percentage〉 )
+  〈rgba color〉 = rgba( 〈number〉, 〈number〉, 〈number〉, 〈alpha value〉 ) | rgba( 〈percentage〉, 〈percentage〉, 〈percentage〉, 〈alpha value〉 )
+  〈hex color〉 = #〈hex digits〉
+
+  〈alpha value〉 = 〈number〉
+  ```
+  example:
+  ```css
+  color: transparent;
+  background-color: red;
+  border-top-color: rgb(128,57,0);
+  border-left-color: rgba(10%,20%,30%,0.5);
+  border-right-color: #ff00cc;
+  border-bottom-color: #ffff0000cccc;
+  ```
+- 颜色变量的定义和引用
    ```CSS
     # 变量名定义
     @define-color COLOR_NAME color_value
@@ -154,7 +180,8 @@ image {
         color: @COLOR_NAME;
     }
 
-   ```
+  ```
+  code中引用如下：
    ```vala
     var provider = new Gtk.CssProvider ();
     var colored_css = "@define-color COLOR_NAME red";
@@ -162,3 +189,28 @@ image {
     context.add_provider (provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
     context.add_class ("class_name");
    ```
+
+## GTK.CSS
+### 文件功能
+- 所在位置：/usr/share/theme/theme-name/gtk-3.0/gtk[-dark].css
+- 影响系统gtk控件的所有类别class在定义在此文件中
+### scss
+
+### 分类
+#### 状态 
+- 定义方法：类名（或&）+“:”+状态
+- 状态列表
+
+|状态名|解释|
+|:-|-|
+backdrop|在其它窗口后，非当前窗口
+active| 被点击时
+disabled| 被禁用，sensitive为false时
+hover|鼠标放置于上时
+
+
+#### 属性
+|属性名|解释|
+|-|-|
+-gtk-icon-theme|图标，在button的background-image用此指定图标时图标当作前景图。color可以直接改图标颜色
+-gtk-icon-shadow|图标阴影颜色

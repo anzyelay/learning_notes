@@ -1,25 +1,50 @@
+## Gdk.Pixbuf
+A pixel buffer.
+`GdkPixbuf` contains information about an image's pixel data, its color space, bits per sample, width and height, and the rowstride (the number of bytes between the start of one row and the start of the next)
+- scale
+- copy
+- rotate
+  
 ## Gtk.Image
 - way 1
-```vala
-thumb = new Gdk.Pixbuf (Gdk.Colorspace.RGB, false, 8, THUMB_WIDTH * scale, THUMB_HEIGHT * scale);
-image.gicon = thumb
-```
+    ```vala
+    thumb = new Gdk.Pixbuf (Gdk.Colorspace.RGB, false, 8, THUMB_WIDTH * scale, THUMB_HEIGHT * scale);
+    image.gicon = thumb
+    ```
 - way 2
-```vala
-
-```
+    ```vala
+    ```
 
 ## Granite.Asyncimage   
 1. set_from_file_async()
 1. set_from_gicon_async()
-- way 1
-```vala
-try {
-    yield image.set_from_file_async (File.new_for_path (thumb_path), THUMB_WIDTH, THUMB_HEIGHT, false);
-} catch (Error e) {
-    warning (e.message);
-}
-```
+    - way 1
+    ```vala
+    try {
+        yield image.set_from_file_async (File.new_for_path (thumb_path), THUMB_WIDTH, THUMB_HEIGHT, false);
+    } catch (Error e) {
+        warning (e.message);
+    }
+    ```
+1. Granite.Drawing.BufferSurface-->blur
+    ```vala
+        private Gdk.Pixbuf load_file (string input) {
+            Gdk.Pixbuf pixbuf = null;
+            try {
+                pixbuf = new Gdk.Pixbuf.from_file (input);
+            } catch (Error e) {
+                GLib.warning (e.message);
+            }
+
+            var surface = new Granite.Drawing.BufferSurface (pixbuf.width, pixbuf.height);
+            Gdk.cairo_set_source_pixbuf (surface.context, pixbuf, 0, 0);
+            surface.context.paint ();
+            //  surface.exponential_blur (3);
+            surface.gaussian_blur (3);
+            surface.context.paint ();
+            return Gdk.pixbuf_get_from_surface (surface.surface, 0, 0, pixbuf.width, pixbuf.height);
+        }
+    ```
 
 ## Actor设置图形
 ```vala

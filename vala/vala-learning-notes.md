@@ -211,25 +211,6 @@ main_window.resize(800, 600);//
         }
     }  
     ```
-
-7. async function
-
-    - 有返回值的，无的话直接调用begin就行。    
-    ```vala
-    async typeRet funcA(typeArg args...){
-        ...
-    }   
-    //call as bellow:
-        funcA.begin(typeArg args... , (obj, res) => {
-            typeRet ret = funcA.end(res);
-            //judge ret 
-                ...
-            
-
-        })；
-    
-    ```
-
 8. 连接按键不能切换页面的问题
     ```vala
     stack.visible_child = software_grid;//显示 1
@@ -399,8 +380,27 @@ return startup_dir;
 `GLib.FileUtils.set_contents (path, keyfile.to_data ());`
 
 - 一般文件的读写：Posix.open/read/fcntl/  监控文件的变化使用 IOChannel.unix_new(fd).add_watch
-3. GLib.Filename 获取文件basename, display_name
-4. 获取文件类型
+- example 
+  ```vala
+      public GtkSettings () {
+        keyfile = new GLib.KeyFile ();
+
+        path = GLib.Environment.get_user_config_dir () + "/gtk-3.0/settings.ini";
+
+        if (!(File.new_for_path (path).query_exists ())) {
+            return;
+        }
+
+        try {
+            keyfile.load_from_file (path, 0);
+        } catch (Error e) {
+            warning ("Error loading GTK+ Keyfile settings.ini: " + e.message);
+        }
+    }
+  ```
+
+1. GLib.Filename 获取文件basename, display_name
+2. 获取文件类型
 ```vala
     private string get_mime_type (string uri) {
     try {
@@ -496,7 +496,38 @@ filename.has_prefix ("file://")
 
 
 ## command line args
-GLib.OptionContext
+1. GLib.OptionContext
+2. Glib.Application类handle_local_options方法重载
+   ```vala
+   public class SettingsDaemon.Application : GLib.Application {
+        // step 1: define options
+        public const OptionEntry[] OPTIONS = {
+            { "version", 'v', 0, OptionArg.NONE, out show_version, "Display the version", null},
+            { null }
+        };
+        private Application () {}
+
+        construct {
+            application_id = Build.PROJECT_NAME;
+            // step 2: add options
+            add_main_option_entries (OPTIONS);
+        }
+        //step 3: handle options
+        public override int handle_local_options (VariantDict options) {
+            if (show_version) {
+                stdout.printf ("%s\n", Build.VERSION);
+                return 0;
+            }
+            return -1;
+        }
+
+        public static int main (string[] args) {
+            var application = new Application ();
+            return application.run (args);
+        }
+
+   }
+   ```
 
 ## 信号事件
 1. 属性是可以被监听的

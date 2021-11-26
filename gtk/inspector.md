@@ -4,7 +4,7 @@
 ## miscellaneous
 ```xml
 H_______________________________________________I________M_________M'
-|                                 |             :        |scroll.w :
+|                                  |            :        |scroll.w :
 |                             margin-top        :        |         :
 |            (x,y) a_______________|____________b        |         :
 |                  |          (allocation)      |        |         :
@@ -72,3 +72,34 @@ K'                                                               L'
         clip: 704=688+16        465=436+29
         因为29<32，所以垂直方向出现滚动条，把margin-bottom调整为29即无  
         ```
+
+## css
+selector![css selector](../picture/gtk/inspector-css-selector.png)
+css node![css node](../picture/gtk/inspector-css-node.png)
+- scss code :
+  ```scss
+  levebar {
+      &.discrete {
+          &.horizontal {
+              block {
+                  min-width: rem(10px);
+              }
+          }
+  }
+  ```
+- inspector css :
+  ```css
+  levelbar.discrete.horizontal block {
+    min-width:10px;
+  }
+  #101 {
+    min-width:24px;
+    border:2px solid red;
+  }
+
+  ```
+- #ID 选择某个控件指定，效果如下图, 其余的block width=10
+  ![id selector](../picture/gtk/inspector-css-example.png)
+  
+- 样式类别： 图中的样式类别就代表着当前所用的类名classname （eg: .horizontal, .discrete）
+- 状态： 代表当前控件的状态是disable,active,backdrop等，状态以`classname:status`书写css
