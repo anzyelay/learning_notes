@@ -28,3 +28,8 @@
 7. ssh 
     - 远客机首先安装有openssh-server
     - 可以运行界面的ssh连接 `DISPLAY=:0 ssh -X username@ip`
+
+8. pkg-config:查找编译前置条件或依赖等
+    ```
+     gcc -o test test.c `pkg-config gtk+-3.0 --cflags --libs`
+    ```

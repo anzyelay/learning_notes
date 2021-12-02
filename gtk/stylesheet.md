@@ -207,6 +207,7 @@ backdrop|在其它窗口后，非当前窗口
 active| 被点击时
 disabled| 被禁用，sensitive为false时
 hover|鼠标放置于上时
+checked|选中
 
 
 #### 属性
@@ -214,3 +215,4 @@ hover|鼠标放置于上时
 |-|-|
 -gtk-icon-theme|图标，在button的background-image用此指定图标时图标当作前景图。color可以直接改图标颜色
 -gtk-icon-shadow|图标阴影颜色
+background-clip|规定背景的绘制区域,有content-box（内容框）, padding-box（内边距框）, border-box（边框盒）三种

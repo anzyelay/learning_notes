@@ -70,4 +70,14 @@ async typeRet funcA(typeArg args...){
         
 
     })；
-    ```
+```
+
+## 3. how to call override class parent function
+```vala    
+public override void func () {
+    base.func();
+    /*
+        you func code here 
+    */
+}
+```

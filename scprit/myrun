@@ -168,7 +168,7 @@ find_git_reposity(){
 		done
 	fi
 }
-#func git_numstat path from to : get all git reposity  number statistic in path between [from] and [to] date
+#func git_numstat path from to : get all git reposity  number statistic in path between [from] and [to] date (from like this 2021-12-21)
 extern_git_numstat(){
 	git_dirs=()
 	find_git_reposity $1
