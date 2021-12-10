@@ -1,7 +1,18 @@
-![inspector](../picture/gtk/inspector-miscellaneous.png)
 ## 开启调试功能
-`gsettings set org.gtk.Settings.Debug enable-inspector-keybinding true`
+1. 快捷方式：
+   - step 1:
+      - normal: `gsettings set org.gtk.Settings.Debug enable-inspector-keybinding true`
+      - flatpak 应用
+        ```sh
+        flatpak run --command='sh' org.gnome.Polari
+        gsettings set org.gtk.Settings.Debug enable-inspector-keybinding true
+        ```
+    - step 2: 按快捷键-->**"Control-shift-d/i"**
+
+2. 直接命令行启动：`GTK_DEBUG=interactive your-app`
+
 ## miscellaneous
+![inspector](../picture/gtk/inspector-miscellaneous.png)
 ```xml
 H_______________________________________________I________M_________M'
 |                                  |            :        |scroll.w :

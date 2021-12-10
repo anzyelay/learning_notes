@@ -154,6 +154,7 @@ man deb-changelog
    ```sh
     apt depends name.deb
     apt rdepends name.deb
+    apt-get build-dep project-dir
    ```
 
 

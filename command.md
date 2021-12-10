@@ -33,3 +33,15 @@
     ```
      gcc -o test test.c `pkg-config gtk+-3.0 --cflags --libs`
     ```
+9. 命令行行为
+   - 上一条命令为:`!!`
+   - 往上第N条命令:`!-n`
+   - 上条命令的最后一个参数:`!$`
+   - 忽略重定向的最后一个参数:`$_`
+
+## gtk开发命令
+1. gtk-update-icon-cache
+2. glib-compile-schemas
+3. glib-compile-resources
+4. update-fonts-dir,update-fonts-scale,mkfontscale,mkfontdir
+5. 
