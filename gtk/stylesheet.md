@@ -216,3 +216,4 @@ checked|选中
 -gtk-icon-theme|图标，在button的background-image用此指定图标时图标当作前景图。color可以直接改图标颜色
 -gtk-icon-shadow|图标阴影颜色
 background-clip|规定背景的绘制区域,有content-box（内容框）, padding-box（内边距框）, border-box（边框盒）三种
+borde-radius | 1个占位点：代表四角<br>2个占位点：上左下右\   上右下左/<br>4个占位点:按顺时针方向排序，即 上左 上右 下右 下左 eg: border-radius:0 10px 10px 20px

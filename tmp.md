@@ -702,7 +702,7 @@ AADEF((add default csd))
 
 SINIT[[decorated:true<br>client_decorated:false<br>GTK_CSD=0]]
 SCSD1[[csd/solid-csd<br>titlebar]]
-SNCSD[[default:no csd/solid-csd]]
+SNCSD[[default: ssd]]
 SCSD2[[csd/solid-csd<br>titlebar<br>default-decoration]]
 
 
