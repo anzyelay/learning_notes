@@ -115,7 +115,6 @@ IOSchedulingClass=idle
 
 
 
-
 usr: gsd-sound.target
 
 ## 更改插件名称

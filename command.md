@@ -2,10 +2,6 @@
     ```sh
     ffplay -fs ~/Downloads/Big_Buck_Bunny_1080_10s_2MB.mp4  -noborder -an -sn
     ```
-1. 替换文件内容
-    ```sh
-    grep "patapus" . -rl --exclude=*{po,pot} | xargs sed -i "s/patapus/patapua/g"
-    ```
 1.  vi 替换
     ```bash
     :%s/search/repl/flags
@@ -19,10 +15,6 @@
       - n:skip
     - i: ignore case
 
-4. grep 多词搜索
-    ```sh
-    grep -E "elementary|switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot}
-    ```
 5. lsof:查看进程打开的文件
 6. fuser:查看打开文件的进程
 7. ssh 
@@ -37,7 +29,7 @@
    - 上一条命令为:`!!`
    - 往上第N条命令:`!-n`
    - 上条命令的最后一个参数:`!$`
-   - 忽略重定向的最后一个参数:`$_`
+   - 忽略重定向的最后一个参数:`$_   `
 
 ## gtk开发命令
 1. gtk-update-icon-cache
@@ -45,3 +37,13 @@
 3. glib-compile-resources
 4. update-fonts-dir,update-fonts-scale,mkfontscale,mkfontdir
 5. 
+
+## linux 三剑客相关
+1. 替换文件内容
+    ```sh
+    grep "patapus" . -rl --exclude=*{po,pot} | xargs sed -i "s/patapus/patapua/g"
+    ```
+1. grep 多词搜索
+    ```sh
+    grep -E "elementary|switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot}
+    ```

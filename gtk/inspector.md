@@ -144,7 +144,7 @@ element1~element2 |	p ~ ul |	选择前面有 \<p\> 元素的每个 \<ul\> 元素
 [attribute] |	[target] |	选择带有 target 属性的所有元素。
 [attribute=value] |	[target=_blank] |	选择带有 target="_blank" 属性的所有元素。
 [attribute~=value] |	[title~=flower] |	选择 title 属性包含单词 "flower" 的所有元素。
-[attribute|=value] |	[lang|=en] |	选择 lang 属性值以 "en" 开头的所有元素。
+[attribute\|=value] |	[lang\|=en] |	选择 lang 属性值以 "en" 开头的所有元素。
 [attribute^=value] |	a[href^="https"] |	选择其 src 属性值以 "https" 开头的每个 \<a\> 元素。
 [attribute$=value] |	a[href$=".pdf"] |	选择其 src 属性以 ".pdf" 结尾的所有 \<a\> 元素。
 [attribute*=value] |	a[href*="w3schools"] |	选择其 href 属性值中包含 "abc" 子串的每个 \<a\> 元素。

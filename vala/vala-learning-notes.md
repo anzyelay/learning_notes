@@ -1,6 +1,8 @@
 - [语法](#语法)
   - [类型定义](#类型定义)
   - [属性的定义](#属性的定义)
+  - [几个修饰符的说明](#几个修饰符的说明)
+    - [ownership](#ownership)
 - [Gtk](#gtk)
   - [一 窗口属性](#一-窗口属性)
     - [label & Granite.Widget.AlerView](#label--granitewidgetalerview)
@@ -55,6 +57,73 @@
         }
     }
     ```
+## 几个修饰符的说明
+### [ownership](https://wiki.gnome.org/Projects/Vala/Tutorial#Ownership)
+1. Unowned References: 
+   > 通常在 Vala 中创建对象时，返回给你的是对它的引用。  具体来说，这意味着除了传递一个指向内存中对象的指针外，还在对象本身中记录了该指针的存在。  类似地，每当创建针对该对象的另一个引用时，对象本身也会记录此引用。  由于一个对象知道有多少对它的引用，它可以在需要时自动删除。  这是 Vala 内存管理的基础。
+
+   强烈建议看下[Vala's Memory Management Explained](https://wiki.gnome.org/Projects/Vala/ReferenceHandling)中的Unowned References
+    > Vala类的所有对象和大部分gobject-based libraries对象是引用计数的（are reference counted）,但是，Vala 也允许您使用默认情况下不支持引用计数的非基于 gobject 的 C 库类。  这些类称为紧凑类（用 [Compact] 属性注释）。
+    > 非引用计数对象可能只有一个强引用（将其视为“owned”引用）。当此引用超出范围时，对象将被释放。所有其他引用必须是unowned引用。当这些引用超出范围时，对象将不会被释放。
+    >
+    > 因此，当您调用一个方法返回一个无主引用（这在方法的返回类型上用 unowned 关键字标记）到您感兴趣的对象时，您有两种选择：要么复制对象，如果它有复制方法，那么你可以有自己对新复制对象的单一强引用，要么将引用分配给一个用 unowned 关键字声明的变量，Vala会知道它在你这一则不应该释放引用的对象。
+    >
+    > Vala阻止您将无主引用分配给强（即非无主）引用。 但是，您可以使用 (owned) 将原先拥有者的所有权转让给另一个引用（注:原拥有者变为无主引用不再处理对象的释放）
+
+   - 无主引用(unowned references)
+     - 不会在其引用对象中存留引用记录
+     - 引用超出定义范围,引用对象不被释放;
+   - 有主引用(owned references,或强引用)：
+     - 引用记录会在引用对象中存留
+     - 引用超出定义范围,引用对象将被释放掉;
+
+    ```mermaid
+    graph BT
+    ca(("被引用对象<br>引用计数：1"))
+    cb(("被引用对象<br>引用计数：4"))
+
+    a[unowned] 
+    b[unowned] 
+    c[unowned]
+    d[owned]
+
+    f[owned]
+    g[owned]
+    h[owned]
+    i[owned]
+    a .->ca
+    b .->ca
+    c .->ca
+    d -->ca
+
+    f-->cb
+    g-->cb
+    h-->cb
+    i-->cb
+
+    ```
+
+2. Methods ownership:
+    > 无主引用反过来不会记录在它们引用的对象中。这允许在逻辑上应该删除对象时删除它，而不管可能仍然存在对它的引用的情况。实现此目的的常用方法是使用定义为返回无主引用的方法
+
+    自己的理解：一般的普通函数返回的是有主引用。
+3. Properties ownership:
+    > 与普通方法相反，属性总是返回无主的值
+    自己的理解： 属性的拥有者必须是对象本身，所以get方法里不可能new一个属性返回
+4. Ownership Transfer:
+    - 作为参数类型的前缀，它意味着对象的所有权被转移到这个代码上下文中。
+    - 作为类型转换运算符，它可以用来避免复制（duplicate）非引用计数类，这在 Vala 中通常是不可能的。例如
+        ```vala
+        Foo foo = (owned) bar;//这意味着bar将被设置为null,并且foo继承对象bar引用的引用/所有权。
+        ```
+        ```mermaid
+        graph RL
+        o((object))
+
+        bar--> |x|o
+        foo--> o
+
+        ```
 
 # Gtk 
 ## 一 窗口属性
