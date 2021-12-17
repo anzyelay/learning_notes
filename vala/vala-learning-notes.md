@@ -91,15 +91,10 @@
     g[owned]
     h[owned]
     i[owned]
-    a .->ca
-    b .->ca
-    c .->ca
-    d -->ca
+    a & b & c  -.->ca
+    d  -->ca
 
-    f-->cb
-    g-->cb
-    h-->cb
-    i-->cb
+    f & g & h & i -->cb
 
     ```
 
@@ -120,8 +115,8 @@
         graph RL
         o((object))
 
-        bar--> |x|o
-        foo--> o
+        bar -- X --> o
+        foo --> o
 
         ```
 
