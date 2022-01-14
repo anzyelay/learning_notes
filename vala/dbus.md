@@ -10,6 +10,8 @@
 - [server](#server)
   - [编写规则和步骤](#编写规则和步骤)
   - [查找一个dbus服务所在](#查找一个dbus服务所在)
+    - [找服务脚本](#找服务脚本)
+    - [找服务进程](#找服务进程)
 - [参考](#参考)
 # 前提概要
 ## vala中的概念
@@ -54,23 +56,23 @@ Unique name:
 在D-Feet中也可双点方法名在弹出窗口查看上述值, 双击属性得到当前值， 以上四个未说明均是大小写敏感
 ## Type Table
 
-|D-Bus | Vala | Description | Example |
-|:-:|:-:|:-:|-|
-b | bool | Boolean |
-y|uint8 |	Byte |
+|D-Bus | Vala | Description | Example | d-feet中使用方法
+|:-:|:-:|:-:|-|-|
+b | bool | Boolean | | False/True
+y |uint8 |	Byte |
 i | int | Integer |
 u | uint | Unsigned Integer |
 n | int16 | 16-bit Integer |
 q | uint16 | Unsigned 16-bit Integer |
 x| int64| 64-bit Integer |
 t| uint64| Unsigned 64-bit Integer |
-d| double| Double|
-s| string| String|
-v| GLib.Variant| Variant|
-o| GLib.ObjectPath| Object Path|
-a| []| Array| ai maps to int[]
-a{}| GLib.HashTable<,>| Dictionary| a{sv} maps to HashTable<string, Variant>
-()| a struct type| Struct| a(ii) maps to Foo[] where Foo might be defined as struct Foo { public int a; public int b }; A struct representing a(tsav) might look like struct Bar { public uint64 a; public string b; public Variant[] c;} |
+d| double| Double| | 3.0123
+s| string| String| | "strings"
+v| GLib.Variant| Variant|  | GLib.Variant("s", "data")、GLib.Variant("i", 3)、GLib.Variant("b", False)等等
+o| GLib.ObjectPath| Object Path| 
+a| []| Array| ai maps to int[] | eg:ai--> [1,2,3]
+a{}| GLib.HashTable<,>| Dictionary| a{sv} maps to HashTable<string, Variant> | eg:a{sv}--> {"key1": GLib.Variant("s", "value"), "key2": GLib.Variant("b", False)} 
+()| a struct type| Struct| a(ii) maps to Foo[] where Foo might be defined as struct Foo { public int a; public int b }; A struct representing a(tsav) might look like struct Bar { public uint64 a; public string b; public Variant[] c;} | eg:a(si)-->('sddd',1)
 
 *注：vala中定义struct type后，在使用时不要再加struct修饰符* eg:
 ```vala

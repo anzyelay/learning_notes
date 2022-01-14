@@ -8,11 +8,19 @@ A pixel buffer.
 ## Gtk.Image
 - way 1
     ```vala
-    thumb = new Gdk.Pixbuf (Gdk.Colorspace.RGB, false, 8, THUMB_WIDTH * scale, THUMB_HEIGHT * scale);
+    Gtk.Image image = new Gtk.Image ();
+    var thumb = new Gdk.Pixbuf (Gdk.Colorspace.RGB, false, 8, THUMB_WIDTH * scale, THUMB_HEIGHT * scale);
     image.gicon = thumb
     ```
 - way 2
     ```vala
+    Gtk.Image image = new Gtk.Image ();
+    try {
+        Gtk.IconTheme icon_theme = Gtk.IconTheme.get_default ();
+        image.pixbuf = icon_theme.load_icon (icon_name, 16, 0);
+    } catch (Error e) {
+        warning (e.message);
+    }
     ```
 
 ## Granite.Asyncimage   

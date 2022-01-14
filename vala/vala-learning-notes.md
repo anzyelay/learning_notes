@@ -48,12 +48,11 @@
 ## 属性的定义
 - set,get
     ```vala
+    private string _description;
     public string description {
-        get {
-            return description;
-        }
+        get { return _description; }
         set {
-            description = value; // value是关键字，代表传进来的设置值，可以先判断是否为空
+            _description = value; // value是关键字，代表传进来的设置值，可以先判断是否为空
         }
     }
     ```
@@ -129,16 +128,17 @@
 1. pass_through：输入事件可否过滤到下层窗口
 
 2. 窗口大小相关
-```
-get_position (out root_x, out root_y);获取窗口位置
-set_size_request (width,height);//设置最小需求，包涵margin,alignment区域，如果后面几种设置方法设置的大小比这个小，那么get_allocation获取的值就是此值，否则就以其它设置方法的大小为准
-set_default_size (rect.width,rect.height);//设置main_window窗口初始大小。
-set_allocation(rect);//main_window设置子窗口区域的大小，设置值可能被子窗口的虚方法adjust_size_allocation校准，（默认是去掉margins,alignments等），所以此设置可能导致main_window的绘图区变大;
-get_allocation (out rect);//获取程序绘图区域的大小,包涵不可见的区域（如margin, alignment）随区域的更改而更改。
-get_default_size (out rect.width, out rect.height);//一直是set_default_size设置的值，不随窗口变化而变。
-get_size_request;//一直是set_size_request设置的值，不随窗口变化而变。
-get_size (out rect.width, out rect.height);//用户真正看到的main_window大小，窗口大小改变，其取值也变化，但比allocation那个要小。
-```
+- get_position (out root_x, out root_y): 获取窗口位置
+- set_size_request (width,height): 设置最小需求，包涵margin,alignment区域，如果后面几种设置方法设置的大小比这个小，那么get_allocation获取的值就是此值，否则就以其它设置方法的大小为准
+- set_default_size (rect.width,rect.height): 设置main_window窗口初始大小。
+- set_allocation(rect): main_window设置子窗口区域的大小，设置值可能被子窗口的虚方法adjust_size_allocation校准，（默认是去掉margins,alignments等），所以此设置可能导致main_window的绘图区变大;
+- get_allocation (out rect): 获取程序绘图区域的大小,包涵不可见的区域（如margin, alignment）随区域的更改而更改。
+- get_default_size (out rect.width, out rect.height): 一直是set_default_size设置的值，不随窗口变化而变。
+- get_size_request: 一直是set_size_request设置的值，不随窗口变化而变。
+- get_size (out rect.width, out rect.height): 用户真正看到的main_window大小，窗口大小改变，其取值也变化，但比allocation那个要小。
+- [h/v]homogeneous:同质化属性值，设置各子窗口控件水平或垂直方向的尺寸大小是否相同，若设为true，则所有子窗体以最大子窗体大小显示。
+- align: 取值有FILL, START, END, CENTER等， 当值为FILL时，remove一个子窗口后，整体窗口大小不会变小。
+
 设置窗口大小使用如下方式：
 ```vala
 //main_window.set_size_request(x,y);//如何使用了此方法则必须满足x<800,y<600；否则width,height可能会比800，600大一点，但也不是，x,y的值， get_allocation才是它的值

@@ -717,3 +717,38 @@ C2-.yes 1,3-.-> AADEF--> SCSD2
 
 ```
 
+## gnome-panel
+### source code review
+```mermaid
+flowchart TB
+panel_object_loader_idle_handler 
+--> panel_applet_frame_load
+--> panel_applets_manager_get_applet_info
+--> gp_module_manager_init??
+---> load_modules
+--> A{find so file}
+--yes-->gp_module_new_from_path
+--> newojbect["g_object_new (GP_TYPE_MODULE, NULL)"]
+--> xdasdas["gp_module[_class]_init"]
+--> PRI0["module-->gp_module_load"]
+--> get_applet_info
+--> PRI1[module->get_applet_info_func<br>.func=sn_applet_get_type]
+--> A
+
+A--no--> gp_applet_manager_get_applet_info
+--> panel_applet_frame_load_helper
+--> panel_applets_manager_load_applet
+--+1--> gp_applet_manager_get_applet_info
+--2----> gp_applet_manager_load_applet
+--> gp_module_applet_new
+--> PRI2["call get_applet_info"]
+--> PRI3["info->get_applet_type_func"]
+
+```
+### gnome-panel notification
+必须项:
+- indicator-
+/usr/lib/x86_64-linux-gnu/indicator-application/indicator-application-service--->creat watcher
+- application---> StatusNotifierItem
+- gnome-panel---> display notification area
+
