@@ -121,34 +121,47 @@ man deb-changelog
         $ dpkg -c xxx.deb # 安装前根据deb文件查看
         $ dpkg -L debname # 安装后根据包名查看
     ```
-
-1. 安装deb包,还可指明安装路径
-    ```sh
-        $ dpkg -i xxx.deb
-    ```
 1. 查看某个文件属于哪个deb包
     ```sh
-        $ dpkg -S filefullpath
+        $ dpkg -S /path/to/file
+    ```
+1. 下载包
+    ```sh
+        $ apt-get download packagename # 下载包
+        $ apt-get source packagename # 下载源码包
+    ```
+1. 模拟安装远程deb包
+    ```sh
+        $ apt install -s debname
+    ```
+1. 安装远程deb包,还可指定版本
+    ```sh
+        $ sudo apt-get install package=version
+    ```
+1. 安装本地deb包,还可指明安装路径
+    ```sh
+        $ sudo dpkg -i xxx.deb
+        $ sudo apt-get install -f #如果远程仓库有可用的依赖包,则安装它们
+        $ sudo gdebi xxx.deb # 自动安装依赖项
     ```
 1. 卸载deb包
     ```sh
-        $ dpkg -r debname
-        $ dpkg -P debname # 完全卸载deb包（包含配置文件)
+        $ sudo apt remove/purge debname #
+        $ sudo dpkg -r debname
+        $ sudo dpkg -P debname # 完全卸载deb包（包含配置文件)
     ```
-1. 下载源码包
-    ```sh
-        $ apt-get source packagename
-    ```
-
 1. 根据软件包名模糊检索
     ```sh
+        $ apt search xxx #在源中的所有软件包列表中搜索
         $ dpkg -l|grep xxx #在已安装的软件包列表中搜索
-        $ apt-cache search xxx #在源中的所有软件包列表中搜索
+        $ apt list --installed |grep xxx #在已安装的软件包列表中搜索
+        $ dpkg --get-selections # 所有安装包和已删但未删除配置的包的列表 
+        $ dpkg --get-selections | awk '$2 ~ /^install/' # awk 中用!~ 取反
     ```
 1. 修改添加源
    ```sh
-    apt edit-source [xxx.list]
-    apt-add-repository url
+    sudo apt edit-source [xxx.list]
+    sudo apt-add-repository url
    ```
 1. 找依赖
    ```sh
@@ -156,7 +169,7 @@ man deb-changelog
     apt rdepends name.deb
     apt-get build-dep project-dir
    ```
-
+1. 更多命令请看[Ubuntu and Debian Package Management Essentials](https://www.digitalocean.com/community/tutorials/ubuntu-and-debian-package-management-essentials)
 
 ## dpkg-buildpackage error信息
 1. error: Please specify the compatibility level in debian/compat

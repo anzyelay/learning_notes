@@ -14,18 +14,23 @@
       - y:replace
       - n:skip
     - i: ignore case
+1. find:
+   ```sh
+   # {}代表找到的文件结果名, 安装多级目录文件
+   find build/ -type f -exec install -Dm 755 "{}" "/tmp/{}" \;
+   ```
 
-5. lsof:查看进程打开的文件
-6. fuser:查看打开文件的进程
-7. ssh 
+2. lsof:查看进程打开的文件
+3. fuser:查看打开文件的进程
+4. ssh 
     - 远客机首先安装有openssh-server
     - 可以运行界面的ssh连接 `DISPLAY=:0 ssh -X username@ip`
 
-8. pkg-config:查找编译前置条件或依赖等
+5. pkg-config:查找编译前置条件或依赖等
     ```
      gcc -o test test.c `pkg-config gtk+-3.0 --cflags --libs`
     ```
-9. 命令行行为
+6. 命令行行为
    - 上一条命令为:`!!`
    - 往上第N条命令:`!-n`
    - 上条命令的最后一个参数:`!$`
@@ -46,4 +51,9 @@
 1. grep 多词搜索
     ```sh
     grep -E "elementary|switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot}
+    sed -nr -e '/elementary/p' -e 'switchboard' source
+    ```
+1. awk '待匹配项 [!]~ /正则表达式/ { action }' ,匹配行后执行action，默认是打印
+    ```sh
+    dpkg --get-selections | awk '$2 ~ /^install/'
     ```
