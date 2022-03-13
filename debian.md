@@ -10,6 +10,8 @@
 - [help](#help)
 - [关于deb包的常用命令](#关于deb包的常用命令)
 - [dpkg-buildpackage error信息](#dpkg-buildpackage-error信息)
+- [appstream](#appstream)
+  - [如何生成appstream data](#如何生成appstream-data)
 ## 参考
 - [第 4 章 debian 目录中的必需内容](https://www.debian.org/doc/manuals/maint-guide/dreq.zh-cn.html)
 
@@ -215,3 +217,16 @@ man deb-changelog
     -3.0 (quilt)
     +3.0 (native)
     ```
+
+## appstream
+ 此软件包提供了用于生成、维护和查询已安装和可用软件的 AppStream 数据池的工具，并支持与 APT 软件包管理器的集成。
+ > The 'appstreamcli' tool can be used for accessing the software component pool as well as for working with AppStream metadata directly, including validating it for compliance with the specification. 
+### 如何生成appstream data
+
+
+- pkcon : packagekit
+- appstreamcli : appstream
+- appstream-generator
+
+
+

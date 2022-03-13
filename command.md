@@ -35,6 +35,14 @@
    - 往上第N条命令:`!-n`
    - 上条命令的最后一个参数:`!$`
    - 忽略重定向的最后一个参数:`$_   `
+1. read读文件，每次读取一行，直到读取不到返回非0：
+```sh
+cat tmp.txt  | while read line; do echo $line; done
+
+while read name; do
+    # Do what you want to $name
+done < filename
+```
 
 ## gtk开发命令
 1. gtk-update-icon-cache
