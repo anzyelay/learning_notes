@@ -17,6 +17,10 @@
   - [command line args](#command-line-args)
   - [信号事件](#信号事件)
   - [apt 安装(参考语言插件中的aptd-client.vala)](#apt-安装参考语言插件中的aptd-clientvala)
+  - [http](#http)
+    - [post + urlencoded](#post--urlencoded)
+    - [post + json](#post--json)
+    - [json 解析](#json-解析)
 # 语法
 ## 类型定义
 - vala中的enum, struct申明和c/c++相同，但没有typedef一说，使用时无需加enum,struct修饰符
@@ -726,4 +730,82 @@ public class AptdTransactionProxy : GLib.Object {
         }
     });
 
+```
+
+## http
+来源：appcenter--> StripeDialog.vala
+### post + urlencoded
+```vala
+    private string get_stripe_data (string _key, string _email, string _amount, string _cc_num, string _cc_exp_month, string _cc_exp_year, string _cc_cvc) {
+        private const string STRIPE_URI = "https://api.stripe.com/v1/tokens";
+        private const string STRIPE_REQUEST = "email=%s"
+                                + "&payment_user_agent=%s&amount=%s&card[number]=%s"
+                                + "&card[cvc]=%s&card[exp_month]=%s&card[exp_year]=%s"
+                                + "&key=%s"
+                                + "&currency=USD";
+        var session = new Soup.Session ();
+        var message = new Soup.Message ("POST", STRIPE_URI);
+        var request = STRIPE_REQUEST.printf (
+            Soup.URI.encode (_email, null),
+            Soup.URI.encode (USER_AGENT, null),
+            Soup.URI.encode (_amount, null),
+            Soup.URI.encode (_cc_num, null),
+            Soup.URI.encode (_cc_cvc, null),
+            Soup.URI.encode (_cc_exp_month, null),
+            Soup.URI.encode (_cc_exp_year, null)
+        );
+
+        message.request_headers.append ("Authorization", STRIPE_AUTH.printf (_key));
+        message.request_headers.append ("Content-Type", "application/x-www-form-urlencoded");
+        message.request_body.append_take (request.data);
+
+        session.send_message (message);
+
+        var data = new StringBuilder ();
+        foreach (var c in message.response_body.data) {
+            data.append ("%c".printf (c));
+        }
+
+        return data.str;
+    }
+```
+### post + json
+```vala
+    private string post_to_houston (string _app_key, string _app_id, string _purchase_token, string _email, string _amount) {
+        private const string HOUSTON_URI = "https://developer.elementary.io/api/payment/%s";
+        private const string HOUSTON_PAYLOAD = "{ "
+                                    + "\"data\": {"
+                                        + "\"key\": \"%s\","
+                                        + "\"token\": \"%s\","
+                                        + "\"email\": \"%s\","
+                                        + "\"amount\": %s,"
+                                        + "\"currency\": \"USD\""
+                                    + "}}";
+        var session = new Soup.Session ();
+        var message = new Soup.Message ("POST", HOUSTON_URI.printf (_app_id));
+
+        message.request_headers.append ("Accepts", "application/vnd.api+json");
+        message.request_headers.append ("Content-Type", "application/vnd.api+json");
+
+        var payload = HOUSTON_PAYLOAD.printf (_app_key, _purchase_token, _email, _amount);
+        message.request_body.append_take (payload.data);
+
+        session.send_message (message);
+
+        var data = new StringBuilder ();
+        foreach (var c in message.response_body.data) {
+            data.append ("%c".printf (c));
+        }
+
+        return data.str;
+    }
+```
+### json 解析
+```vala
+        var parser = new Json.Parser ();
+        parser.load_from_data (data);
+        var root_object = parser.get_root ().get_object ();
+        if (root_object.has_member ("type")) {
+           string type = root_object.get_string_member ("type");
+        }
 ```

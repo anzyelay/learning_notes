@@ -1,4 +1,5 @@
 ## appdata.xml
+参考AppStream
 - translation : 表示该应用使用到的翻译文件，如下为data/po/networking-plug.pot, 生成的翻译文本为 *.mo 文件
 
 ```xml

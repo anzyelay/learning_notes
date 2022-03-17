@@ -752,3 +752,24 @@ A--no--> gp_applet_manager_get_applet_info
 - application---> StatusNotifierItem
 - gnome-panel---> display notification area
 
+
+## AWS  cml
+### install
+```sh
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+aws configure //
+```
+
+### configure快速配置
+`aws configure`
+### s3 cli 文档
+- https://docs.aws.amazon.com/cli/latest/reference/s3/
+
+
+## http
+### question
+1. 怎么获取后台仓库的所有可用包信息？
+2. 获取的包库的存储格式？
+

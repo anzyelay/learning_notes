@@ -45,6 +45,11 @@ help(){
 # -----------  extern function bellow --------------
 #extern function prefix is extern_
 #you can use ln -s $0 pre_func to call a extern_func()
+#func exec	: exec app in private runtime profile
+extern_exec(){
+	. profile_usr
+	find `dirname $1` -name `basename $1` -type f -exec '{}' \;
+}
 #func set	:run settingboard
 extern_set(){
 	build_install || return 1
@@ -75,7 +80,7 @@ extern_dtar(){
 		*.dsc 
 
 	if [ $? -ne 0 ] ;then 
-		read -p "not delete ? (y)es/(n)o : " 
+		read -p "not delete the tared files? delete as default.\n (y)es/(n)o : " 
 		if [ "$REPLY" = "y" -o "$REPLY" = "yes" ];then
 			return 1
 		fi
