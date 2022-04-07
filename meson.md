@@ -125,6 +125,7 @@ install_data(
 ```sh
 ann@B460M-d5c6e3b7:settingboard-plug-sound$ ls data/
 icons.gresource.xml
+css.gresource.xml
 ```
 - meson.build
 ```sh
@@ -136,12 +137,42 @@ plug_resources = gnome.compile_resources(
     'data/icons.gresource.xml',
     source_dir: 'data'
 )
+css_resources = gnome.compile_resources(
+    'plug_resources',
+    'data/css.gresource.xml',
+    source_dir: 'data'
+)
 # step 3 : 资源文件加到工程中
 shared_module(
     meson.project_name(),
     'test.vala',
     plug_resources,
+    css_resources,
 )
+```
+- 在源码中的引用
+  - 在css文件中引用
+```css
+.category.graphics label {
+    border-image:
+        -gtk-scaled(
+            /* stylelint-disable-next-line function-comma-newline-after (bug in stylelint?) */
+            url("resource:///io/elementary/appcenter/backgrounds/graphics.svg"),
+            url("resource:///io/elementary/appcenter/backgrounds/graphics@2x.svg")
+        ) 10 10 10 10 / 10px 10px 10px 10px repeat;
+    padding: 12px;
+}
+
+```
+  - 在vala中的引用    
+```vala
+   weak Gtk.IconTheme default_theme = Gtk.IconTheme.get_default ();
+   default_theme.add_resource_path ("/io/elementary/appcenter/icons");
+   var icon = new GLib.ThemedIcon ("category");
+
+   var arrow_provider = new Gtk.CssProvider ();
+   arrow_provider.load_from_resource ("io/elementary/appcenter/arrow.css");
+    
 ```
 
 ## 添加schemas
