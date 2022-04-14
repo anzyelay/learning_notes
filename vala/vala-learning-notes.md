@@ -425,7 +425,7 @@ main_window.resize(800, 600);//
 
 ## 文件
 1. FileUtils
-2. KeyFile: 配置文件读写类
+1. KeyFile: 配置文件读写类
 - KeyFileDesktop: 用于.desktop文件的宏
 - 判断文件是否存在
 ```vala
@@ -468,7 +468,7 @@ return startup_dir;
   ```
 
 1. GLib.Filename 获取文件basename, display_name
-2. 获取文件类型
+1. 获取文件类型
 ```vala
     private string get_mime_type (string uri) {
     try {
@@ -479,7 +479,7 @@ return startup_dir;
     }
 }
 ```
-5. 获取/etc/passwd信息
+1. 获取/etc/passwd信息
 ```vala
 public uid_t getuid () ;
 public unowned Passwd? getpwuid (uid_t uid);
@@ -494,7 +494,7 @@ public class Passwd {
     public uid_t pw_uid 
 }
 ```
-6. file monitor
+1. file monitor
 ```vala
 var file = File.new_for_path (filename);
 try {
@@ -506,12 +506,65 @@ try {
     warning ("Failed to monitor %s: %s", filename, e.message);
 }
 ```
-7. 文件前后缀名判断
+1. 文件前后缀名判断
 ```vala
 string filename;
 filename.has_suffix (".xml")
 filename.has_prefix ("file://")
 
+```
+1. 下载远程文件
+```vala
+        // GVFS handles HTTP URIs for us
+        var remote_file = File.new_for_uri (url);//远程文件地址
+        var local_file = File.new_for_path (path);//path 本地保存地址
+
+            // Setup our own timeout for GVFS, as the HTTP backend has no timeout
+            var cancellable = new GLib.Cancellable ();
+            uint cancel_source = 0;
+            cancel_source = Timeout.add (HTTP_HEAD_TIMEOUT, () => {
+                cancel_source = 0;
+                cancellable.cancel ();
+                return GLib.Source.REMOVE;
+            });
+            var file_info = yield remote_file.query_info_async (
+                GLib.FileAttribute.TIME_MODIFIED,
+                FileQueryInfoFlags.NONE,
+                GLib.Priority.DEFAULT,
+                cancellable
+            );
+            if (cancel_source != 0) {
+                GLib.Source.remove (cancel_source);
+            }
+
+        if (local_file.query_exists ()) {
+            ...
+        }
+
+        // We don't have the local copy, or it's not up to date, download it
+        try {
+            var cancellable = new GLib.Cancellable ();
+            uint cancel_source = 0;
+            cancel_source = Timeout.add (HTTP_DOWNLOAD_TIMEOUT, () => {
+                cancel_source = 0;
+                cancellable.cancel ();
+                return GLib.Source.REMOVE;
+            });
+
+            yield remote_file.copy_async (
+                local_file,
+                FileCopyFlags.OVERWRITE | FileCopyFlags.TARGET_DEFAULT_PERMS,
+                GLib.Priority.DEFAULT,
+                cancellable
+            );
+
+            if (cancel_source != 0) {
+                GLib.Source.remove (cancel_source);
+            }
+        } catch (Error e) {
+            warning ("Unable to download screenshot from %s: %s", url, e.message);
+            return false;
+        }
 ```
 
 ## 进程相关

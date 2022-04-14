@@ -63,6 +63,12 @@ extern_win(){
 	. profile_usr
 	io.elementary.wingpanel
 }
+#func app	:run appstore
+extern_app(){
+	build_install || return 1
+	. profile_usr
+	com.patapua.appstore	
+}
 #func dtar	: tar  a deb package and remove the tared files
 extern_dtar(){
 	if [ "_$1" = "_" ];then

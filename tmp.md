@@ -773,3 +773,32 @@ aws configure //
 1. 怎么获取后台仓库的所有可用包信息？
 2. 获取的包库的存储格式？
 
+
+● ID： 必需 
+● Type：必需，支持, 
+  ○ generic
+  ○ desktop-application 
+  ○ console-application
+  ○ addon
+  ○ codec
+  ○ inputmethod
+  ○ firmware
+● Name：必需
+● Package：必需， 类似pkgname,安装的包名
+● Summary：必需
+
+
+应用详情页-tag | xml tag | 类型 
+-|-|-
+应用名称 | name
+slogan | summary
+分类标签,类别 | categories
+应用简介 | description
+新功能 |  release ->description
+大小 | release --> artifact
+版本号 |  release 
+更新时间 | release
+开发者 | developer_name 或 project_group
+应用类型 |  | android, linux
+图标 | icon
+截图 | screenshots
