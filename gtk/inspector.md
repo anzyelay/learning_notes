@@ -121,7 +121,7 @@ css node![css node](../picture/gtk/inspector-css-node.png)
 - #ID： 选择某个控件指定，效果如下图, 其余的block width=10
   ![id selector](../picture/gtk/inspector-css-example.png)
 - css node节点名称： 在inspector的css里如果是名称则直接使用，有级联关系的中间使用空格分开
-- 样式类别： 图中的样式类别就代表着当前所用的类名classname （eg: .horizontal, .discrete）
+- 样式类别： 图中的样式类别就代表着当前所用的样式类名classname （eg: .horizontal, .discrete）
 - 状态： 代表当前控件的状态是disable,active,backdrop,checked等，状态以`classname:status`书写, 
   - 在inspector的css中书写时**注意类名与状态符：中间留空格**，`.classname :status`。
   - 取反状态使用`:not(status)`

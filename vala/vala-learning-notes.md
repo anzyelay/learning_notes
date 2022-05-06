@@ -21,6 +21,7 @@
     - [post + urlencoded](#post--urlencoded)
     - [post + json](#post--json)
     - [json 解析](#json-解析)
+  - [异步定时超时操作](#异步定时超时操作)
 # 语法
 ## 类型定义
 - vala中的enum, struct申明和c/c++相同，但没有typedef一说，使用时无需加enum,struct修饰符
@@ -861,4 +862,28 @@ public class AptdTransactionProxy : GLib.Object {
         if (root_object.has_member ("type")) {
            string type = root_object.get_string_member ("type");
         }
+```
+## 异步定时超时操作
+
+```vala
+    var cancellable = new GLib.Cancellable ();
+    uint cancel_source = 0;
+    cancel_source = Timeout.add (HTTP_HEAD_TIMEOUT, () => {
+        cancel_source = 0;
+        cancellable.cancel ();
+        return GLib.Source.REMOVE;
+    });
+
+    // GVFS uses libsoup to get the mtime via a HEAD request
+    var file_info = yield remote_file.query_info_async (
+        GLib.FileAttribute.TIME_MODIFIED,
+        FileQueryInfoFlags.NONE,
+        GLib.Priority.DEFAULT,
+        cancellable
+    );
+
+    if (cancel_source != 0) {
+        GLib.Source.remove (cancel_source);
+    }
+
 ```
