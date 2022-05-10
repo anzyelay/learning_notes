@@ -207,6 +207,7 @@ backdrop|在其它窗口后，非当前窗口
 active| 被点击时
 disabled| 被禁用，sensitive为false时
 hover|鼠标放置于上时
+prelight|小部件上有一个鼠标指针
 checked|选中
 
 

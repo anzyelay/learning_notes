@@ -2,6 +2,7 @@
 A pixel buffer.
 `GdkPixbuf` contains information about an image's pixel data, its color space, bits per sample, width and height, and the rowstride (the number of bytes between the start of one row and the start of the next)
 - scale
+    - 目标： 尽最大可能按目标窗体大小显示源图中最多的内容， 然后宽高等比例放大填满目标窗体。
     ```vala
     // 先整体放大图像，再平移剪切对应大小到目标上去。
     public Gdk.Pixbuf get_pixbuf_for_size (string path, int width_request, int height_request) {
@@ -14,8 +15,8 @@ A pixel buffer.
         double scale_x = (double)dst_w/width;
         double scale_y = (double)dst_h/height;
         var scale = double.max (scale_x, scale_y);
-        double offset_x = (dst_w - width*scale)/2; // x轴平移距离
-        double offset_y = (dst_h - height*scale)/2;// y轴平移距离
+        double offset_x = (dst_w - width*scale)/2; // x轴平移距离   实际是: -(width*scale-dst_w)/2
+        double offset_y = (dst_h - height*scale)/2;// y轴平移距离   实际同上
         try {
             Gdk.Pixbuf src_pixbuf = new Gdk.Pixbuf.from_file (path);
             //src_pixbuf先按scale缩放后，再平移offset距离，再将处理过的图形的目标区域渲染到目标图形上去
@@ -75,6 +76,9 @@ A pixel buffer.
         warning (e.message);
     }
     ```
+
+- 注意：
+  - image控件的button_press_event不会触发，如果需要可使用DrawingArea
 
 ## Granite.Asyncimage   
 1. set_from_file_async()
@@ -144,6 +148,44 @@ A pixel buffer.
                 ctx.paint();
             }
             return true;
+        }
+    }
+```
+针对jpg等图的处理
+```vala
+    public class BannerImage : Gtk.DrawingArea {
+
+        private Gdk.Pixbuf ?pixbuf = null;
+        private int orig_width;
+        private int orig_height;
+        
+        public BannerImage(string png_path) {
+            try {
+                pixbuf = new Gdk.Pixbuf.from_file (path);
+            }catch (Error e) {
+                warning (e.message);
+            }
+            orig_width = pixbuf.get_width ();
+            orig_height = pixbuf.get_height ();
+        }
+        // override widget.draw
+        public override bool draw (Cairo.Context ctx) {
+            if (pixbuf != null) {
+                var width = get_allocated_width ();
+                var height = get_allocated_height ();
+
+                double scale_x = (double)width/orig_width;
+                double scale_y = (double)height/orig_height;
+                var scale = double.max (scale_x, scale_y);
+                double offset_x = (width/scale - orig_width)/2; // x轴平移距离   实际是: -(width*scale-dst_w)/2
+                double offset_y = (height/scale - orig_height)/2;// y轴平移距离   实际同上
+
+                ctx.scale(scale, scale);
+                Gdk.cairo_set_source_pixbuf (ctx, pixbuf, offset_x, offset_y);
+                ctx.paint();
+                return true;
+            }
+            return false;
         }
     }
 ```
