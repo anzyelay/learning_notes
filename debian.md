@@ -12,6 +12,8 @@
 - [dpkg-buildpackage error信息](#dpkg-buildpackage-error信息)
 - [appstream](#appstream)
   - [如何生成appstream data](#如何生成appstream-data)
+- [公钥的获取与上传](#公钥的获取与上传)
+- [错误集](#错误集)
 ## 参考
 - [第 4 章 debian 目录中的必需内容](https://www.debian.org/doc/manuals/maint-guide/dreq.zh-cn.html)
 
@@ -230,3 +232,51 @@ man deb-changelog
 
 
 
+## 公钥的获取与上传
+参考1:[Securing Debian Manual](https://www.debian.org/doc/manuals/securing-debian-manual/deb-pack-sign.en.html)
+参考2:[APT-KEY](https://manpages.debian.org/testing/apt/apt-key.8.en.html);
+- 生成密钥： `gpg --generate-key`
+- 将自己的公钥上传到 [keyserver.ubuntu.com](http://keyserver.ubuntu.com)
+- 用上述密钥加密Debian的Release文件信息, 更新仓库
+- 用`apt update`检查gpg密钥，获取缺失的PUBKEY-ID
+    ```bash
+    ann@dell:appstore$ sudo apt update 
+    命中:1 http://192.168.16.174/patapua/test/ubuntu focal InRelease
+    命中:2 http://mirrors.aliyun.com/ubuntu focal InRelease
+    错误:2 http://mirrors.aliyun.com/ubuntu focal InRelease    
+    由于没有公钥，无法验证下列签名： NO_PUBKEY 3B4FE6ACC0B21F32 NO_PUBKEY 871920D1991BC93C
+    ```
+- 下载对应的PUBKEY ID，
+    ```bash
+    ann@dell:appstore$ gpg --keyserver keyserver.ubuntu.com --recv-keys 871920D1991BC93C
+    gpg: 密钥 871920D1991BC93C：公钥 “Ubuntu Archive Automatic Signing Key (2018) <ftpmaster@ubuntu.com>” 已导入
+    gpg: 处理的总数：1
+    gpg:               已导入：1
+    ```
+- 添加公钥
+  ```sh
+  $ gpg -a --export 871920D1991BC93C | sudo apt-key add -
+    gpg: no ultimately trusted keys found
+    OK
+  ```
+- apt-key list 显示已加公钥
+
+- 添加已知<URL>地址公钥
+  ```sh
+  GET <URL> | sudo apt-key add -
+  curl -sL <URL> | sudo apt-key add -
+  wget -qO- <URL> | sudo apt-key add -
+  // 或者把apt-key add 替换成tee
+  wget -qO- https://myrepo.example/myrepo.asc | sudo tee /etc/apt/trusted.gpg.d/myrepo.asc
+  /**
+  确保对ASCII密钥使用“asc”扩展名，对二进制 OpenPGP 格式（也称为“GPG 密钥公共环”）使用“gpg”扩展名。  
+  二进制 OpenPGP 格式适用于所有 apt 版本，而 ASCII格式适用于 apt 版本 >= 1.4。
+  */
+  ```
+## 错误集
+1. preinst,postinst,prerm, postrm等打包时不会添加到deb包里
+    > hese scripts are the control information files preinst, postinst, prerm and postrm. They must be proper executable files; if they are scripts (which is recommended), they must start with the usual #! convention. They should be readable and executable by anyone, and must not be world-writable.
+    >           
+    >转自[Package maintainer scripts and installation procedure](https://www.debian.org/doc/debian-policy/ch-maintainerscripts.html)
+    
+    必须是可执行文件！！, 文件名比如是preinst.ex，必须改为preinst
