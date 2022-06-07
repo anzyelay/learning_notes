@@ -273,6 +273,39 @@ man deb-changelog
   二进制 OpenPGP 格式适用于所有 apt 版本，而 ASCII格式适用于 apt 版本 >= 1.4。
   */
   ```
+### apt-key的替代
+  参考：[https://www.linuxuprising.com/2021/01/apt-key-is-deprecated-how-to-add.html](https://www.linuxuprising.com/2021/01/apt-key-is-deprecated-how-to-add.html)使用 **signed-by** 方式
+1. key的分类：
+   - ascii-armored OpenPGP keys
+   - non-ascii-armored OpenPGP keys
+    如何区分：`file <repo-key>.gpg`（注：后缀可以是.gpg,.asc,.key或其它合适的）,如果输出如下，则为**ascii-armored**
+    ```sh
+    epo-key.gpg: PGP public key block Public-Key (old)
+    ```
+2.  如何添加：
+- step 1:  下载 APT 存储库密钥
+    - 针对ascii-armored OpenPGP keys：  
+        ```sh
+        wget -O- <https://example.com/key/repo-key.gpg> | gpg --dearmor | sudo tee /usr/share/keyrings/<myrepository>-archive-keyring.gpg
+        curl <https://example.com/key/repo-key.gpg> | gpg --dearmor > /usr/share/keyrings/<myrepository>-archive-keyring.gpg
+        ```
+    - 针对non-ascii-armored OpenPGP keys:
+        ```sh
+        wget -O- <https://example.com/key/repo-key.gpg> | sudo tee /usr/share/keyrings/<myrepository-archive-keyring.gpg>
+        wget -O /usr/share/keyrings/<myrepository-archive-keyring.gpg> <https://example.com/key/repo-key.gpg>
+        ```
+   - 将OpenPGP密钥直接从密钥服务器导入 /usr/share/keyrings 中的文件
+        ```sh
+        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/<myrepository>-archive-keyring.gpg --keyserver <hkp://keyserver.ubuntu.com:80> --recv-keys <fingerprint>
+        ```
+- step 2:
+  将source添加到/etc/apt/source.list.d/下， 并指定signed-by参数，如下：
+  ```sh
+  deb [signed-by=/usr/share/keyrings/<myrepository>-archive-keyring.gpg] <https://repository.example.com/debian/ stable main>
+  ```
+
+
+
 ## 错误集
 1. preinst,postinst,prerm, postrm等打包时不会添加到deb包里
     > hese scripts are the control information files preinst, postinst, prerm and postrm. They must be proper executable files; if they are scripts (which is recommended), they must start with the usual #! convention. They should be readable and executable by anyone, and must not be world-writable.
@@ -280,3 +313,5 @@ man deb-changelog
     >转自[Package maintainer scripts and installation procedure](https://www.debian.org/doc/debian-policy/ch-maintainerscripts.html)
     
     必须是可执行文件！！, 文件名比如是preinst.ex，必须改为preinst
+2. gpg: 找不到有效的 OpenPGP 数据
+    

@@ -67,8 +67,7 @@ extern_win(){
 extern_app(){
 	build_install || return 1
 	profile_usr
-	# G_MESSAGES_DEBUG=all 
-	com.patapua.appstore	
+	G_MESSAGES_DEBUG=all com.patapua.appstore	
 }
 #func dtar	: tar  a deb package and remove the tared files
 extern_dtar(){

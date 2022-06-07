@@ -23,19 +23,22 @@ update_pkg(){
 	fi
 	cd $1
 
-	git branch  | grep "develop" > /dev/null 
+	BRANCH=${2:-develop}
+	echo $BRANCH
+
+	# checkout to ${BRANCH} branch,and check it need to update
+	git branch  | grep "${BRANCH}" > /dev/null 
 	if [ $? -eq 0 ];then
-		# checkout to develop branch,and check it need to update
-		git branch  | grep "* develop" > /dev/null || git checkout develop
-		git status | grep "Your branch is up to date with 'origin/develop'" > /dev/null
+		git branch  | grep "* ${BRANCH}" > /dev/null || git checkout ${BRANCH}
+		git fetch
+		git status | grep "Your branch is up to date with 'origin/${BRANCH}'" > /dev/null
 		if [ $? -eq 0 -a $force -eq 0 ];then
 			echo "needless to update $1"
 			cd - > /dev/null; return 0
 		fi
 		git pull origin
 	else
-		#echo "set upstream to develop"
-		git checkout develop
+		git checkout ${BRANCH}
 	fi
 
 	# start to build the deb package here
@@ -47,7 +50,7 @@ update_pkg(){
 
 	cd ..
 	# archive the deb and transfer to ppa
-	TARNAME=`basename $1`.tar
+	TARNAME=arm_`basename $1`.tar
 	find .  -maxdepth 1 -type f | xargs tar cvf ${TARNAME} --exclude=*.tar
 	tar tf $TARNAME | xargs rm && scp $TARNAME ppa@192.168.16.174:/tmp/ && rm ${TARNAME}
 }
@@ -69,7 +72,7 @@ fi
 
 for dir in ${GIT_DIRS[@]}
 do
-	echo start to updating $dir
-	update_pkg $dir
+	echo start to updating $dir at branch $2
+	update_pkg $dir $2
 done
 
