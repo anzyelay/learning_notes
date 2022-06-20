@@ -9,10 +9,17 @@
   - [i18n模块介绍](#i18n模块介绍)
   - [工程翻译步骤](#工程翻译步骤)
   - [问题集](#问题集)
+- [手动在vala工程中添加vapi （以添加sdl2_image为例)](#手动在vala工程中添加vapi-以添加sdl2_image为例)
+  - [在工程中添加vapi目录](#在工程中添加vapi目录)
+  - [添加vapi文件](#添加vapi文件)
+  - [在meson.build中添加 **'--vapidir'**](#在mesonbuild中添加---vapidir)
+  - [在meson.build中添加对应库, 参数本章命令节第二条](#在mesonbuild中添加对应库-参数本章命令节第二条)
 ## 命令
 1. 查看当前配置状态 (build为构建目录)
 `meson configure build`
 2. 添加lib `dependency('libcanberra')`
+   - `pkg-config --list-all` 列出所有可用库
+   - `pkg-config --libs libname`, 去掉-l就是要添加到dependency中间的名字，大小写敏感
 3. 获取参数值：`get_option('prefix')`
 4. foreach
    ```meson.build
@@ -378,3 +385,30 @@ i18n.merge_file(
     resolved: 需要将对应的.po文件中charset值从ASCII修改为UTF-8，再执行上述命令即可！
 
 
+
+## 手动在vala工程中添加vapi （以添加sdl2_image为例)
+### 在工程中添加vapi目录
+```sh
+ann@dell:appstore$ mkdir vapi
+ann@dell:appstore$ ls
+build  builddir  data  debian  meson  meson.build  po  README.md  src  vapi
+```
+### 添加vapi文件
+查看SDL2_image.deps，得知SDL2_image只依赖sdl2, 则添加如下两个vapi文件
+```sh
+ann@dell:appstore$ ls vapi/
+SDL2_image.vapi  sdl2.vapi
+```
+### 在meson.build中添加 **'--vapidir'**
+```sh
+vapi_dir = join_paths(meson.current_source_dir(), 'vapi')
+add_project_arguments(['--vapidir', vapi_dir], language: 'vala')
+```
+### 在meson.build中添加对应库, 参数本章命令节第二条
+```sh
+dependencies:[
+    dependency ('sdl2'),
+    dependency ('SDL2_image')
+    ]
+    
+```

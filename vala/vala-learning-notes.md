@@ -1,6 +1,7 @@
 - [语法](#语法)
   - [类型定义](#类型定义)
   - [属性的定义](#属性的定义)
+  - [libgee中容器的注意事项：](#libgee中容器的注意事项)
   - [几个修饰符的说明](#几个修饰符的说明)
     - [ownership](#ownership)
 - [Gtk](#gtk)
@@ -61,6 +62,10 @@
         }
     }
     ```
+## libgee中容器的注意事项：
+> You can use any type fitting into the size of a pointer (e.g. int, bool, reference types) directly as generic type argument: <bool>, <int>, <string>, <MyObject>. Other types must be "boxed" by appending a question mark: <float?>, <double?>, <MyStruct?>. The compiler will tell you this if necessary. 
+<https://wiki.gnome.org/Projects/Vala/GeeSamples>
+
 ## 几个修饰符的说明
 ### [ownership](https://wiki.gnome.org/Projects/Vala/Tutorial#Ownership)
 1. Unowned References: 
