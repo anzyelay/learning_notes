@@ -6,12 +6,12 @@ codenames=(focal)
 archs=(arm64)
 
 ppa_root="/home/ppa"
-patapua_ports_root="${ppa_root}/patapua-ports"
+patapua_root="${ppa_root}/patapua-ports"
 conf_file="${ppa_root}/conf/${channels[0]}/aptftp.conf"
 
 for channel in ${channels[@]}
 do
-  channel_path=${patapua_ports_root}/${channel}/ubuntu
+  channel_path=${patapua_root}/${channel}/ubuntu
   if [ -d ${channel_path} ]; then
     echo "entering ${channel_path}"
     cd ${channel_path}

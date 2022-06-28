@@ -1,5 +1,7 @@
+- [- 在meson.build中添加对应库, 参数本章命令节第二条](#--在mesonbuild中添加对应库-参数本章命令节第二条)
 - [命令](#命令)
 - [路径和名称](#路径和名称)
+- [1. 工程名： `meson.project_name()`](#1-工程名-mesonproject_name)
 - [资源文件的引入](#资源文件的引入)
 - [添加schemas](#添加schemas)
 - [Config.vala 文件自动生成](#configvala-文件自动生成)
@@ -14,6 +16,7 @@
   - [添加vapi文件](#添加vapi文件)
   - [在meson.build中添加 **'--vapidir'**](#在mesonbuild中添加---vapidir)
   - [在meson.build中添加对应库, 参数本章命令节第二条](#在mesonbuild中添加对应库-参数本章命令节第二条)
+-------------
 ## 命令
 1. 查看当前配置状态 (build为构建目录)
 `meson configure build`
@@ -80,7 +83,7 @@
     endif
 
     ```
-
+--------------
 ## 路径和名称
 1. 源代码root路径： `meson.source_root() `
 1. 当前路径 :   `meson.current_source_dir()`
@@ -126,6 +129,7 @@ install_data(
 
 ```
 1. 工程名： `meson.project_name()`
+-------------
 
 ## 资源文件的引入
 - 文件所在位置
@@ -181,7 +185,7 @@ shared_module(
    arrow_provider.load_from_resource ("io/elementary/appcenter/arrow.css");
     
 ```
-
+-------------
 ## 添加schemas
  - 在工程schemas或data目录中添加*.gschema.xml文件
  - 在gschema.xml同层的meson.build中加入如下内容,安装到系统指定schemas目录中
@@ -207,7 +211,7 @@ if not os.environ.get('DESTDIR'):
 ```
 - 在主meson.build中添加`meson.add_install_script('meson/post_install.py')`,执行编译脚本,使之生效
 
-
+-------------
 ## Config.vala 文件自动生成
 
 - 在目录“src”下创建“Config.vala.in”文件 , 内容如下：
@@ -248,7 +252,7 @@ GLib.Intl.bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
 GLib.Intl.bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 ```
 
-
+--------------
 ## 翻译
 ### 构成目录
 ```sh
@@ -385,7 +389,7 @@ i18n.merge_file(
     resolved: 需要将对应的.po文件中charset值从ASCII修改为UTF-8，再执行上述命令即可！
 
 
-
+---------------
 ## 手动在vala工程中添加vapi （以添加sdl2_image为例)
 ### 在工程中添加vapi目录
 ```sh

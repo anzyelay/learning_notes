@@ -1,10 +1,11 @@
 - [参考](#参考)
 - [环境变量](#环境变量)
-- [打包命令](#打包命令)
+- [从源码开始打包](#从源码开始打包)
   - [1. 生成debian目录](#1-生成debian目录)
   - [2. 修改changelog文件](#2-修改changelog文件)
   - [3. 修改control文件](#3-修改control文件)
   - [4. 打包文件](#4-打包文件)
+- [修改已有deb包](#修改已有deb包)
 - [包改名](#包改名)
   - [过渡包方法:](#过渡包方法)
 - [help](#help)
@@ -13,6 +14,7 @@
 - [appstream](#appstream)
   - [如何生成appstream data](#如何生成appstream-data)
 - [公钥的获取与上传](#公钥的获取与上传)
+  - [apt-key的替代](#apt-key的替代)
 - [错误集](#错误集)
 ## 参考
 - [第 4 章 debian 目录中的必需内容](https://www.debian.org/doc/manuals/maint-guide/dreq.zh-cn.html)
@@ -27,7 +29,7 @@
     EOF
     $ . ~/.bashrc
     ```
-## 打包命令
+## 从源码开始打包
 ### 1. 生成debian目录 
 ```sh
 dh_make  --copyright gpl3 --email leixa@jideos.com --createorig -s
@@ -90,6 +92,12 @@ debchange  # 添加说明，修改版本号
 
 ### 4. 打包文件
 - 打包 ：  `dpkg-buildpackage -rfakeroot -tc --no-sign`
+
+## 修改已有deb包
+- 解包到指定目录dirname：`dpkg-deb -x name.deb dirname`
+- 修改内容
+- 重新打包指定目录dirname：`fakeroot dpkg-deb -b dirname name.deb`
+
 
 ## [包改名](https://wiki.debian.org/RenamingPackages)
 ### 过渡包方法: 
