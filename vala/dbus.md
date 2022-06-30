@@ -92,6 +92,7 @@ DemoStruct object;
 - 方法如果要取别名，须在方法上用 [DBus (name = "...")] 注释原DBus中的方法名，（eg: name = "GetCurrentIM"）
 - 为每个接口方法添加 throws GLib.Error 或 throws GLib.DBusError, GLib.IOError,信号属性则不用
 - 方法，属性，信号必须是public
+- [DBus Attribute修饰词](https://wiki.gnome.org/Projects/Vala/Manual/Attributes#DBus_Attribute)
 
 ## dbus 信号的监听
 - 申明
@@ -135,6 +136,8 @@ DemoStruct object;
 - 使用
     ```vala
     var user_path = accounts_service.find_user_by_name (GLib.Environment.get_user_name ());
+    var proxy = accounts_service as DBusProxy;
+    proxy.set_default_timeout (300000);
     ```
 
 ## dbus 属性的监听

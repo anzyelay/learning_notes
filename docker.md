@@ -30,7 +30,7 @@
     
     镜像名形如：anzye/ubuntu:v2;  **dockerfile_dir**是指dockerfile所在的目录，也可以是绝对路径
     
-    dockerfile格式：
+    [dockerfile格式](https://www.runoob.com/docker/docker-dockerfile.html)：
     ```sh
     runoob@runoob:~$ cat Dockerfile 
     FROM    centos:6.7
