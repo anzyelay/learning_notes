@@ -77,7 +77,8 @@ update-binfmts --display qemu-arm
 > Please make sure that the qemu-arm-static binary is under /usr/bin/ directory of your system. If not, copy it from post-compiled qemu file.
 
 
-## 运行docker
+## [运行docker](../docker.md)
 ```sh
 docker run -it --name your-container-name -v /usr/bin/qemu-arm-static:/usr/bin/qemu-arm-static your-arm-image 
 ```
+
