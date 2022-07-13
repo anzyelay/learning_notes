@@ -813,3 +813,8 @@ slogan | summary
 |沟通表达能力 |  一般, 未正面回应也未能自圆其说
 |解决问题能力 |  未展现
 | 用人建议: 不建议
+
+## seeds --> metapackages
+## What is [Germinate](https://wiki.debian.org/Germinate#:~:text=What%20is%20Germinate%3F%20Germinate%20is%20a%20package%20available,for%20each%20of%20these%20lists.%20Files%20You%20Need)?  
+Germinate is a package available in Debian and Ubuntu which starts with lists of packages (called seeds) and grows them into a full list of packages including dependencies and (in additional lists) suggests, recommends, and sources for each of these lists. 
+可以结合elementary seeds工程看

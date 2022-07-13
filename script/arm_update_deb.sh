@@ -42,7 +42,7 @@ update_pkg(){
 	fi
 
 	# start to build the deb package here
-	sudo apt build-dep .
+	echo "jideos123" | sudo -S apt build-dep .
 	dpkg-buildpackage -rfakeroot -tc --no-sign  
 	if [ $? -ne 0 ];then
 		cd - >/dev/null; return 1
