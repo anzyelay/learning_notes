@@ -9,6 +9,7 @@
   - [直接使用](#直接使用)
 - [server](#server)
   - [编写规则和步骤](#编写规则和步骤)
+  - [Dbus服务的属性更改通知](#dbus服务的属性更改通知)
   - [查找一个dbus服务所在](#查找一个dbus服务所在)
     - [找服务脚本](#找服务脚本)
     - [找服务进程](#找服务进程)
@@ -137,6 +138,7 @@ DemoStruct object;
     ```vala
     var user_path = accounts_service.find_user_by_name (GLib.Environment.get_user_name ());
     var proxy = accounts_service as DBusProxy;
+    //设置接口默认的超时返回时间。
     proxy.set_default_timeout (300000);
     ```
 
@@ -163,6 +165,21 @@ DemoStruct object;
             bool is_12h = ("12h" in greeter_act.time_format);
         }
     });
+
+    ```
+    **注：属性值直接获取时，在获取前必须重新获取下dbus对象，否则只是获取本地的备份值而非真实的代理值**
+    ```vala
+    var format = greeter_act.time_format; // format="12h"
+    ...
+    //changed to "24h" on the remote service side
+    ...
+    format = greeter_act.time_format; // still format="12h"
+    greeter_act = yield GLib.Bus.get_proxy<Pantheon.AccountsService> (GLib.BusType.SYSTEM,
+                                            "org.freedesktop.Accounts",
+                                            user_path,
+                                            GLib.DBusProxyFlags.GET_INVALIDATED_PROPERTIES);
+    format = greeter_act.time_format; // format="24h"
+
     ``` 
 
 ## 直接使用
@@ -210,7 +227,91 @@ void main () {
     new MainLoop ().run ();
 }
 ```
+## Dbus服务的属性更改通知
+此示例将设置一个 D-Bus 服务，该服务可以发送有关属性更改的通知。  （示例代码部分由 Faheem 提供）,
+```vala
+[DBus (name = "org.example.Demo")]
+public class DemoServer : Object {
+  
+    public string pubprop { owned get; set; }
+  
+    private weak DBusConnection conn;
+  
+    public DemoServer (DBusConnection conn) {
+        this.conn = conn;
+        this.notify.connect (send_property_change);
+    }
 
+    private void send_property_change (ParamSpec p) {
+        var builder = new VariantBuilder (VariantType.ARRAY);
+        var invalid_builder = new VariantBuilder (new VariantType ("as"));
+
+        if (p.name == "pubprop") {
+            Variant i = pubprop;
+            builder.add ("{sv}", "pubprop", i);
+        }
+
+        try {
+            conn.emit_signal (null, 
+                              "/org/example/demo", 
+                              "org.freedesktop.DBus.Properties", 
+                              "PropertiesChanged", 
+                              new Variant ("(sa{sv}as)", 
+                                           "org.example.Demo", 
+                                           builder, 
+                                           invalid_builder)
+                              );
+        } catch (Error e) {
+            stderr.printf ("%s\n", e.message);
+        }
+    }
+}
+
+public class NotificationsTest : Object {
+
+    private DemoServer dserver;
+
+    public NotificationsTest () {
+        Bus.own_name (BusType.SESSION, "org.example.Demo", BusNameOwnerFlags.NONE,
+                      on_bus_acquired, on_name_acquired, on_name_lost);
+    }
+
+    private void on_bus_acquired (DBusConnection conn) {
+        print ("bus acquired\n");
+        try {
+            this.dserver = new DemoServer (conn);
+            conn.register_object ("/org/example/demo", this.dserver);
+        } catch (IOError e) {
+            print ("%s\n", e.message);
+        }
+    }
+
+    private void on_name_acquired () {
+        print ("name acquired\n");
+    }  
+
+    private void on_name_lost () {
+        print ("name_lost\n");
+    }
+
+    public void setup_timeout () {
+        Timeout.add_seconds (4, () => {
+            dserver.pubprop = Random.next_int ().to_string ();
+            return true;
+        });
+    }
+}
+
+void main () {
+    var nt = new NotificationsTest ();
+    nt.setup_timeout ();
+    new MainLoop ().run ();
+}
+```
+编译命令如下：
+```sh
+$ valac --pkg gio-2.0 gdbus-change-notificationst.vala
+```
 ## 查找一个dbus服务所在
 ### 找服务脚本
 /usr/share/dbus-1/services/

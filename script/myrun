@@ -23,8 +23,8 @@ build_install(){
 	# else
 	# 	ninja -C build clean
 	fi
-	ninja -C build -j4  > ./.tmp.log
-	if [ $? -eq 1 ];then
+	ninja -C build -j4  | tee ./.tmp.log
+	if [ ${PIPESTATUS[0]} -eq 1 ];then
 		echo "ninja failure" 
 		return 1
 	fi

@@ -21,7 +21,7 @@ Germinate 是 Debian 中可用的一个包，它以包列表（称为种子）�
 - 包列表中总一个特殊的文件叫**STRUCTURE**, 该文件的特点如下：
     - 它实际上不是包列表，而是用来说明种子列表以及它们如何相互依赖。
     - 每一行都由一个种子名加“：”号组成，冒号后面是一个空格和一个空格分隔的种子列表，表明当前种子依赖哪些种子构成  
-    - 以**include**开头的可以引入其它种子列表
+    - 以**include**开头的可以引入其它种子列表,如`include platform.focal`表示引入platform工程的focal分支作为种子列表
     - 以**feature**开头设置了处理种子工程的标识, 当前只定义了一个标识，即‘follow-recommends’,指示germinate把Recommends字段当作Depends处理, 在每个种子文件中又可以‘* Feature: no-follow-recommends’关闭单个种子文件的标识。
 - blacklist：一个特殊的种子文件，它总是没有依赖种子，相反，它列出了永远不会包含在germinate输出中的包。
 - seed-file种子文件如下:
