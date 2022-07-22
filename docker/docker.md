@@ -37,16 +37,26 @@
     MAINTAINER      Fisher "fisher@sudops.com"
 
     RUN     /bin/echo 'root:123456' |chpasswd
-    RUN     useradd runoob
-    RUN     /bin/echo 'runoob:123456' |chpasswd
+
+    # customize
+    # adduser leixa 
+    RUN useradd leixa -u 1001 -d /home/leixa -m -s /bin/bash
+    # change password
+    RUN echo "leixa:lxa123" | chpasswd
+
+
     RUN     /bin/echo -e "LANG=\"en_US.UTF-8\"" >/etc/default/local
     EXPOSE  22
     EXPOSE  80
+    WORKDIR /home/
+
     CMD     /usr/sbin/sshd -D
     ```
       1. 每一个指令都会在镜像上创建一个新的层，每一个指令的前缀都必须是大写的。
-      1. 第一条FROM，指定使用哪个镜像源
-      1. RUN 指令告诉docker 在镜像内执行命令，安装了什么。。。
+      2. 第一条FROM，指定使用哪个镜像源
+      3. RUN 指令告诉docker 在镜像内执行命令，安装了什么。。。
+      4. WORKDIR: 指示登录后的目录所在
+      5. CMD:容器启动后运行的指令
  1. 设置镜像标签: `docker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]`
     
     eg: 镜像id为860c279d2fec多了一个dev的tag
