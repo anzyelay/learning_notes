@@ -201,32 +201,104 @@ Bus.watch_name (BusType.SYSTEM, "org.freedesktop.timedate1", BusNameWatcherFlags
   - 在类名前加上[DBus (name = "...")] 注明接口名，由于历史遗留原因沿用name
   - 只有修饰为public的属性，信号，方法可导出dbus接口
   - 方法中的GLib.BusName sender形参可在此方法中获取dbus发送者的信息，但在dbus导出接口中不可见
-2. 注册一个服务实例，并启动main loop
-  
-```vala
-void on_bus_aquired (DBusConnection conn) {
-    try {
-        // start service and register it as dbus object
-        var service = new DemoService();
-        conn.register_object ("/org/example/demo", service);
-    } catch (IOError e) {
-        stderr.printf ("Could not register service: %s\n", e.message);
+  - 如有不导出某个接口的需求，可用[DBus (visible = false)]修饰;
+2. 注册一个服务实例，并启动main loop  
+    ```vala
+    void on_bus_aquired (DBusConnection conn) {
+        try {
+            // start service and register it as dbus object
+            var service = new DemoService();
+            conn.register_object ("/org/example/demo", service);
+        } catch (IOError e) {
+            stderr.printf ("Could not register service: %s\n", e.message);
+        }
     }
-}
 
-void main () {
-    // try to register service name in session bus
-    Bus.own_name (BusType.SESSION, "org.example.DemoService", /* name to register */
-                  BusNameOwnerFlags.NONE, /* flags */
-                  on_bus_aquired, /* callback function on registration succeeded */
-                  () => {}, /* callback on name register succeeded */
-                  () => stderr.printf ("Could not acquire name\n"));
-                                                     /* callback on name lost */
+    void main () {
+        // try to register service name in session bus
+        Bus.own_name (BusType.SESSION, "org.example.DemoService", /* name to register */
+                    BusNameOwnerFlags.NONE, /* flags */
+                    on_bus_aquired, /* callback function on registration succeeded */
+                    () => {}, /* callback on name register succeeded */
+                    () => stderr.printf ("Could not acquire name\n"));
+                                                        /* callback on name lost */
 
-    // start main loop
-    new MainLoop ().run ();
-}
-```
+        // start main loop
+        new MainLoop ().run ();
+    }
+    ```
+3. 服务按需启动（由另一程序按名称向dbus总线请求来激活服务: service activation）   
+- 会话总线（session buses）- [INTEGRATING SESSION SERVICES](https://dbus.freedesktop.org/doc/dbus-daemon.1.html)     
+    只需编写"*.service"服务文件；   
+    安装到对应目录/usr/share/dbus-1/services,具体有哪些目录可`man dbus-daemon`查看；      
+    **服务文件名不强制要求与dbus服务名一样**；    
+    **com.example.SessionService1.service** 示例如下：   
+    ```service
+    [D-BUS Service]
+    Name=com.example.SessionService1
+    Exec=/usr/bin/example-session-service
+    # Optional
+    SystemdService=example-session-service
+    ```
+    如果声明了可选项SystemdService，则必须提供一个systemd的服务文件，示例如下
+    ```service
+    [Unit]
+    Description=Example session service
+
+    [Service]
+    Type=dbus
+    BusName=com.example.SessionService1
+    ExecStart=/usr/bin/example-session-service
+    ```
+- 系统总线（system buses）- [INTEGRATING SYSTEM SERVICES](https://dbus.freedesktop.org/doc/dbus-daemon.1.html)    
+  - 编写策略文件（policy file）    
+    >默认情况下，标准系统总线不允许方法调用或拥有众所周知的总线名称，因此有用的 D-Bus 系统服务通常需要配置允许其工作的默认安全策略。  D-Bus 系统服务应在 ${datadir}/dbus-1/service.d 中安装默认策略文件，其中包含使该系统服务正常运行所需的策略规则,一个实践最好的policy文件如下：    
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE busconfig PUBLIC
+    "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+    "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+    <busconfig>
+    <policy user="_example">
+        <allow own="com.example.Example1"/>
+    </policy>
+
+    <policy context="default">
+        <allow send_destination="com.example.Example1"/>
+    </policy>
+    </busconfig>
+    ```
+    - *_example*： 是要运行这个服务程序的uid对应的用户名如root;  
+    - *com.example.Example1*： 是dbus名称;  
+    - 该文件应该命名为: ”com.example.Example1.conf“    
+
+  - 编写服务文件：
+    - 同会话总线一样也需要一个服务文件，安装目录/usr/share/dbus-1/system-services，其它目录参见`man dbus-daemon`;
+    - DBus名称必须和文件前缀一样，如com.example.Example1的服务文件，则必须将其命名为 com.example.Example1.service。   
+        ```service
+        [D-BUS Service]
+        Name=com.example.Example1
+        Exec=/usr/sbin/example-service
+        User=_example
+        # Optional
+        SystemdService=dbus-com.example.Example1.service
+        ```
+    - 如果声明了可选项SystemdService，则必须提供一个systemd的服务文件，示例如下
+        ```service
+        [Unit]
+        Description=Example service
+
+        [Service]
+        Type=dbus
+        BusName=com.example.Example1
+        ExecStart=/usr/sbin/example-service
+
+        [Install]
+        WantedBy=multi-user.target
+        Alias=dbus-com.example.Example1.service
+        ```
+    注： 系统会话的自启动服务用gtk.application会报"org.freedesktop.DBus.Error.Spawn.ChildExited: Launch helper exited with unknown return code 1"的错，改为glib.application就好了
+
 ## Dbus服务的属性更改通知
 此示例将设置一个 D-Bus 服务，该服务可以发送有关属性更改的通知。  （示例代码部分由 Faheem 提供）,
 ```vala
@@ -325,3 +397,4 @@ $ valac --pkg gio-2.0 gdbus-change-notificationst.vala
 2. [Vala D-Bus Client Examples](https://wiki.gnome.org/Projects/Vala/DBusClientSamples#Waiting_for_a_service_to_become_available_.28outdated_example.29)
 3. [DBusServerSample](https://wiki.gnome.org/Projects/Vala/DBusServerSample)
 4. [D-Bus_Integration](https://wiki.gnome.org/Projects/Vala/Tutorial#D-Bus_Integration)
+5. [dbus-daemon](https://dbus.freedesktop.org/doc/dbus-daemon.1.html)

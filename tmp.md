@@ -818,3 +818,46 @@ slogan | summary
 ## What is [Germinate](https://wiki.debian.org/Germinate#:~:text=What%20is%20Germinate%3F%20Germinate%20is%20a%20package%20available,for%20each%20of%20these%20lists.%20Files%20You%20Need)?  
 Germinate is a package available in Debian and Ubuntu which starts with lists of packages (called seeds) and grows them into a full list of packages including dependencies and (in additional lists) suggests, recommends, and sources for each of these lists. 
 可以结合elementary seeds工程看
+
+
+
+##  3588
+Rockusb>pl
+Partition Info(gpt):
+NO  LBA        Size       Name
+01  0x00004000 0x00002000 uboot
+02  0x00006000 0x00002000 misc
+03  0x00008000 0x00100000 boot
+04  0x00108000 0x00100000 recovery
+05  0x00208000 0x00010000 backup
+06  0x00218000 0x00c00000 rootfs
+07  0x00e18000 0x06663fc0 userdata
+Rockusb>
+
+Rockusb>pl
+Partition Info(gpt):
+NO  LBA        Size       Name
+01  0x00004000 0x00002000 uboot
+02  0x00006000 0x00002000 misc
+03  0x00008000 0x00040000 boot
+04  0x00048000 0x00040000 recovery
+05  0x00088000 0x00010000 backup
+06  0x00098000 0x00c00000 rootfs
+07  0x00c98000 0x067e3fc0 userdata
+
+
+seeds to removed:
+io.elementary.screenshot* io.elementary.videos* org.gnome.fileroller*
+
+org.gnome.desktop.background picture-uri
+
+
+## 7.25
+wallpapers
+patapua-default-settings
+metapackages
+
+##  7.26
+显示已安装软件及版本
+dpkg -l | awk '{ if(NR%5==4){printf "%s (<= %s)\n", $2, $3} else { printf "%s (<= %s)," , $2, $3 } }'
+
