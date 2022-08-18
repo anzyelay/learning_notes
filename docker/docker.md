@@ -79,10 +79,11 @@
         option说明：
         - i: 交互式操作
         - t: 终端
-        - v: 绑定挂载卷
+        - v: 绑定挂载卷, "-v localhost_path:container_path"
         - --name: 容器名称
-        - p: 指定端口映射
+        - p: 指定端口映射,"-p localhost_port:container_port"
         - d: 后台运行
+        - '--privileged': 解决在容器内的权限问题
     
     1. 启动已存在容器：`docker start container_id`
     1. 重启容器:`docker restart container_id`
@@ -107,10 +108,78 @@
 2. 登录:`docker login -u name`
 3. 退出:`docker logout`
 4. 推送镜像：`docker push username/ubuntu:18.04`
-```sh
-$ docker push username/ubuntu:18.04
-$ docker search username/ubuntu
+    ```sh
+    $ docker push username/ubuntu:18.04
+    $ docker search username/ubuntu
 
-NAME             DESCRIPTION       STARS         OFFICIAL    AUTOMATED
-username/ubuntu
-```
+    NAME             DESCRIPTION       STARS         OFFICIAL    AUTOMATED
+    username/ubuntu
+    ```
+
+
+## 示例：
+1. Dockerfile文件如下：    
+   ```Dockerfile
+   ############################################################
+    # Dockerfile to build KunLun complie container images
+    # Based on Ubuntu 16.04
+    ############################################################
+
+    # Set the base image to Ubuntu
+    FROM ubuntu:21.04
+
+    # File Author / Maintainer
+    MAINTAINER Lei xiaoan, leixa@jideos.com
+
+    ################## BEGIN INSTALLATION ######################
+    RUN sed -i 's/archive.ubuntu.com/repo.huaweicloud.com/g' /etc/apt/sources.list
+    RUN apt update 
+    RUN apt install -y sudo
+    RUN apt install -y openssh-server
+    RUN apt install -y vim bash-completion
+    RUN apt install -y man bc
+    RUN apt install -y repo git ssh make gcc libssl-dev liblz4-tool 
+    RUN apt install -y expect g++ patchelf chrpath gawk texinfo 
+    RUN apt install -y chrpath diffstat binfmt-support 
+    RUN apt install -y qemu-user-static live-build bison flex
+    RUN apt install -y  fakeroot cmake gcc-multilib g++-multilib
+    RUN apt install -y unzip device-tree-compiler ncurses-dev time
+
+    RUN mkdir -p /var/run/sshd
+
+    RUN useradd jide -u 1000 -d /home/jide -m -s /bin/bash
+    RUN echo "jide:123" | chpasswd
+    #############################################################
+
+    # Expose ports
+    EXPOSE 22
+
+    # customize
+    # adduser leixa 
+    RUN useradd leixa -u 1001 -d /home/leixa -m -s /bin/bash
+
+    # change password
+    RUN echo "leixa:lxa123" | chpasswd
+
+    # create directory
+    RUN mkdir -p /home/jide/rk3588_sdk
+    RUN chown -R jide:jide /home/jide/rk3588_sdk
+    WORKDIR /home/jide/rk3588_sdk
+
+    CMD     /usr/sbin/sshd -D
+   ```
+2. 使用Dockerfile生成 "**ubuntu:rk3588**" 镜像：    
+    `docker build -t ubuntu:rk3588 /your/dockerfile/path（不是文件名，只是路径名，会自动搜索Dockerfile）`    
+    镜像基于ubuntu 21.04构建，包含一个缺省用户root，密码123123，编译rk3588需要的基本环境
+    建议修改Dockerfile中customize部分，添加一个与20上自己用户同名的用户和uid，否则下面共享文件会出现权限问题，可以创建自己需要的用于共享的目录
+
+3. 以镜像**ubuntu:rk3588**创建容器**rk3588_sdk_env**：    
+   - 无共享文件夹：   
+     `docker run --name rk3588_sdk_env --privileged -v /dev:/dev -v /proc:/proc -v /dev/pts:/dev/pts -d -p 10088:22 ubuntu:rk3588 /usr/sbin/sshd -D`
+   - 有共享文件夹：   
+     `docker run --name rk3588_sdk_env --privileged -v /dev:/dev -v /proc:/proc -v /dev/pts:/dev/pts -d -p 10088:22 -v /home/jide/rk3588:/home/jide/rk3588_sdk ubuntu:rk3588 /usr/sbin/sshd -D`
+
+4. ssh进入容器**rk3588_sdk_env **   
+    `ssh -p 10088 yourname@localhost`
+    
+5. 容器有变更可先以当前容器生成新镜像，再从新创建容器

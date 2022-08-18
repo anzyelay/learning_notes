@@ -861,3 +861,9 @@ metapackages
 显示已安装软件及版本
 dpkg -l | awk '{ if(NR%5==4){printf "%s (<= %s)\n", $2, $3} else { printf "%s (<= %s)," , $2, $3 } }'
 
+
+## GPU
+1. 测试性能工具：glmark2, glmark2-es2
+2. 设置环境变量输出调试信息：LIBGL_DEBUG=verbose glmark2
+3. 设置运行环境： COGL_DRIVER=gles2, GST_GL_API=gles2
+

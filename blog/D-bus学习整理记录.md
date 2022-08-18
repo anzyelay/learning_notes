@@ -90,10 +90,13 @@ bus_name-->|object|O1 & O2 & On
 点对点不展开讲，后边主要讲下D-Bus消息总线
 > 顾名思义，D-Bus使用逻辑“总线”，连接的应用程序可以通过它进行通信。为便于使用，此通信通过一个支持 RPC 和发布订阅机制的简单对象模型进行。  连接到总线的应用程序可以查询对象的可用性，调用它们的远程方法，并对它们发出的信号发出通知请求。--[DBus Overview](https://pythonhosted.org/txdbus/dbus_overview.html#key%20components)
 
-消息总线daemon的两个主要(user-case)用例：
-system daemon|per-user-login daemon
-|-|-|
-通常在系统init脚本中启动<br>广泛用于广播系统事件，如:"new hardware device added"或"printer queue changed" | 针对用户应用间的一般通信需求,或者说桌面环境下的应用间通信 
+消息总线daemon的两类主要(user-case)用例：
+类型|说明| 个数
+|-|-|-|
+system daemon | 通常在系统init脚本中启动<br>广泛用于广播系统事件，如:"new hardware device added"或"printer queue changed" | 只有一个服务程序，每个登录用户都可与之通信（注：实践中发现system daemon不能连接到用户daemon去）
+per-user-login daemon | 针对用户应用间的一般通信需求,或者说桌面环境下的应用间通信| 每个登录用户启动一个，相互之间不能通信 |  
+
+
 
 图解如下：
 ```mermaid

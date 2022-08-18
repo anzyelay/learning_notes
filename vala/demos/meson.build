@@ -13,7 +13,9 @@ gee_dep = dependency('gee-0.8')
 granite_dep = dependency('granite', version: '>=5.4.0')
 handy_dep = dependency('libhandy-1', version: '>=0.83.0')
 m_dep = meson.get_compiler('c').find_library('m', required : false)
+dbus_dep = dependency ('dbus-glib-1')
 
 
 
-subdir('demo_args')
+# subdir('demo_args')
+subdir('demo_dbus')
