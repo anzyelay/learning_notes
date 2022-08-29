@@ -177,8 +177,16 @@ main_window.resize(800, 600);//
 1. Gtk.Overlay： 是一个容器，它包含一个主子项，它可以在其上放置“覆盖”小部件。（相当于背景与前景）
 2. GLib.DesktopAppInfo,AppInfo:lanch方法启动程序
     ```vala
+    // way 1
     var initial_setup = AppInfo.create_from_commandline ("io.elementary.initial-setup", null, GLib.AppInfoCreateFlags.NONE);
     initial_setup.launch (null, null);
+
+    // way 2, 当程序中有open方法，且有对应路径处理如：settings (参考第3点的open方法)
+    GLib.AppInfo.launch_default_for_uri ("settings://update-backup", null);
+
+    // way 3
+    var appcenter_info = new GLib.DesktopAppInfo ("io.elementary.appcenter.desktop");
+    appcenter_info.launch_action ("ShowUpdates", new GLib.AppLaunchContext ());
     ```
 3. GLib.Application.open: 
     ```vala        

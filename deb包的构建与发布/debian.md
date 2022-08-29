@@ -179,7 +179,12 @@ man deb-changelog
     apt rdepends name.deb
     apt-get build-dep project-dir
    ```
-1. 更多命令请看[Ubuntu and Debian Package Management Essentials](https://www.digitalocean.com/community/tutorials/ubuntu-and-debian-package-management-essentials)
+1. 标识为hold, unhold
+   ```sh
+   apt-mark hold xxx
+   apt-mark unhold xxx
+   ```
+2. 更多命令请看[Ubuntu and Debian Package Management Essentials](https://www.digitalocean.com/community/tutorials/ubuntu-and-debian-package-management-essentials)
 
 ## dpkg-buildpackage error信息
 1. error: Please specify the compatibility level in debian/compat
