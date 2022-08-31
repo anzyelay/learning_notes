@@ -17,5 +17,6 @@ dbus_dep = dependency ('dbus-glib-1')
 
 
 
-# subdir('demo_args')
+subdir('demo_args')
 subdir('demo_dbus')
+subdir('demo_drag_and_drop')
