@@ -628,7 +628,111 @@ filename.has_prefix ("file://")
         return partition;
     }  
     ```
+4. 设置环境变量执行    
+    ```vala
+    try {
+        string dpkg_stdout;
+        var subprocess_launcher = new GLib.SubprocessLauncher (
+            GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE
+        );
+        subprocess_launcher.setenv ("LANG", "C", true);
+        var subprocess = subprocess_launcher.spawnv ({"dpkg-query", "--status", name});
+        subprocess.communicate_utf8 (null, null, out dpkg_stdout, null);
+        if (subprocess.get_successful ()) {
+            var output = dpkg_stdout.split ("\n");
+            foreach (var line in output) {
+                var splits = line.split (":", 2);
+                if (splits.length == 2) {
+                    string key = splits[0].strip ();
+                    if (key == ("Status")) {
+                        string value = splits[1].strip ();
+                        installed = value.has_prefix ("install");
+                    }
+                    else if (key == ("Version")) {
+                        string value = splits[1].strip ();
+                        pre_version = value;
+                    }
+                }
+            }
+        }
+    } catch (Error e) {
+        warning (e.message);
+    }
+    ```
+5. 重定向输出信息到textview
+   ```vala
+    public bool install (Func<GLib.InputStream> handler_stdout, GLib.Cancellable ?cancellable = null) {
+        try {
+            var subprocess = new GLib.Subprocess (
+                            GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE,
+                             "dpkg", 
+                             "-i",
+                             deb_path
+                            );
+            var outstreamer = subprocess.get_stdout_pipe ();
+            handler_stdout (outstreamer);
+            subprocess.wait (cancellable);
+            outstreamer.close ();
+            return subprocess.get_successful ();
+        } catch (Error e) {
+            warning (e.message);
+        }     
+        return false;
+    }
 
+    private async void on_installing () {
+        Gtk.ProgressBar ?progress_bar = new Gtk.ProgressBar () {
+            show_text = true,
+            text = _("installing..."),
+        };
+
+        var textview_detail = new Gtk.TextView ();
+        var scrolled_win = new Gtk.ScrolledWindow (null, null) {
+            vexpand = true,
+        };
+        scrolled_win.add (textview_detail);
+        var expander_show_msg = new Gtk.Expander (_("show detail"));
+        expander_show_msg.add (scrolled_win);
+        var progress_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8) {
+            vexpand = true,
+        };
+
+        var ret = debpkg.install ( (instream) => { 
+            Gtk.TextIter iter;
+            var buffer = textview_detail.get_buffer ();
+            buffer.get_end_iter (out iter);
+            size_t size = 0;
+            GLib.ByteArray text  = new GLib.ByteArray ();
+            do {
+                try {
+                    var bytes =  instream.read_bytes (1);
+                    size = bytes.get_size ();
+                    if (size > 0) {
+                        text.append (bytes.get_data ());
+                        if (bytes.get (0) == '\n') {
+                            //  warning ("==%s", (string)text.data);
+                            buffer.insert (ref iter, (string)text.data, (int)text.data.length);
+                            text.steal (); 
+                        }
+                    }
+                } catch (Error e) {
+                    warning (e.message);
+                    break;
+                }
+                progress_bar.pulse ();
+                while (Gtk.events_pending ()) {
+                    Gtk.main_iteration ();
+                }
+                Posix.usleep (100);
+            } while (size>0);
+        });
+
+        progress_bar.set_text ("");
+        progress_bar.set_fraction (1.0);
+
+    }   
+  
+   ```
 
 ## command line args
 1. GLib.OptionContext

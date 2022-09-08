@@ -51,6 +51,7 @@
     ```
 
 2. vala代码中如何使用？
+- 添加依赖： `dependency ('polkit-gobject-1')`
 - 使用**action id**创建permission对象
    ```vala
         Polkit.Permission ?permission = null;

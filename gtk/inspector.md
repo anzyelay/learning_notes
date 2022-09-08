@@ -1,3 +1,8 @@
+- [开启调试功能](#开启调试功能)
+- [miscellaneous](#miscellaneous)
+- [css](#css)
+- [CSS Node](#css-node)
+- [CSS 选择器](#css-选择器)
 ## 开启调试功能
 1. 快捷方式：
    - step 1:
@@ -125,7 +130,26 @@ css node![css node](../picture/gtk/inspector-css-node.png)
 - 状态： 代表当前控件的状态是disable,active,backdrop,checked等，状态以`classname:status`书写, 
   - 在inspector的css中书写时**注意类名与状态符：中间留空格**，`.classname :status`。
   - 取反状态使用`:not(status)`
+## CSS Node
+> GTK 通过将选择器与节点树进行匹配来应用样式表中的样式信息。  树中的每个节点都有一个名称、一个状态和可能的样式类。  每个节点的子节点是线性排序的。
+> 每个小部件都有一个或多个这样的 CSS 节点，并确定它们的名称、状态、样式类以及它们在整个节点树中作为子级和兄弟级的布局方式。  每个小部件的文档解释了它有哪些 CSS 节点。
+- The CSS nodes of a GtkScale
+```xml
+scale[.fine-tune]
+├── marks.top
+│   ├── mark
+┊   ┊
+│   ╰── mark
+├── trough
+│   ├── slider
+│   ├── [highlight]
+│   ╰── [fill]
+╰── marks.bottom
+    ├── mark
+    ┊
+    ╰── mark
 
+```
 ## [CSS 选择器](https://www.w3school.com.cn/cssref/css_selectors.asp)
 选择器 |	例子 |	例子描述
 :-|:-|-

@@ -16,6 +16,7 @@
 - [错误集](#错误集)
 ## 参考
 - [第 4 章 debian 目录中的必需内容](https://www.debian.org/doc/manuals/maint-guide/dreq.zh-cn.html)
+- [Introduction to Debian packaging](https://www.debian.org/doc/devel-manuals#packaging-tutorial)
 
 ## 环境变量
 - 设置 dh_make的邮箱，名称

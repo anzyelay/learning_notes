@@ -10,6 +10,7 @@
   - [i18n模块介绍](#i18n模块介绍)
   - [工程翻译步骤](#工程翻译步骤)
   - [问题集](#问题集)
+- [翻译与Config相结合](#翻译与config相结合)
 - [手动在vala工程中添加vapi （以添加sdl2_image为例)](#手动在vala工程中添加vapi-以添加sdl2_image为例)
   - [1. 在工程中添加vapi目录](#1-在工程中添加vapi目录)
   - [2. 添加vapi文件](#2-添加vapi文件)
@@ -23,6 +24,12 @@
 2. 添加lib `dependency('libcanberra')`
    - `pkg-config --list-all` 列出所有可用库
    - `pkg-config --libs libname`, 去掉-l就是要添加到dependency中间的名字，大小写敏感
+   - 都找不到就用meson查找命令：
+        ```meson
+        m_dep = meson.get_compiler('c').find_library('m', required : false)
+        posix_dep = meson.get_compiler('vala').find_library('posix')
+        # 其中posix是由valadoc中的某个函数的 Package:posix 字段得到。比如查找Posix.sleep就能看到
+        ```
 3. 获取参数值：`get_option('prefix')`
 4. foreach
    ```meson.build
@@ -392,7 +399,23 @@ project
 1. 将po翻译文件转成二进制文件时报错: 无效的多字节序列
     
     resolved: 需要将对应的.po文件中charset值从ASCII修改为UTF-8，再执行上述命令即可！
-
+## 翻译与Config相结合
+```meson
+# AppData file
+appdata_in = configure_file(
+    input: 'my.appdata.xml.in.in',
+    output: meson.project_name() + '.appdata.xml.in',
+    configuration: conf_data
+)
+i18n.merge_file(
+    input: appdata_in,
+    output: meson.project_name() + '.appdata.xml',
+    po_dir: join_paths(meson.source_root (), 'po', 'extra'),
+    type: 'xml',
+    install_dir: join_paths(get_option('datadir'), 'metainfo'),
+    install: true
+)
+```
 
 ---------------
 ## 手动在vala工程中添加vapi （以添加sdl2_image为例)

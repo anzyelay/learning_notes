@@ -548,22 +548,23 @@ for i in `ls ./settingboard* --directory`;do  cd $i; sudo apt build-dep .;cd ->/
 
 4. GTK_CSD=1, 在启动程序将禁止窗口管理器自动加标题栏
 
+5. chrome设置默认的系统标题栏   
+    路径：
 
-5. chrome设置默认的系统标题栏
-  - 路径：
-
-  ```mermaid
-  graph LR
-  A("～/.config/goolge-chrome/Default/Preferences")
-  B(custom_chrome_frame)
-  A-->B
-  ```
+    ```mermaid
+    graph LR
+    A("～/.config/goolge-chrome/Default/Preferences")
+    B(custom_chrome_frame)
+    A-->B
+    ```
 6. 针对默认加载的的标题栏的css的样式，试验发现只在登录环境时加载一次（可能libgtk3库首次加载时会读取记录一次默认的样式到自己的上下文中），如果改变了样式文件需要测试默认标题栏是否更改，则必须注销重新登录才能测试出来，否则更改无效。
-标题栏的button在目前的gtk.css中如下（大致在1306行）：
-window.ssd .titlebar button {
-  border-radius: 3px;
-}
-   
+标题栏的button在目前的gtk.css中如下（大致在1306行）：   
+
+    ```css
+    window.ssd .titlebar button {
+      border-radius: 3px;
+    }
+    ```
 
 
 ### gtk default title bar source 
