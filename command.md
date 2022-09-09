@@ -66,3 +66,12 @@ done < filename
     ```sh
     dpkg --get-selections | awk '$2 ~ /^install/'
     ```
+## shell异常退出处理
+```sh
+finish() {
+  echo "here do something before exit"
+  exit -1
+}
+set -e # If not interactive, exit immediately if any untested command fails.
+trap  finish ERR
+```
