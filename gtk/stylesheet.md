@@ -128,7 +128,8 @@ GtkStyleProvider是一个用于向StyleContext提供样式信息的接口,具体
 
 ### 使用时的一些注意事项
 #### 直接使用markup标签表达式   
-`logo_text.set_markup ("\<span weight='bold' color='white' font_desc='16'>Jide OS\</span>")`
+`logo_text.set_markup ("\<span weight='bold' color='white' font_desc='16'>Jide OS\</span>")`    
+具体使用参见Pangoy库的[Text Attributes and Markup](https://docs.gtk.org/Pango/pango_markup.html)
 
 #### 关于css stylesheet中的类名和ID问题
 以下是一个css.xml

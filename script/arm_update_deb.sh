@@ -38,7 +38,8 @@ update_pkg(){
 		fi
 		git pull origin
 	else
-		git checkout ${BRANCH}
+		git pull origin ${BRANCH}
+		git checkout -b ${BRANCH}
 	fi
 
 	# start to build the deb package here

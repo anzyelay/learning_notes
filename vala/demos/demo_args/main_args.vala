@@ -3,6 +3,11 @@ Glib.application: 它封装了一些特定于平台的底层服务，旨在充�
 1. 通过维护一个主应用实例(primary application instance)的‘use count’（使用计数）来提供一个更方便的生命周期管理服务。这个使用计数可以通过**hold()**和**release()**方法来增减操作，当计数为0时，应用退出,结束整个生命周期。
 2. 通过一个唯一的application_id（应用id号）来标识一个应用，从而在一个session(图形登录会话界面)中保持该应用的进程唯一性。当一个相同id的应用再次被启动时，它的参数会通过相应平台的通信方式(linux下为D-bus session bus)传递给已经运行起来的拥有此id的应用，这个已经运行的应用就叫主实例(primary instance)
 
+> There is a number of different entry points into a GApplication:
+>   - via ‘Activate’ (i.e. just starting the application)
+>   - via ‘Open’ (i.e. opening some files)
+>   - by handling a command-line
+>   - via activating an action
 
 
 from: https://wiki.gnome.org/HowDoI/GtkApplication
@@ -16,7 +21,7 @@ public class MyApplication : Application {
 		Object (application_id: "org.example.application", flags: ApplicationFlags.HANDLES_COMMAND_LINE);
 		set_inactivity_timeout (10000);// 最后一次调用release()到inactivity之间的时间
 	}
-
+	//无参数启动时被调用，有参数启动时调用open方法
 	public override void activate () {
 		this.hold ();
 		print ("Activated\n");

@@ -877,3 +877,7 @@ finish() {
 set -e # If not interactive, exit immediately if any untested command fails.
 trap  finish ERR
 ```
+
+## 如何在x86机器上跑arm应用
+1. 安装QEMU emulator ：``
+2. 

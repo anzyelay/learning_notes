@@ -195,7 +195,8 @@
 
     var arrow_provider = new Gtk.CssProvider ();
     arrow_provider.load_from_resource ("io/elementary/appcenter/arrow.css");
-        
+
+    // set_resource_base_path (resource_path)
     ```
 -------------
 ## 添加schemas
