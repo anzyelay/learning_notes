@@ -13,6 +13,8 @@
 - [dpkg-buildpackage error信息](#dpkg-buildpackage-error信息)
 - [appstream](#appstream)
   - [如何生成appstream data](#如何生成appstream-data)
+- [高级功能](#高级功能)
+  - [如何只用debian目录获取上游源码打包？](#如何只用debian目录获取上游源码打包)
 - [错误集](#错误集)
 ## 参考
 - [第 4 章 debian 目录中的必需内容](https://www.debian.org/doc/manuals/maint-guide/dreq.zh-cn.html)
@@ -124,6 +126,7 @@ man deb-control
 
 debchange // 修改日志 
 man deb-changelog
+man uscan //依watch文件规则获取上游源码用来编译
 ```
 
 ## 关于deb包的常用命令
@@ -242,6 +245,31 @@ man deb-changelog
 - appstreamcli : appstream
 - appstream-generator
 
+## 高级功能
+### 如何只用debian目录获取上游源码打包？
+1. 当前目录下仅有debian(git相关的也可)目录,其它如“.vscode”除非源码中有，否则报有差异错处理
+1. 将"debian/source/format"的值由**native**改为**quilt**
+1. 添加"debian/watch"文件，写明规则，如下使用git源，以git的tags为匹配规则，当tags的版本比"debian/changelog的最新版本还大时，匹配上执行后面的script动作。
+   ```txt
+   version=4
+   
+   opts="mode=git" http://192.168.16.188:8080/patapua/appstore.git \
+    refs/tags/v@ANY_VERSION@ debian uupdate
+   #格式是： opts="xxx" url-xxx match-xxx [version-xxx] [script] 
+   #标签必须以v开头
+   ```
+1. 使用`uscan`获取是否有最新的版本,uscan的执行流程如下  
+   1. 从debian/watch中指定的url下载网页
+   2. 使用watch中的匹配规则从网页中提取指向上游压缩包的href
+   3. 从href下载比上一个版本高的最新上游压缩包
+   4. 将下载的包保存到上级目录中，命名为"../\<upkg\>-\<uversion\>.tar.gz"
+   5. 调用`mk-origtargz`生成源码压缩包"../\<spkg\>_\<oversion\>..orig.tar.gz"
+   6. 调用`uupdate`生成Debian化的源码树目录"../\<spkg\>-\<oversion\>/*", (debian化即是自动生成一个debian打包目录)
+2. 进入 [4.6] 中`uupdate`生成的目录"../\<spkg\>-\<oversion\>/",在此目录下打包
+
+> 注：上述中的压缩包不一定是gz,也可以是xz等格式   
+> changelog中的版本号必须比上游低, changelog第一行的 "pkgname (xx.xx.xx-xxx) unstable; urgency=medium" 与 git tags中的 "vxx.xx.xx" 对比前面的xx.xx.xx即可
+    
 
 ## 错误集
 1. preinst,postinst,prerm, postrm等打包时不会添加到deb包里
@@ -251,4 +279,36 @@ man deb-changelog
     
     必须是可执行文件！！, 文件名比如是preinst.ex，必须改为preinst
 2. gpg: 找不到有效的 OpenPGP 数据
-    
+
+3. uscan: 错误: uupdate -f --upstream-version 1.0.6 subprocess returned exit status 1
+   ```sh
+    #error1
+    test@test-FT2004:~/patapua/appstore$ uscan 
+    warning: 重定向到 http://192.168.16.188:8080/patapua/appstore.git/
+    uscan: Newest version of com.patapua.appstore on remote site is 1.0.6, local version is 1.0.1ubuntu0
+    uscan:    => Newer package available from
+        http://192.168.16.188:8080/patapua/appstore refs/tags/v1.0.6
+    Leaving ../com.patapua.appstore_1.0.6.orig.tar.xz where it is.
+    uscan: 错误: uupdate -f --upstream-version 1.0.6 subprocess returned exit status 1
+    # error2
+    test@test-FT2004:~/patapua/appstore$ uscan 
+    warning: 重定向到 http://192.168.16.188:8080/patapua/appstore.git/
+
+    #正确
+    test@test-FT2004:~/patapua/appstore$ uscan 
+    warning: 重定向到 http://192.168.16.188:8080/patapua/appstore.git/
+    uscan: Newest version of com.patapua.appstore on remote site is 1.0.6, local version is 1.0.0
+    uscan:    => Newer package available from
+        http://192.168.16.188:8080/patapua/appstore refs/tags/v1.0.6
+    Leaving ../com.patapua.appstore_1.0.6.orig.tar.xz where it is.
+    uupdate: ../com.patapua.appstore-1.0.6 directory exists.
+    uupdate: remove ../com.patapua.appstore-1.0.6 directory.
+    uupdate: debian/source/format is "3.0 (quilt)".
+    uupdate: Auto-generating com.patapua.appstore_1.0.0-ubuntu0.debian.tar.xz
+    uupdate: -> Copy to      com.patapua.appstore_1.0.6-0ubuntu1.debian.tar.xz
+
+   ```
+   错1： 是debian/changelog的版本号错误:"1.0.1ubuntu0" ,应写成“1.0.1-ubuntu0”  
+   错2： 版本号“2.0.0-ubuntu0)” ，高于上游的"1.0.6"
+
+

@@ -73,7 +73,7 @@ fi
 
 for dir in ${GIT_DIRS[@]}
 do
-	echo start to updating $dir at branch $2
+	echo start to updating "${dir}" at branch "${2:-default}"
 	update_pkg $dir $2
 done
 

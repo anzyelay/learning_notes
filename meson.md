@@ -200,13 +200,22 @@
     ```
 -------------
 ## 添加schemas
- - 在工程schemas或data目录中添加*.gschema.xml文件
+ - 在工程schemas或data目录中添加*.gschema.xml文件，此处的命名不强制，但安装到系统目录中的文件必须是以".gschema.xml"为后缀结尾,否则不识别。
  - 在gschema.xml同层的meson.build中加入如下内容,安装到系统指定schemas目录中
     ```meson
     install_data(
-        'io.elementary.switchboard.locale.gschema.xml',
-        install_dir: join_paths(datadir, 'glib-2.0', 'schemas')
+        'my.xxx.gschema.xml',
+        install_dir: join_paths (get_option('datadir'), 'glib-2.0', 'schemas')
     )
+    #也可以添加翻译后安装，如下：
+    i18n.merge_file(
+        input: 'my.gschema.xml.in',
+        output: meson.project_name () + '.gschema.xml',
+        po_dir: join_paths(meson.source_root (), 'po', 'extra'),
+        install_dir: join_paths (get_option('datadir'), 'glib-2.0', 'schemas'),
+        install: true
+    )
+
     ```
  - 新建meson目录，创建编译脚本post_install.py
     ```python
@@ -284,7 +293,7 @@ project
         |--LINGUAS
 ```
    - POTFILES: 内容为要翻译的所有源文件路径名，换行符分隔
-   - LINGUAS:  它应该包含您要为其提供翻译的所有语言的两个字母的语言代码，换行符分隔
+   - LINGUAS:  它应该包含您要为其提供翻译的所有语言的两个字母的语言代码，换行符分隔，**在未生成pot文件前，先不要写该文件，否则在执行meson build配置时就报错**
    - extra下一般为不需安装的翻译,故meson.build中i18n.gettext的install字段为false
   
 ### 命令
@@ -400,6 +409,8 @@ project
 1. 将po翻译文件转成二进制文件时报错: 无效的多字节序列
     
     resolved: 需要将对应的.po文件中charset值从ASCII修改为UTF-8，再执行上述命令即可！
+2. “.*/meson.build:1:5: ERROR: File xx.po does not exist”
+   在执行`meson build`前，LINGUAS文件内容要先注释掉。执行`meson build`配置成功后，再执行`ninja -C build xxx-pot`生成对应的pot文件，然后在LINGUAS文件中加入内容，执行`ninja -C build xxx-update-po`生成对应po文件。
 ## 翻译与Config相结合
 ```meson
 # AppData file

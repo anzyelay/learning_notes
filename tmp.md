@@ -881,3 +881,22 @@ trap  finish ERR
 ## 如何在x86机器上跑arm应用
 1. 安装QEMU emulator ：``
 2. 
+
+
+
+## 3588 linux sdk
+
+1. ITX-3588J android12.0 SDK 源码
+
+1、百度网盘链接
+链接：https://pan.baidu.com/s/15hXLJ5Wbi-5sJipF_k1Ihw?pwd=1234 提取码：1234
+2、Google driver
+https://drive.google.com/drive/folders/1GWlPj3D8SrceV_nRhTBNdxULQ8FtAtRK?usp=sharing
+
+ 
+ITX-3588J，Linux sdk：
+1、百度网盘：
+链接：https://pan.baidu.com/s/1w1fd31vgxkyFmRBOs_Wu_g?pwd=1234 
+提取码：1234 
+2、Google driver
+https://drive.google.com/drive/folders/1LovVy481bNUfbZpoCMSAeDEzIZmvZNKH?usp=sharing
