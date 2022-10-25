@@ -1,3 +1,10 @@
+- [- 示例：](#--示例)
+- [名词解释：](#名词解释)
+- [Docker 镜像使用](#docker-镜像使用)
+- [容器使用](#容器使用)
+- [docker仓库管理](#docker仓库管理)
+- [示例：](#示例)
+------
 ## 名词解释：
 - 镜像： Docker 镜像（Image），就相当于是一个 root 文件系统
 - 容器： 容器是镜像运行时的实体
@@ -79,7 +86,7 @@
         option说明：
         - i: 交互式操作
         - t: 终端
-        - v: 绑定挂载卷, "-v localhost_path:container_path"
+        - v: 绑定挂载卷, "-v localhost_path:container_path[:ro]", 只读卷在末尾加上":ro",默认为rw
         - --name: 容器名称
         - p: 指定端口映射,"-p localhost_port:container_port"
         - d: 后台运行
@@ -103,6 +110,8 @@
     #导入容器way-3
     $ docker import /tmp/ubuntu.tgz example/imagerepo
     ```
+1. 为了容器或宿主机重启后自动启动，需要设置如下   
+    宿主机： docker update –restart=always 容器ID(或者容器名)
 ## docker仓库管理
 1. 镜像加速器：https://www.runoob.com/docker/docker-mirror-acceleration.html
 2. 登录:`docker login -u name`

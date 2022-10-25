@@ -66,6 +66,12 @@ done < filename
     ```sh
     dpkg --get-selections | awk '$2 ~ /^install/'
     ```
+1. sed 中用"\1"代替要"\(text\)"的text值
+   ```sh
+   # 原文内容为： com.patapua.os-updates (1.0.0-4ubuntu1) unstable; urgency=medium
+   # oldversion为 1.0.0-4ubuntu1
+   OLDVERSION=$(sed -n '1s/.*(\(.*\)).*/\1/p' debian/changelog)
+   ```
 ## shell异常退出处理
 ```sh
 finish() {

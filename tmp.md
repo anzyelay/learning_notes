@@ -900,3 +900,28 @@ ITX-3588J，Linux sdk：
 提取码：1234 
 2、Google driver
 https://drive.google.com/drive/folders/1LovVy481bNUfbZpoCMSAeDEzIZmvZNKH?usp=sharing
+
+## grub 
+### 启动步骤：
+1. 加载内核：
+   ```sh
+   grub> cat (lvm/data-root)/etc/fstab
+   PARTUUID=238232-234.....         /boot/efi vfat umask=0077 0 0
+   UUID=33b3063f-5dfa-4cec-bb4c-b0ae86b47d86 / ext4 noatime,errors=remount-ro 0 0
+   
+   grub> linux (lvm/data-root)/boot/vmlinuz ro root=UUID=33b3063f-5dfa-4cec-bb4c-b0ae86b47d86 quiet
+   #其它版本linux命令改为kernel
+   grub> kernel 
+   ```
+   - (lvm/data-root)/boot/vmlinuz：指定了内核文件的位置，这里的 (lvm/data-root)/boot/ 是指 boot 分区。
+   - ro：启动时以只读方式挂载根文件系统，这是为了不让启动过程影响磁盘内的文件系统。
+   - root=UUID=33b3063f-5dfa-4cec-bb4c-b0ae86b47d86：指定根文件系统的所在位置。这里和以前的Linux版本不太一样了，不再通过分区的设备文件名或卷标号来指定，而是通过分区的 UUID 来指定的。
+
+2. 加载initramfs虚拟文件系统镜像
+   ```sh
+   grub> initrd (lvm/data-root)/boot/initrd.img
+   ```
+3. 启动
+   ```sh
+   grub> boot
+   ```
