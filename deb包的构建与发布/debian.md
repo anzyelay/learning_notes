@@ -182,12 +182,17 @@ man uscan //依watch文件规则获取上游源码用来编译
     apt depends name.deb
     apt rdepends name.deb
     apt-get build-dep project-dir
+    apt-get build-dep name
    ```
 1. 标识为hold, unhold
    ```sh
    apt-mark hold xxx
    apt-mark unhold xxx
    ```
+1. apt-get “OPTIONS” 选项的使用
+    ```sh
+    apt-get install -o DPkg::Options::=--force-confnew name.deb
+    ```
 2. 更多命令请看[Ubuntu and Debian Package Management Essentials](https://www.digitalocean.com/community/tutorials/ubuntu-and-debian-package-management-essentials)
 
 ## dpkg-buildpackage error信息
