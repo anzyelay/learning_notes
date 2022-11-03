@@ -196,30 +196,44 @@ xz -T0 -z "${basedir}/${imagename}.img"
     ```
 3. fs.img未格式化,使用`file fs.img`显示是data,无法mount
 
-
+-----------
 #  Overlay FS
 1. [Introduction to the OverlayFS](https://linuxconfig.org/introduction-to-the-overlayfs)
 
 overlay fs分为三层：
-- merge layer: 混合层， 由lower+upper构成，使用者实际操作层，在此层的增删改操作最终只会修改upper层的文件
-- upper layer: 覆盖层，但与lower有相同文件或目录则覆盖使用此层的文件和目录。混合层增加文件时，会在此层增加对应文件，删除时则删除对应文件，如果删除的是属于lower layer的文件和目录，则会使用一个**witheout file**（或有trusted.overlay.opaque属性的目录）代替执行，**witheout file**是一个字符设备文件。
-- lower layer: 该层的文件为中读，混合层的修改不会改变此层数据
+- merge layer: 混合层， 由lower+upper构成，供使用者实际读写的层，在此层的增删改操作最终“copy up”到可写的upper层去
+- upper layer: 覆盖层，可读写, 由upper和work组成
+  - 当与lower有相同文件或目录则覆盖使用此层的文件和目录。
+  - 混合层增加或删除文件、目录时，会在此层增加或删除对应文件、目录。
+  - 但是，**如果删除的是属于lower layer的文件或目录，则会使用一个在此层创建的witheout file或（有trusted.overlay.opaque属性的）目录来模拟执行**，**witheout file**是一个字符设备文件。
+- lower layer: 该层的文件为只读，混合层的修改不会改变此层数据，当前层的数据可被upper层存在的同名数据遮挡（或叫掩盖）
+  
 
 ```sh
+# step 1
 $ sudo mkdir /lower /overlay
 
 $ sudo mount -o ro /dev/sda1 /lower
 $ sudo mount /dev/sda2 /overlay
 
+# step 2 
 $ sudo mkdir /overlay/{upper,work}
 
-
+# step 3
 $ sudo mount overlay -t overlay -o lowerdir=/lower,upperdir=/overlay/upper,workdir=/overlay/work  /media
 
+# 
 $ mount | grep -i overlay
 overlay on /media type overlay (rw,relatime,seclabel,lowerdir=/lower,upperdir=/overlay/upper,workdir=/overlay/work)
 
 ```
 如上：  
 - 第一步：将两个分区sda1, sda2分别mount到lower和overlay,并且lower为只读模式，overlay为可读写模式。  
-- 第二步：创建两个目录upper和work, 前者用于
+- 第二步：在overlay上准备好创建upper层目录和work目录, 前者用于掌管upper层的文件; 后者用于在交换文件到其它层时，先行在内部准备好要交换的文件,work必须是个空目录，并与upper层目录同处一个文件系统上
+- 第三步： 装配并挂载overlay，执行上述脚本中的"step 3"命令,
+  - -t： 指定mount的文件系统 --“overlay"
+  - -o : 列出mount选项： 
+    - “lowerdir”： 只读文件系统的目录
+    - "upperdir"： 掌管上层文件的可写层目录
+    - "workdir"：  “work”的目录
+  - /media : 装配的混合层的挂载点

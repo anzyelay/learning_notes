@@ -71,6 +71,9 @@ done < filename
    # 原文内容为： com.patapua.os-updates (1.0.0-4ubuntu1) unstable; urgency=medium
    # oldversion为 1.0.0-4ubuntu1
    OLDVERSION=$(sed -n '1s/.*(\(.*\)).*/\1/p' debian/changelog)
+ 
+   # -r+双引号: 可以使用变量MY_DATA, 
+   sed -i -r "s/^(CURRENT_TIME =).*/\1 $MY_DATE/" test.txt
    ```
 ## shell异常退出处理
 ```sh
