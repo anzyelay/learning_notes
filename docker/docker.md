@@ -1,9 +1,9 @@
-- [- 示例：](#--示例)
 - [名词解释：](#名词解释)
 - [Docker 镜像使用](#docker-镜像使用)
 - [容器使用](#容器使用)
 - [docker仓库管理](#docker仓库管理)
 - [示例：](#示例)
+- [代理设置](#代理设置)
 ------
 ## 名词解释：
 - 镜像： Docker 镜像（Image），就相当于是一个 root 文件系统
@@ -192,3 +192,7 @@
     `ssh -p 10088 yourname@localhost`
     
 5. 容器有变更可先以当前容器生成新镜像，再从新创建容器
+
+## 代理设置
+- 拉取镜像时的代理设置： [Configure the daemon with systemd](https://docs.docker.com/config/daemon/systemd/)
+- 创建的容器内的代理设置： [Configure Docker to use a proxy server](https://docs.docker.com/network/proxy/)
