@@ -96,3 +96,21 @@ git tag | xargs git tag -d
 #delete remote
 git tag | xargs git push origin :refs/tags/  
 ```
+
+## log
+> SYNOPSIS  
+>   `git log [<options>] [<revision range>] [[--] <path>...]`  
+> path前的"--"是用来与前面的options和revision避免混淆分隔用的，没分歧时可省略  
+> revision raqnge: 中间用“..“分隔, eg:"old..new" ,默认”orig..HEAD“
+
+1. 查看单独一个文件/文件侠的修改历史  
+  ```sh
+  git log path
+  git log --follow path ## 包括path被改名前的记录.
+  git log -p path ##可以显示每次提交的diff
+  git show c5e69804bbd9725 filename ##只看某次提交中的某个文件变化，可以直接加上fileName
+  ```
+2. 输出检索的日志信息
+  ```sh
+  git log --grep=<pattern>
+  ```
