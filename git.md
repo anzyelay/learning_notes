@@ -97,7 +97,7 @@ git tag | xargs git tag -d
 git tag | xargs git push origin :refs/tags/  
 ```
 
-## log
+## 日志
 > SYNOPSIS  
 >   `git log [<options>] [<revision range>] [[--] <path>...]`  
 > path前的"--"是用来与前面的options和revision避免混淆分隔用的，没分歧时可省略  
@@ -114,3 +114,11 @@ git tag | xargs git push origin :refs/tags/
   ```sh
   git log --grep=<pattern>
   ```
+
+## QA 
+1.  How to ignore a tracked file in git without deleting it?
+```sh
+ git rm --cached  path/to/file 
+ git rm --cached -r path/to/folder
+```
+
