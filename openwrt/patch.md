@@ -18,10 +18,11 @@ openwrt的构建系统为方便补丁管理集成了quilt工具， 此文简要�
 ## 概要
 
 1. 准备源码和补丁： `make package/example/{clean,prepare} V=s QUILT=1`
-2. 进入目录，应用已有补丁或新增补丁: `quilt push/add`
-3. 修改文件:`quilt edit files`
-4. 更新补丁:`quilt refresh`
-5. 拷出临时补丁:`make package/example/update V=s`
+2. 进入源码目录，查看可用补丁：`quilt series`
+2. 应用已有补丁或新增临时补丁: `quilt push/add`
+3. 添加文件到补丁并修改文件:`quilt edit files`
+4. 更新临时补丁:`quilt refresh`
+5. 拷出临时补丁到openwrt中:`make package/example/update V=s`
 
 -----
 
@@ -51,7 +52,12 @@ EOF
 1. 为了在一个存在的包中添加一个全新的补丁，首先准备好源码目录
 
     ```sh
+    # for packages
     make package/example/{clean,prepare} V=s QUILT=1  
+    # for linux kernel
+    make target/linux/{clean,prepare} V=s QUILT=1
+    # for toolchain
+    make toolchain/gcc/{clean,prepare} V=99 QUILT=1
     ```
 
     上述命令会解压软件包，将存在的补丁准备好作为"quilt patch series"，调试输出将会显示源码解压的目录地址
@@ -59,8 +65,14 @@ EOF
 2. 切换到准备好的源码目录，并用`quilt push`打上所有准备好的补丁
 
     ```sh
+    # for packages
     cd build_dir/target-*/example-*
-    quilt push -a
+    # for linux kernel
+    cd build_dir/target-*/linux-*/linux-*
+    # for toolchain
+    cd build_dir/toolchain-*_gcc-*/gcc-*
+    # quilt series 列出所有可用补丁
+    quilt push -a # 应用所有补丁
     ```
 
 3. 添加新补丁，有两种方式：  
@@ -91,8 +103,9 @@ EOF
 5. 更改完成后检查并更新修改
 
     ```sh
-    quilt diff
-    quilt refresh
+    quilt files #查看补丁中包含的文件
+    quilt diff # 查看补丁差异
+    quilt refresh # 刷新补丁，更新修改
     ```
 
 6. 返回顶层目录，执行update(将临时目录下修改的补丁放到对应包的补丁目录下)，重构包
