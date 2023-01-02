@@ -950,3 +950,7 @@ https://drive.google.com/drive/folders/1LovVy481bNUfbZpoCMSAeDEzIZmvZNKH?usp=sha
     sudo systemctl show --property=Environment docker
     ```
 
+## open remote github repository
+1. install extension: remote repositories
+2. `ctrl+shitf+p` to choose "Remote Repositories: Open ..." or click left corner >< icon
+3. open github repository
