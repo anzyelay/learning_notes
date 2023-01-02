@@ -1,4 +1,3 @@
-
 - [参考](#参考)
 - [前言](#前言)
 - [概要](#概要)
@@ -18,13 +17,13 @@ openwrt的构建系统为方便补丁管理集成了quilt工具， 此文简要�
 ## 概要
 
 1. 准备源码和补丁： `make package/example/{clean,prepare} V=s QUILT=1`
-2. 进入源码目录，查看可用补丁：`quilt series`
-2. 应用已有补丁或新增临时补丁: `quilt push/add`
-3. 添加文件到补丁并修改文件:`quilt edit files`
-4. 更新临时补丁:`quilt refresh`
-5. 拷出临时补丁到openwrt中:`make package/example/update V=s`
+1. 进入源码目录，查看可用补丁：`quilt series`
+1. 应用已有补丁或新增临时补丁: `quilt push/add`
+1. 添加文件到补丁并修改文件:`quilt edit files`
+1. 更新临时补丁:`quilt refresh`
+1. 拷出临时补丁到openwrt中:`make package/example/update V=s`
 
------
+---
 
 ## 准备quilt配置
 
@@ -40,8 +39,6 @@ QUILT_DIFF_OPTS="-p"
 EDITOR="nano"
 EOF
 ```
-
---------
 
 - EDITOR:指定交互编辑器
 - 其它变量控制补丁格式的属性，像a/, b/ 目录名和无时间戳
@@ -94,6 +91,7 @@ EOF
         ```
 
 4. 针对新建空白补丁，要打补丁的文件必须与补丁关联起来（使用`quilt add`），然后就可以像平常使用编辑器一样修改文件，也可以使用`quilt edit path/to/file`将两步合并,任何需要修改的文件都要如此处理
+
     ```sh
     quilt edit src/main.c 
     ## 1. add src/main.c to 010-main_code_fix.patch
@@ -109,19 +107,20 @@ EOF
     ```
 
 6. 返回顶层目录，执行update(将临时目录下修改的补丁放到对应包的补丁目录下)，重构包
-    
+
     ```sh
     cd ../../..
     make package/example/update V=s ## 将临时目录下修改的补丁放到对应包的补丁目录下
     make package/example/{clean,compile} package/index V=s ## 重构包
     ```
+
     如果出现问题，需要修改补丁解决，参考下面的 **修改已存在的补丁** 章节
 
------------------------------------------------
+---
 
-## 修改已存在的补丁    
+## 修改已存在的补丁
 
- 1. 首先准备好源码目录
+1. 首先准备好源码目录
 
     ```sh
     make package/example/{clean,prepare} V=s QUILT=1
@@ -155,9 +154,7 @@ EOF
     - `quilt files`: 检查哪些文件在补丁中  
     - `quilt diff`: 审查修改  
 　　
-
     **注： 如果不想后面直接clean源码目录，此处可以执行`quilt push -a`,再到顶层执行`make package/example/{compile,install}`，验证补丁修改是否成功，如果需要进一步修改，则返回第3步，继续修改。验证成功后直接到每6步update即可**
-
 
 5. 如果修改OK了，用就`quilt refresh`更新当前修改
 
@@ -178,9 +175,10 @@ EOF
     make package/example/{clean,compile} package/index V=s
     ```
 
---------------
+---
 
 ## 针对内核的补丁命名空间
+
 > The patches-* subdirectories contain the kernel patches applied for every OpenWrt target.
 > All patches should be named 'NNN-lowercase_shortname.patch' and sorted into the following categories:
 >
@@ -200,5 +198,4 @@ EOF
 > - they must contain a proper subject
 > - they must contain a proper commit message explaining what they change
 > - they must contain a valid Signed-off-by line
-> 
-
+>
