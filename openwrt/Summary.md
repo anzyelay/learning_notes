@@ -41,9 +41,12 @@ opkg | a package manager in OpenWrt |  a program that downloads/opens/installs/u
 
 dir       | 说明
 ----------|------------------
+config    | menuconfig的配置文件目录
+include   | makefile配置文件目录
 dl        | 所有要下载的包的存放目录
-package   | openwrt第三方包的配置目录，在openwrt固件中一切都是ipk。
-tools     | needs to be written about
+package   | 包的makefile和配置目录，在openwrt固件中一切都是ipk。
+scripts   | 构建过程中用到的一些脚本的目录
+tools     | 构建过程中用到的一些工具的目录
 toolchain | 指向用于构建固件镜像的编译器，C库和通用工具, 编译时会生成两个新的目录: <li> toolchain_build_\<arch\> : 用于构建指定架构工具链的临时目录 <li>staging_dir_\<arch\> : 工具链安装的目录<br>除非要添加新版本交叉工具，否则toolchain目录不需要任何改动
 target    | 指向嵌入式平台相关的目录，这里包含了特定嵌入式平台的项目文件，特别要关注的是“target/linux”和“target/image” <li>target/linux : 特定平台的内核配置与补丁文件目录 <li>target/image : 针对特定平台的打包方式目录
 bin       | 编译好的固件和包的存放地

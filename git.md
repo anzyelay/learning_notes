@@ -88,17 +88,32 @@ git config --global core.editor "vim" //修改commit的编辑器
     # 注意空提交已被注释掉  
     ```
 
-- 仅修改提交信息，比如修改author
-    1. `git rebase -i father_commit_id` ,将要修改的commit前的pick改为edit,保存退出
-    1. `git commit --amend --reset-author`
-    1. `git rebase --continue`
-    1. 下一个修改或完成
+- 仅修改提交信息，比如修改author或时间
+
+    ```sh
+    # 1. 将要修改的commit前的pick改为edit,保存退出
+    git rebase -i father_commit_id
+
+    # 2. 修改信息
+    git commit --amend --reset-author` 
+    # or
+    git commit --date="$(date -R)"
+    # or
+    git commit --date=`(date -R)`
+
+    # 3. 继续,执行 step2 进行下一个修改 或 提示完成全部commit修改
+    git rebase --continue
+    ```
 
 - 合并多个commit，保持历史简洁，`git rebase` ,合并步骤
     1. 查看 log 记录，使用git rebase -i 选择要合并的commit之后的一个commit
     1. 编辑要合并的版本信息，保存提交(多条合并会出现多次,可能会出现冲突)
     1. 修改注释信息后，保存提交(多条合并会出现多次)
     1. 推送远程仓库或合并到主干分支
+
+### 应用其它分支的某个commit
+
+- `git cherry-pick commits -e` : -e[dit] 是重新编辑commit
 
 ---
 
