@@ -1,10 +1,4 @@
-- [参考](#参考)
-- [前言](#前言)
-- [概要](#概要)
-- [准备quilt配置](#准备quilt配置)
-- [添加新补丁](#添加新补丁)
-- [修改已存在的补丁](#修改已存在的补丁)
-- [针对内核的补丁命名空间](#针对内核的补丁命名空间)
+# OpenWrt Patch 管理
 
 ## 参考
 
@@ -45,6 +39,51 @@ EOF
 - FreeBSD 不支持`--color=auto`选项并且`-pab`必须写成`-p ab`,-p ab在0.63版本之后支持，详见man page.
 
 ## 添加新补丁
+
+```mermaid
+graph
+
+
+SP[openwrt package+patch]
+Q[(quilt 补丁系统)]
+B[build_dir/source]
+C[应用上补丁的源码] 
+W((待修改文件))
+EP[外部补丁]
+NP[quilt 补丁]
+
+ca[[1. Make clean/prepare]]
+cb[[2. quilt push patch]]
+cc[[3. quilt import]]
+ce[[3. quilt new]]
+cf[[4. quilt edit file]]
+cd[[4.1 quilt add]]
+cr[[5. refresh]]
+cu[[6. update]]
+ch[[quilt diff]]
+ci[[quilt files]]
+
+SP --> ca --> B & Q
+B --> C 
+Q --> cb -->|应用补丁| C
+Q -->ce-->|新建补丁文件| NP
+W -.-> |4.2 修改| C -.-> W
+W --> cf -->  NP
+W -.-> cd  -.-> |加入补丁监控|NP
+cd -.-> W
+
+EP-->cc--> |引入外部补丁| Q
+
+NP -->cr-->|确认修改| Q --> cu --> |提取quilt补丁| SP
+
+Q-->ch--> |查看补丁修改|NP
+Q-->ci--> |查看所改文件|NP
+
+EA[结点]
+EB[[命令]]
+
+
+```
 
 1. 为了在一个存在的包中添加一个全新的补丁，首先准备好源码目录
 
