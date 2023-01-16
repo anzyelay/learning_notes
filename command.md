@@ -46,6 +46,7 @@ done < filename
 ```
 
 ## gtk开发命令
+
 1. gtk-update-icon-cache
 2. glib-compile-schemas
 3. glib-compile-resources
@@ -53,20 +54,38 @@ done < filename
 5. 
 
 ## linux 三剑客相关
+
+### 总结
+
+| | 语法 | 特点
+--|--|--
+sed | sed [option] 'pattern+action' filename | <li>找谁(pattern)干啥(action)<li>只能针对文件操作<li>针对全文匹配后干点啥
+[g]awk | gawk [option] [--] 'pattern {action}' | <li>找谁(pattern)干啥({action})<li>可以针对管道输出的内容<li>针对每一行匹配后干点啥，可汇总
+grep | grep [option] patterns [filename] | <li>找谁<li>可以针对管道输出的内容
+
+### example
+
 1. 替换文件内容
+
     ```sh
     grep "patapus" . -rl --exclude=*{po,pot} | xargs sed -i "s/patapus/patapua/g"
     ```
+
 1. grep 多词搜索
+
     ```sh
     grep -E "elementary|switchboard" . -rn --exclude-dir={build,.git,.github} --exclude=*.{po,pot}
     sed -nr -e '/elementary/p' -e 'switchboard' source
     ```
+
 1. awk '待匹配项 [!]~ /正则表达式/ { action }' ,匹配行后执行action，默认是打印
+
     ```sh
     dpkg --get-selections | awk '$2 ~ /^install/'
     ```
+
 1. sed 中用"\1"代替要"\(text\)"的text值
+
    ```sh
    # 原文内容为： com.patapua.os-updates (1.0.0-4ubuntu1) unstable; urgency=medium
    # oldversion为 1.0.0-4ubuntu1
@@ -75,7 +94,17 @@ done < filename
    # -r+双引号: 可以使用变量MY_DATA, 
    sed -i -r "s/^(CURRENT_TIME =).*/\1 $MY_DATE/" test.txt
    ```
+
+1. awk 替换从管道出来的文本
+
+   ```sh
+    # 替换mac数据
+    ifconfig | gawk '{ gsub(/([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}/, "**:**:**:**:**:**"); print $0 }' > tmp.txt
+    ifconfig | sed -r 's/([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}/**:**:**:**:**:**/' /dev/stdin
+   ```
+
 ## shell异常退出处理
+
 ```sh
 finish() {
   echo "here do something before exit"
