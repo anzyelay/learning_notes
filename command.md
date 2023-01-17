@@ -57,11 +57,11 @@ done < filename
 
 ### 总结
 
-| | 语法 | 特点
---|--|--
-sed | sed [option] 'pattern+action' filename | <li>找谁(pattern)干啥(action)<li>只能针对文件操作<li>针对全文匹配后干点啥
-[g]awk | gawk [option] [--] 'pattern {action}' | <li>找谁(pattern)干啥({action})<li>可以针对管道输出的内容<li>针对每一行匹配后干点啥，可汇总
-grep | grep [option] patterns [filename] | <li>找谁<li>可以针对管道输出的内容
+| | 语法 | 特点 | option |
+--|--|--|--
+sed | sed [option] 'pattern+action' filename | <li>找谁(pattern)干啥(action)<li>只能针对文件操作<li>针对全文匹配后干点啥 |
+[g]awk | gawk [option] [--] 'pattern {action}' | <li>找谁(pattern)干啥({action})<li>可以针对管道输出的内容<li>针对每一行匹配后干点啥，可汇总|
+grep | grep [option] patterns [filename] | <li>找谁<li>可以针对管道输出的内容|<li>-o:只显示匹配字串<li>-l:只显示匹配文件
 
 ### example
 
@@ -102,6 +102,8 @@ grep | grep [option] patterns [filename] | <li>找谁<li>可以针对管道输�
     ifconfig | gawk '{ gsub(/([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}/, "**:**:**:**:**:**"); print $0 }' > tmp.txt
     ifconfig | sed -r 's/([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}/**:**:**:**:**:**/' /dev/stdin
     ifconfig | sed -r 's/(..):(..):(..):(..):(..):(..)/\1:**:**:\3:**:\6/' /dev/stdin
+    # (..:){n}: 如果字符是“aa:bb:cc:dd:”合计有n项，\placeholder为"dd:"，指代最后一项
+    grep -Erl "([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}" . | xargs sed -nr "s/([[:xdigit:]]{2})(:[[:xdigit:]]{2}){3}(:[[:xdigit:]]{2}){2}/\1:**:**\2:**\3/p"
    ```
 
 ## shell异常退出处理
