@@ -101,6 +101,7 @@ grep | grep [option] patterns [filename] | <li>找谁<li>可以针对管道输�
     # 替换mac数据
     ifconfig | gawk '{ gsub(/([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}/, "**:**:**:**:**:**"); print $0 }' > tmp.txt
     ifconfig | sed -r 's/([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}/**:**:**:**:**:**/' /dev/stdin
+    ifconfig | sed -r 's/(..):(..):(..):(..):(..):(..)/\1:**:**:\3:**:\6/' /dev/stdin
    ```
 
 ## shell异常退出处理
