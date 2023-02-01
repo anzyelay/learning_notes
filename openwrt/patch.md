@@ -14,7 +14,7 @@ openwrt的构建系统为方便补丁管理集成了quilt工具， 此文简要�
 1. 进入源码目录，查看可用补丁：`quilt series`
 1. 应用已有补丁或新增临时补丁: `quilt push/add`
 1. 添加文件到补丁并修改文件:`quilt edit files`
-1. 更新临时补丁:`quilt refresh`
+1. 刷新临时补丁（默认topmost补丁，`quilt series`时最后一条），执行完后可在./patch目录中看到文件生成（若没有文件）或更新:`quilt refresh`
 1. 拷出临时补丁到openwrt中:`make package/example/update V=s`
 
 ---
@@ -142,7 +142,7 @@ EB[[命令]]
     ```sh
     quilt files #查看补丁中包含的文件
     quilt diff # 查看补丁差异
-    quilt refresh # 刷新补丁，更新修改
+    quilt refresh # 在当前的patch目录下创建前面new出来的补丁文件（如果没有该文件），并将diff内容写入补丁文件中
     ```
 
 6. 返回顶层目录，执行update(将临时目录下修改的补丁放到对应包的补丁目录下)，重构包
