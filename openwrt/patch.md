@@ -66,7 +66,7 @@ ci[[quilt files]]
 SP --> ca --> B & Q
 B --> C 
 Q --> cb -->|应用补丁| C
-Q -->ce-->|新建补丁文件| NP
+Q -->ce-->|在patch/series新增行并<br>录入补丁文件名| NP
 W -.-> |4.2 修改| C -.-> W
 W --> cf -->  NP
 W -.-> cd  -.-> |加入补丁监控|NP
@@ -74,7 +74,7 @@ cd -.-> W
 
 EP-->cc--> |引入外部补丁| Q
 
-NP -->cr-->|确认修改| Q --> cu --> |提取quilt补丁| SP
+NP -->cr-->|在quilt的patch目录下<br>新建补丁文件<br>将修改保存到补丁文件中| Q --> cu --> |提取quilt补丁| SP
 
 Q-->ch--> |查看补丁修改|NP
 Q-->ci--> |查看所改文件|NP
