@@ -3,7 +3,9 @@
 ## 正则表达式的分类
 
 1. 基本的正则表达式（Basic Regular Expression 又叫Basic RegEx 简称BREs）
+
 1. 扩展的正则表达式（Extended Regular Expression 又叫Extended RegEx 简称EREs）
+
 1. Perl的正则表达式（Perl Regular Expression 又叫Perl RegEx 简称PREs）
 
 ## 基本组成部分
