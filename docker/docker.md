@@ -91,6 +91,7 @@
         - p: 指定端口映射,"-p localhost_port:container_port"
         - d: 后台运行
         - '--privileged': 解决在容器内的权限问题
+        - e: 指定环境变量: 可参考[mydocker.sh](../script/mydocker.sh)
     
     1. 启动已存在容器：`docker start container_id`
     1. 重启容器:`docker restart container_id`
@@ -125,6 +126,10 @@
     username/ubuntu
     ```
 
+## 代理设置
+- 拉取镜像时的代理设置： [Configure the daemon with systemd](https://docs.docker.com/config/daemon/systemd/)
+- 创建的容器内的代理设置： [Configure Docker to use a proxy server](https://docs.docker.com/network/proxy/)
+
 
 ## 示例：
 1. Dockerfile文件如下：    
@@ -142,17 +147,18 @@
 
     ################## BEGIN INSTALLATION ######################
     RUN sed -i 's/archive.ubuntu.com/repo.huaweicloud.com/g' /etc/apt/sources.list
-    RUN apt update 
-    RUN apt install -y sudo
-    RUN apt install -y openssh-server
-    RUN apt install -y vim bash-completion
-    RUN apt install -y man bc
-    RUN apt install -y repo git ssh make gcc libssl-dev liblz4-tool 
-    RUN apt install -y expect g++ patchelf chrpath gawk texinfo 
-    RUN apt install -y chrpath diffstat binfmt-support 
-    RUN apt install -y qemu-user-static live-build bison flex
-    RUN apt install -y  fakeroot cmake gcc-multilib g++-multilib
-    RUN apt install -y unzip device-tree-compiler ncurses-dev time
+    RUN apt update && apt install -y sudo \
+        openssh-server \
+        vim bash-completion \
+        man bc \
+        repo git ssh make gcc libssl-dev liblz4-tool  \
+        expect g++ patchelf chrpath gawk texinfo  \
+        chrpath diffstat binfmt-support  \
+        qemu-user-static live-build bison flex \
+        fakeroot cmake gcc-multilib g++-multilib \
+        unzip device-tree-compiler ncurses-dev time
+    # dont use mutilpline RUN apt install -y xxx
+    # because of that every RUN command is a new layer of container
 
     RUN mkdir -p /var/run/sshd
 
@@ -190,9 +196,19 @@
 
 4. ssh进入容器**rk3588_sdk_env **   
     `ssh -p 10088 yourname@localhost`
-    
+
 5. 容器有变更可先以当前容器生成新镜像，再从新创建容器
 
-## 代理设置
-- 拉取镜像时的代理设置： [Configure the daemon with systemd](https://docs.docker.com/config/daemon/systemd/)
-- 创建的容器内的代理设置： [Configure Docker to use a proxy server](https://docs.docker.com/network/proxy/)
+6. 如何判断是否在容器中,并更改PS标记？
+
+```sh
+    ps --no-headers --pid 1 | grep  --silent docker-init && in_docker=1 || in_docker=0
+    [ $in_docker = 1 ] && {
+        PS1=`\[\033[01;36m\][docker] `$PS1
+    }
+```
+
+7. script exsample 
+   ```sh
+
+   ```
