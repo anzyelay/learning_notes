@@ -7,7 +7,7 @@
 
 ![图片.png](https://cdn.nlark.com/yuque/0/2021/png/22279344/1631265055969-cd3978e5-bfbc-4e7d-b463-3443b6e27e98.png#clientId=ue2af73b3-1d52-4&crop=0&crop=0&crop=1&crop=1&from=paste&height=405&id=u695b478e&margin=%5Bobject%20Object%5D&name=%E5%9B%BE%E7%89%87.png&originHeight=405&originWidth=720&originalType=binary&ratio=1&rotation=0&showTitle=false&size=63786&status=done&style=none&taskId=u691cb8be-2e3b-4a26-afab-284e83fd0dd&title=&width=720)
 
-## 3. [面易懂的 Systemd 服务管理教程](https://cloud.tencent.com/developer/article/1516125)
+## 3. [容易懂的 Systemd 服务管理教程](https://cloud.tencent.com/developer/article/1516125)
 
 # systemd 知识点
 
@@ -26,7 +26,9 @@ $ systemctl --user start myuser.service
 - user unit directories:`pkg-config systemd --variable=systemduserunitdir`
 - user configuration directory:`pkg-config system --variable=systemduserconfdir`
 
-详见：`man systemd.unit`<br />![图片.png](https://cdn.nlark.com/yuque/0/2021/png/22279344/1631523080311-48dfa3ac-7e18-4d86-8e52-caa96e27b935.png#clientId=ubde14ad4-5364-4&crop=0&crop=0&crop=1&crop=1&from=paste&height=817&id=ue73c9361&margin=%5Bobject%20Object%5D&name=%E5%9B%BE%E7%89%87.png&originHeight=817&originWidth=1342&originalType=binary&ratio=1&rotation=0&showTitle=false&size=195483&status=done&style=none&taskId=u34dc5218-d874-47e0-a1ec-7daaf37787c&title=&width=1342)![图片.png](https://cdn.nlark.com/yuque/0/2021/png/22279344/1631523086927-1df940d4-125b-4ac9-aebb-b63c5e976c7f.png#clientId=ubde14ad4-5364-4&crop=0&crop=0&crop=1&crop=1&from=paste&id=u5981ca69&margin=%5Bobject%20Object%5D&name=%E5%9B%BE%E7%89%87.png&originHeight=817&originWidth=1342&originalType=binary&ratio=1&rotation=0&showTitle=false&size=195483&status=done&style=none&taskId=u81d523ca-599e-4cf4-a597-d6c323fb502&title=)
+详见：`man systemd.unit`<br />
+![图片.png](https://cdn.nlark.com/yuque/0/2021/png/22279344/1631523080311-48dfa3ac-7e18-4d86-8e52-caa96e27b935.png#clientId=ubde14ad4-5364-4&crop=0&crop=0&crop=1&crop=1&from=paste&height=817&id=ue73c9361&margin=%5Bobject%20Object%5D&name=%E5%9B%BE%E7%89%87.png&originHeight=817&originWidth=1342&originalType=binary&ratio=1&rotation=0&showTitle=false&size=195483&status=done&style=none&taskId=u34dc5218-d874-47e0-a1ec-7daaf37787c&title=&width=1342)
+![图片.png](https://cdn.nlark.com/yuque/0/2021/png/22279344/1631523086927-1df940d4-125b-4ac9-aebb-b63c5e976c7f.png#clientId=ubde14ad4-5364-4&crop=0&crop=0&crop=1&crop=1&from=paste&id=u5981ca69&margin=%5Bobject%20Object%5D&name=%E5%9B%BE%E7%89%87.png&originHeight=817&originWidth=1342&originalType=binary&ratio=1&rotation=0&showTitle=false&size=195483&status=done&style=none&taskId=u81d523ca-599e-4cf4-a597-d6c323fb502&title=)
 
 ## 常用命令
 
