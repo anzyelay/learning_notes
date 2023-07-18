@@ -1,9 +1,9 @@
-- [名词解释：](#名词解释)
+- [名词解释](#名词解释)
 - [Docker 镜像使用](#docker-镜像使用)
 - [容器使用](#容器使用)
 - [docker仓库管理](#docker仓库管理)
-- [示例：](#示例)
 - [代理设置](#代理设置)
+- [示例](#示例)
 
 ------
 
@@ -13,11 +13,22 @@
 - 容器： 容器是镜像运行时的实体
 - 仓库（Repository）：仓库可看成一个代码控制中心，用来保存镜像。
 
+## docker 配置
+
+1. Add user to group
+
+    ```sh
+    sudo usermod -aG docker $USER
+    ```
+
 ## Docker 镜像使用
 
 1. 查找镜像: `docker search imagename`
+
 1. 获取一个新的镜像： `docker pull imagename:tag[@sha_number]`
+
 1. 删除镜像: `docker rmi IMAGE`
+
 1. 列出镜像: `docker images`
 
    ```sh
@@ -67,14 +78,17 @@
 
     CMD     /usr/sbin/sshd -D
     ```
+
       1. 每一个指令都会在镜像上创建一个新的层，每一个指令的前缀都必须是大写的。
       2. 第一条FROM，指定使用哪个镜像源
       3. RUN 指令告诉docker 在镜像内执行命令，安装了什么。。。
       4. WORKDIR: 指示登录后的目录所在
       5. CMD:容器启动后运行的指令
- 1. 设置镜像标签: `docker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]`
-    
+
+1. 设置镜像标签: `docker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]`
+
     eg: 镜像id为860c279d2fec多了一个dev的tag
+
     ```sh
     runoob@runoob:~$ docker tag 860c279d2fec runoob/centos:dev
     runoob@runoob:~$ docker images
@@ -84,11 +98,17 @@
     runoob/ubuntu       v2                  70bf1840fd7c        22 hours ago        158.5 MB
     ubuntu              14.04               90d5884b1ee0        6 days ago          188 MB
     ```
+
 ## 容器使用
+
 1. 查看已运行容器: `docker ps [-al]`
-1. 停止一个容器: ` docker stop container_id`
+
+1. 停止一个容器: `docker stop container_id`
+
 1. 删除容器: `docker rm container_id`
+
 1. 启动容器
+
     1. 启动新容器：`docker run [OPTIONS] IMAGE [COMMAND] [ARG...]`
 
         option说明：
@@ -100,15 +120,18 @@
         - d: 后台运行
         - '--privileged': 解决在容器内的权限问题
         - e: 指定环境变量: 可参考[mydocker.sh](../script/mydocker.sh)
-    
+
     1. 启动已存在容器：`docker start container_id`
+
     1. 重启容器:`docker restart container_id`
-   
+
 1. 进入容器  
     在使用 -d 参数时，容器启动后会进入后台。此时想要进入容器，可以通过以下指令进入:
     - `docker attach container_id`: 退出容器时会停止容器
     - `docker exec -it container_id /bin/bash`：从这个容器退出，容器不会停止
+
 1. 导出和导入容器
+
     ```sh
     #导出容器
     $ docker export 1e560fca3906 > ubuntu.tar
@@ -119,13 +142,18 @@
     #导入容器way-3
     $ docker import /tmp/ubuntu.tgz example/imagerepo
     ```
-1. 为了容器或宿主机重启后自动启动，需要设置如下   
+
+1. 为了容器或宿主机重启后自动启动，需要设置如下
+
     宿主机： docker update –restart=always 容器ID(或者容器名)
+
 ## docker仓库管理
+
 1. 镜像加速器：https://www.runoob.com/docker/docker-mirror-acceleration.html
 2. 登录:`docker login -u name`
 3. 退出:`docker logout`
 4. 推送镜像：`docker push username/ubuntu:18.04`
+
     ```sh
     $ docker push username/ubuntu:18.04
     $ docker search username/ubuntu
@@ -137,6 +165,7 @@
 ## 代理设置
 
 - 拉取镜像时的代理设置： [Configure the daemon with systemd](https://docs.docker.com/config/daemon/systemd/)
+
 - 创建的容器内的代理设置： [Configure Docker to use a proxy server](https://docs.docker.com/network/proxy/)
 
 ## 示例

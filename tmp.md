@@ -1032,3 +1032,7 @@ ps --no-headers --pid 1 | grep --silent docker-init && in_docker=1 || in_docker=
         PS1='\[\033[01;36m\][docker] '$PS1
 }
 ```
+
+## curl 7.58 under proxy issue ssl wrong version
+
+https_proxy代理设置错了，设置成与http_proxy一样即可
