@@ -75,7 +75,7 @@ Then it’s time to create a launch script for dockerd. There are two options, m
 - Add the following to .bashrc or .profile (make sure “DOCKER_DISTRO” matches your distro, you can check it by running `wsl -l -q` in Powershell)
 
     ```bash
-    DOCKER_DISTRO="Ubuntu-20.04"
+    DOCKER_DISTRO=`lsb_release -is`
     DOCKER_DIR=/mnt/wsl/shared-docker
     DOCKER_SOCK="$DOCKER_DIR/docker.sock"
     export DOCKER_HOST="unix://$DOCKER_SOCK"

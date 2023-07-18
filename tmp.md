@@ -927,15 +927,22 @@ https://drive.google.com/drive/folders/1LovVy481bNUfbZpoCMSAeDEzIZmvZNKH?usp=sha
    ```
 
 ## proxy
+
 ### linux
-1.  打开网络设置代理设置，勾选手动模式，在http proxy, https proxy和ftp proxy上都填写上代理如 : "username:passwd@proxy_ip", 在端口号上填写对应端口如3128
+
+1. 打开网络设置代理设置，勾选手动模式，在http proxy, https proxy和ftp proxy上都填写上代理如 : "username:passwd@proxy_ip", 在端口号上填写对应端口如3128
     设置好后，打开终端，查看环境变量就会看到 `env | grep -i proxy`， 成功后即可访问网页，wget也可以正常使用
+
 2. 设置apt代理，touch /etc/apt/apt.conf, 内容如下：
+
     ``` txt  
     Acquire::http::Proxy "http://username:passwd@proxy_ip:port";
     ```
-3. docker 代理设置   
+
+3. docker 代理设置
+
    [参考链接](https://docs.docker.com/config/daemon/systemd/)  
+
     ```sh
     sudo mkdir -p /etc/systemd/system/docker.service.d
     sudo touch /etc/systemd/system/docker.service.d/http-proxy.conf
