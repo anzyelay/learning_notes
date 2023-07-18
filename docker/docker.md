@@ -4,17 +4,22 @@
 - [docker仓库管理](#docker仓库管理)
 - [示例：](#示例)
 - [代理设置](#代理设置)
+
 ------
-## 名词解释：
+
+## 名词解释
+
 - 镜像： Docker 镜像（Image），就相当于是一个 root 文件系统
 - 容器： 容器是镜像运行时的实体
 - 仓库（Repository）：仓库可看成一个代码控制中心，用来保存镜像。
+
 ## Docker 镜像使用
+
 1. 查找镜像: `docker search imagename`
 1. 获取一个新的镜像： `docker pull imagename:tag[@sha_number]`
 1. 删除镜像: `docker rmi IMAGE`
-1. 列出镜像
- `docker images`
+1. 列出镜像: `docker images`
+
    ```sh
    runoob@runoob:~$ docker images           
     REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
@@ -22,22 +27,25 @@
     php                 5.6                 f40e9e0f10c8        9 days ago          444.8 MB
     nginx               latest              6f8d099c3adc        12 days ago         182.7 MB
    ```
+
    各个选项说明:
     - REPOSITORY：表示镜像的仓库源
     - TAG：镜像的标签
     - IMAGE ID：镜像ID, 可使用此id运行，删除，提交
     - CREATED：镜像创建时间
     - SIZE：镜像大小
-    
+
     REPOSITORY:TAG 来定义不同的镜像，一个仓库可以有多个TAG
 
-1. 创建镜像: 
+1. 创建镜像:
+
    - 从已经创建的容器中更新镜像，并且提交这个镜像: `docker commit -m="commit description" -a="author" 容器id  镜像名`
    - 从零开始创建新镜像，先为此创建一个Dockerfile文件，包含一组指令来告知docker如何创建一个新的镜像: `docker build -t 镜像名 dockerfile_dir`
-    
+
     镜像名形如：anzye/ubuntu:v2;  **dockerfile_dir**是指dockerfile所在的目录，也可以是绝对路径
-    
+
     [dockerfile格式](https://www.runoob.com/docker/docker-dockerfile.html)：
+
     ```sh
     runoob@runoob:~$ cat Dockerfile 
     FROM    centos:6.7
@@ -127,12 +135,14 @@
     ```
 
 ## 代理设置
+
 - 拉取镜像时的代理设置： [Configure the daemon with systemd](https://docs.docker.com/config/daemon/systemd/)
 - 创建的容器内的代理设置： [Configure Docker to use a proxy server](https://docs.docker.com/network/proxy/)
 
+## 示例
 
-## 示例：
-1. Dockerfile文件如下：    
+1. Dockerfile文件如下:
+
    ```Dockerfile
    ############################################################
     # Dockerfile to build KunLun complie container images
@@ -183,32 +193,41 @@
 
     CMD     /usr/sbin/sshd -D
    ```
-2. 使用Dockerfile生成 "**ubuntu:rk3588**" 镜像：    
-    `docker build -t ubuntu:rk3588 /your/dockerfile/path（不是文件名，只是路径名，会自动搜索Dockerfile）`    
+
+2. 使用Dockerfile生成 "**ubuntu:rk3588**" 镜像：
+
+    `docker build -t ubuntu:rk3588 /your/dockerfile/path（不是文件名，只是路径名，会自动搜索Dockerfile）`
+
     镜像基于ubuntu 21.04构建，包含一个缺省用户root，密码123123，编译rk3588需要的基本环境
     建议修改Dockerfile中customize部分，添加一个与20上自己用户同名的用户和uid，否则下面共享文件会出现权限问题，可以创建自己需要的用于共享的目录
 
-3. 以镜像**ubuntu:rk3588**创建容器**rk3588_sdk_env**：    
-   - 无共享文件夹：   
+3. 以镜像**ubuntu:rk3588**创建容器**rk3588_sdk_env**：
+
+   - 无共享文件夹:
+
      `docker run --name rk3588_sdk_env --privileged -v /dev:/dev -v /proc:/proc -v /dev/pts:/dev/pts -d -p 10088:22 ubuntu:rk3588 /usr/sbin/sshd -D`
-   - 有共享文件夹：   
+
+   - 有共享文件夹：
+
      `docker run --name rk3588_sdk_env --privileged -v /dev:/dev -v /proc:/proc -v /dev/pts:/dev/pts -d -p 10088:22 -v /home/jide/rk3588:/home/jide/rk3588_sdk ubuntu:rk3588 /usr/sbin/sshd -D`
 
-4. ssh进入容器**rk3588_sdk_env **   
+4. ssh进入容器**rk3588_sdk_env**
+
     `ssh -p 10088 yourname@localhost`
 
 5. 容器有变更可先以当前容器生成新镜像，再从新创建容器
 
 6. 如何判断是否在容器中,并更改PS标记？
 
-```sh
-    ps --no-headers --pid 1 | grep  --silent docker-init && in_docker=1 || in_docker=0
-    [ $in_docker = 1 ] && {
-        PS1=`\[\033[01;36m\][docker] `$PS1
-    }
-```
+    ```sh
+        ps --no-headers --pid 1 | grep  --silent docker-init && in_docker=1 || in_docker=0
+        [ $in_docker = 1 ] && {
+            PS1=`\[\033[01;36m\][docker] `$PS1
+        }
+    ```
 
-7. script exsample 
+7. script exsample
+
    ```sh
 
    ```
