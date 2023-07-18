@@ -98,6 +98,31 @@ wsl --install -d Ubuntu
     Acquire::http::proxy "http://username:passwd@proxy_ip:port";
    ```
 
+## 设置开发环境
+
+1. In Ubuntu/WSL:
+
+    ```sh
+    sudo apt install build-essential flex bison libssl-dev libelf-dev git dwarves
+    git clone https://github.com/microsoft/WSL2-Linux-Kernel.git
+    cd WSL2-Linux-Kernel
+    cp Microsoft/config-wsl .config
+    make -j $(expr $(nproc) - 1)
+    ```
+
+1. From Windows, copy `\\wsl$\<DISTRO>\home\<USER>\WSL2-Linux-Kernel\arch\x86\boot\bzimage` to your Windows profile (%userprofile%, like `C:\Users\<Windows_user>`)
+
+1. Create the file `%userprofile%\.wslconfig` that contains:
+
+    ```sh
+    [wsl2]
+    kernel=C:\\Users\\WIN10_USER\\bzimage
+    ```
+
+    *Note: The double backslashes (\\) are required. Also, to avoid a potential old bug, make sure not to leave any trailing whitespace on either line.*
+
+1. In PowerShell, run `wsl --shutdown`, reopen wsl
+
 ## links and references
 
 1. [WSL 中的高级设置配置](https://learn.microsoft.com/zh-cn/windows/wsl/wsl-config)
