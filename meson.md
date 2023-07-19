@@ -1,37 +1,45 @@
-- [- 手动添加编译选项](#--手动添加编译选项)
-- [命令](#命令)
-- [路径和名称](#路径和名称)
-- [资源文件的引入](#资源文件的引入)
-- [添加schemas](#添加schemas)
-- [Config.vala 文件自动生成](#configvala-文件自动生成)
-- [翻译](#翻译)
-  - [构成目录](#构成目录)
-  - [命令](#命令-1)
-  - [i18n模块介绍](#i18n模块介绍)
-  - [工程翻译步骤](#工程翻译步骤)
-  - [问题集](#问题集)
-- [翻译与Config相结合](#翻译与config相结合)
-- [手动在vala工程中添加vapi （以添加sdl2_image为例)](#手动在vala工程中添加vapi-以添加sdl2_image为例)
-  - [1. 在工程中添加vapi目录](#1-在工程中添加vapi目录)
-  - [2. 添加vapi文件](#2-添加vapi文件)
-  - [3. 在meson.build中添加 **'--vapidir'**](#3-在mesonbuild中添加---vapidir)
-  - [4. 在meson.build中添加对应库, 参数本章命令节第二条](#4-在mesonbuild中添加对应库-参数本章命令节第二条)
-- [手动添加编译选项](#手动添加编译选项)
--------------
+# MESON
+
+- [MESON](#meson)
+  - [命令](#命令)
+  - [路径和名称](#路径和名称)
+  - [资源文件的引入](#资源文件的引入)
+  - [添加schemas](#添加schemas)
+  - [Config.vala 文件自动生成](#configvala-文件自动生成)
+  - [翻译](#翻译)
+    - [构成目录](#构成目录)
+    - [翻译命令](#翻译命令)
+    - [i18n 模块介绍](#i18n-模块介绍)
+    - [工程翻译步骤](#工程翻译步骤)
+    - [问题集](#问题集)
+  - [翻译与Config相结合](#翻译与config相结合)
+  - [手动在vala工程中添加vapi （以添加sdl2\_image为例)](#手动在vala工程中添加vapi-以添加sdl2_image为例)
+    - [1. 在工程中添加vapi目录](#1-在工程中添加vapi目录)
+    - [2. 添加vapi文件](#2-添加vapi文件)
+    - [3. 在meson.build中添加 **'--vapidir'**](#3-在mesonbuild中添加---vapidir)
+    - [4. 在meson.build中添加对应库, 参数本章命令节第二条](#4-在mesonbuild中添加对应库-参数本章命令节第二条)
+  - [手动添加编译选项](#手动添加编译选项)
+
+------
+
 ## 命令
+
 1. 查看当前配置状态 (build为构建目录)
 `meson configure build`
 2. 添加lib `dependency('libcanberra')`
    - `pkg-config --list-all` 列出所有可用库
    - `pkg-config --libs libname`, 去掉-l就是要添加到dependency中间的名字，大小写敏感
    - 都找不到就用meson查找命令：
+
         ```meson
         m_dep = meson.get_compiler('c').find_library('m', required : false)
         posix_dep = meson.get_compiler('vala').find_library('posix')
         # 其中posix是由valadoc中的某个函数的 Package:posix 字段得到。比如查找Posix.sleep就能看到
         ```
+
 3. 获取参数值：`get_option('prefix')`
 4. foreach
+
    ```meson.build
     schemas = [ '...', '...' ]
     generated_schemas = []                                                                                     
@@ -46,7 +54,9 @@
     install_data(generated_schemas, install_dir: schemasdir)
 
    ```
+
 5. custom target
+
    ```meson.build
     custom_proc = find_program('xsltproc', required: false)
     assert(custom_proc.found(), 'xsltproc is required to build documentation')
@@ -67,8 +77,10 @@
     )
 
    ```
+
 6. 工程, 有executable, shared_module, shared_lib
-   ```
+
+   ```meson
    executable(
         meson.project_name(),
         sources,
@@ -79,8 +91,10 @@
         install : true
     )
    ```
+
 7. run_command
-    ```
+
+    ```meson
     ls = find_program('ls')
     result = run_command(ls, join_paths(meson.source_root (), directory, size))
     if (result.returncode() == 0)
@@ -90,9 +104,12 @@
     endif
 
     ```
---------------
+
+------
+
 ## 路径和名称
-1. 源代码root路径： `meson.source_root() `
+
+1. 源代码root路径： `meson.source_root()`
 1. 工程名： `meson.project_name()`
 1. 当前路径 :   `meson.current_source_dir()`
 1. 包含include目录: `include_directories('.')`
@@ -141,16 +158,21 @@
         install_dir: join_paths(get_option('datadir'), 'dbus-1', 'services')
     )
     ```  
--------------
+
+------
 
 ## 资源文件的引入
+
 - 文件所在位置
+
     ```sh
     ann@B460M-d5c6e3b7:settingboard-plug-sound$ ls data/
     icons.gresource.xml
     css.gresource.xml
     ```
+
 - meson.build
+
     ```sh
     # step 1 : 引入gnome模块
     gnome = import('gnome')
@@ -173,8 +195,10 @@
         css_resources,
     )
     ```
+
 - 在源码中的引用
   - 在css文件中引用
+
     ```css
     .category.graphics label {
         border-image:
@@ -187,7 +211,9 @@
     }
 
     ```
-  - 在vala中的引用    
+
+  - 在vala中的引用
+
     ```vala
     weak Gtk.IconTheme default_theme = Gtk.IconTheme.get_default ();
     default_theme.add_resource_path ("/io/elementary/appcenter/icons");
@@ -198,10 +224,14 @@
 
     // set_resource_base_path (resource_path)
     ```
--------------
+
+------
+
 ## 添加schemas
- - 在工程schemas或data目录中添加*.gschema.xml文件，此处的命名不强制，但安装到系统目录中的文件必须是以".gschema.xml"为后缀结尾,否则不识别。
- - 在gschema.xml同层的meson.build中加入如下内容,安装到系统指定schemas目录中
+
+- 在工程schemas或data目录中添加*.gschema.xml文件，此处的命名不强制，但安装到系统目录中的文件必须是以".gschema.xml"为后缀结尾,否则不识别。
+- 在gschema.xml同层的meson.build中加入如下内容,安装到系统指定schemas目录中
+
     ```meson
     install_data(
         'my.xxx.gschema.xml',
@@ -217,7 +247,9 @@
     )
 
     ```
- - 新建meson目录，创建编译脚本post_install.py
+
+- 新建meson目录，创建编译脚本post_install.py
+
     ```python
     #!/usr/bin/env python3
 
@@ -231,17 +263,22 @@
         subprocess.call(['glib-compile-schemas', schemadir])
 
     ```
+
 - 在主meson.build中添加`meson.add_install_script('meson/post_install.py')`,执行编译脚本,使之生效
 
--------------
+------
+
 ## Config.vala 文件自动生成
 
-- 在目录“src”下创建“Config.vala.in”文件 , 内容如下：   
+- 在目录“src”下创建“Config.vala.in”文件 , 内容如下：
+
     ```vala
     public const string GETTEXT_PACKAGE = @GETTEXT_PACKAGE@;
     public const string LOCALEDIR = @LOCALEDIR@;
     ```
+
 - meson.build
+
     ```sh
     # step 1: 设置模式值到config_data中
     config_data = configuration_data()
@@ -263,20 +300,27 @@
         config_file,
     )
     ```
--  编译后会在src/下自动生成Config.vala文件, 内容如下：
+
+- 编译后会在src/下自动生成Config.vala文件, 内容如下：
+
     ```vala
     public const string GETTEXT_PACKAGE = "sound-plug";
     public const string LOCALEDIR = "/usr/share/locale";
     ```
- - 代码中的使用
+
+- 代码中的使用
+
     ```vala
     GLib.Intl.bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
     GLib.Intl.bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
     ```
 
---------------
+------
+
 ## 翻译
-### 构成目录   
+
+### 构成目录
+
 ```sh
 project
 |--meson.build
@@ -292,20 +336,26 @@ project
         |--POTFILES
         |--LINGUAS
 ```
-   - POTFILES: 内容为要翻译的所有源文件路径名，换行符分隔
-   - LINGUAS:  它应该包含您要为其提供翻译的所有语言的两个字母的语言代码，换行符分隔，**在未生成pot文件前，先不要写该文件，否则在执行meson build配置时就报错**
-   - extra下一般为不需安装的翻译,故meson.build中i18n.gettext的install字段为false
+
+- POTFILES: 内容为要翻译的所有源文件路径名，换行符分隔
+- LINGUAS:  它应该包含您要为其提供翻译的所有语言的两个字母的语言代码，换行符分隔，**在未生成pot文件前，先不要写该文件，否则在执行meson build配置时就报错**
+- extra下一般为不需安装的翻译,故meson.build中i18n.gettext的install字段为false
   
-### 命令
- - ninja \*-pot : 从POTFILES获取所有待翻译的文档，生成译文模板文档 "\*.pot"
- - ninja \*-update-po  : 生成LINGUAS所列的所有语言的翻译文档 "\*.po"
- - ninja \*-gmo : 编译"\*.po"成"\*.mo"
+### 翻译命令
+
+- `ninja \*-pot` : 从POTFILES获取所有待翻译的文档，生成译文模板文档 "\*.pot"
+- `ninja \*-update-po`  : 生成LINGUAS所列的所有语言的翻译文档 "\*.po"
+- `ninja \*-gmo` : 编译"\*.po"成"\*.mo"
 
     **注意，要在构建目录中运行**, 上面的“*”为传递给gettext()方法的第一个字符参数。
-###  [i18n](https://mesonbuild.com/i18n-module.html)模块介绍
+
+### [i18n](https://mesonbuild.com/i18n-module.html) 模块介绍
+
 该模块提供国际化和本地化功能, 在meson中引入该模块的方法： `i18n = import('i18n')` , 前面一个i18n为对象名，可任意命名，
 提供的方法有：
+
 - i18n.gettext(): 设置gettext本地化，以便在工程**安装期间**构建翻译并安装翻译到合适的位置
+
     ```sh
     i18n.gettext(
         gettext_name, #生成的pot名称的参数, 也是传递给 *-pot/update-po/-gmo 命令的参数
@@ -317,7 +367,9 @@ project
     )
 
     ```
+
 - i18n.merge_file() : 将翻译合并到一个文本文件中并输出output
+
     ```bash
     i18n.merge_file(
         input: # 待翻译的文件
@@ -332,6 +384,7 @@ project
 ### 工程翻译步骤
 
 - step 1 : 在工程的./meson.build 中 引入 i18n 模块
+
     ```sh
     # Include the translations module
     i18n = import('i18n')
@@ -348,15 +401,16 @@ project
     ```
 
     也可在vala代码中设置使用翻译文件, 宏的引入参考[Config.vala 文件自动生成](#configvala-文件自动生成)
+
     ```vala
     GLib.Intl.bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
     GLib.Intl.bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8")
     ```
 
-
 - step 2 : 在./data/meson.build 中 merge_file .desktop和appdata.xml文件
-    
+
     merge_file方法翻译和安装，可替代install_data
+
     ```sh
     #Translate and install our .desktop file
     i18n.merge_file(
@@ -377,12 +431,15 @@ project
     )
 
     ```
-    **.appdata.xml 文件中要指定使用的翻译文件名需与gettext_name一致** 
+
+    **.appdata.xml 文件中要指定使用的翻译文件名需与gettext_name一致**
+
     ```xml
     <translation type="gettext">gettext_name</translation>
     ```
 
 - step 3 :  在工程root目录下创建po,po下的meson.build如下
+
     ```sh
     i18n.gettext(gettext_name, #生成的pot名称
         args: '--directory=' + meson.source_root(), 
@@ -391,27 +448,34 @@ project
     ```
 
 - step 4 : 完善目录po下的文件
-   -  创建 POTFILES ： 包含要翻译的所有文件
-   -  创建 LINGUAS  ： 它应该包含您要为其提供翻译的所有语言的两个字母的语言代码
-   -  返回构建目录并运行命令行生成翻译模板, 运行后会在po下产生一个包含所有待翻译字符串的文档
-        ```
-        ninja gettext_name-pot
-        ``` 
+  - 创建 POTFILES ： 包含要翻译的所有文件
+  - 创建 LINGUAS  ： 它应该包含您要为其提供翻译的所有语言的两个字母的语言代码
+  - 返回构建目录并运行命令行生成翻译模板, 运行后会在po下产生一个包含所有待翻译字符串的文档
 
-   - 在构建目录中运行命令生成LINGUAS所列的所有语言的翻译文档
-        ```sh
-        ninja gettext_name-update-po
-        ```
-        gettext_name替换为具体翻译文件名称
+    ```sh
+    ninja gettext_name-pot
+    ```
+
+  - 在构建目录中运行命令生成LINGUAS所列的所有语言的翻译文档
+
+    ```sh
+    ninja gettext_name-update-po
+    ```
+
+    gettext_name替换为具体翻译文件名称
 
 - step 5 : 每次源代码中更新改变待翻译字串后都需要在构建目录下运行`ninja *-pot` 和 `ninja *-update-po`两条指令
+
 ### 问题集
+
 1. 将po翻译文件转成二进制文件时报错: 无效的多字节序列
-    
+
     resolved: 需要将对应的.po文件中charset值从ASCII修改为UTF-8，再执行上述命令即可！
 2. “.*/meson.build:1:5: ERROR: File xx.po does not exist”
    在执行`meson build`前，LINGUAS文件内容要先注释掉。执行`meson build`配置成功后，再执行`ninja -C build xxx-pot`生成对应的pot文件，然后在LINGUAS文件中加入内容，执行`ninja -C build xxx-update-po`生成对应po文件。
+
 ## 翻译与Config相结合
+
 ```meson
 # AppData file
 appdata_in = configure_file(
@@ -429,26 +493,36 @@ i18n.merge_file(
 )
 ```
 
----------------
+------
+
 ## 手动在vala工程中添加vapi （以添加sdl2_image为例)
+
 ### 1. 在工程中添加vapi目录
+
 ```sh
 ann@dell:appstore$ mkdir vapi
 ann@dell:appstore$ ls
 build  builddir  data  debian  meson  meson.build  po  README.md  src  vapi
 ```
+
 ### 2. 添加vapi文件
+
 查看SDL2_image.deps，得知SDL2_image只依赖sdl2, 则添加如下两个vapi文件
+
 ```sh
 ann@dell:appstore$ ls vapi/
 SDL2_image.vapi  sdl2.vapi
 ```
+
 ### 3. 在meson.build中添加 **'--vapidir'**
+
 ```sh
 vapi_dir = join_paths(meson.current_source_dir(), 'vapi')
 add_project_arguments(['--vapidir', vapi_dir], language: 'vala')
 ```
+
 ### 4. 在meson.build中添加对应库, 参数本章命令节第二条
+
 ```sh
 dependencies:[
     dependency ('sdl2'),
@@ -456,18 +530,25 @@ dependencies:[
     ]
     
 ```
+
 ## 手动添加编译选项
+
 1. 在工程目录下创建meson_options.txt文件，如下：
+
     ```txt
     option('example', type: 'boolean', value: false, description: 'Build an example that shows how it works')
     ```
+
 2. 在工程中获取配置项：
+
    ```meson
    if get_option('example')
     subdir('sample')
    endif
    ```
+
 3. 更改配置项，编译工程
+
     ```sh
     # 配置为true
     meson configure build -D example=true
