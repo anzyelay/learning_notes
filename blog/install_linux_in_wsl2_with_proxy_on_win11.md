@@ -46,6 +46,12 @@
 wsl --install -d Ubuntu
 ```
 
+## Hyper-V 管理器设置
+
+一般在wsl安装linux，会有一个虚拟网卡WSL,默认连接类型为：仅内部， 若不是，则更改“仅内部”
+在win开始菜单输入hyper单击应用打开hyper-v管理器， 点击“虚拟交换机管理”， 选中相应网络（如下图所示）。
+![Hyper-V manager](../picture/blog/image-hyperv-manager.png)
+
 ## 迁移VM到其它盘
 
 1. 终止正在运行的wsl `wsl --shutdown`
