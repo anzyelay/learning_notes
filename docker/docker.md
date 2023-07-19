@@ -1,3 +1,5 @@
+# DOCKER
+
 - [名词解释](#名词解释)
 - [Docker 镜像使用](#docker-镜像使用)
 - [容器使用](#容器使用)
@@ -149,7 +151,7 @@
 
 ## docker仓库管理
 
-1. 镜像加速器：https://www.runoob.com/docker/docker-mirror-acceleration.html
+1. 镜像加速器：<https://www.runoob.com/docker/docker-mirror-acceleration.html>
 2. 登录:`docker login -u name`
 3. 退出:`docker logout`
 4. 推送镜像：`docker push username/ubuntu:18.04`
@@ -249,10 +251,10 @@
 6. 如何判断是否在容器中,并更改PS标记？
 
     ```sh
-        ps --no-headers --pid 1 | grep  --silent docker-init && in_docker=1 || in_docker=0
-        [ $in_docker = 1 ] && {
-            PS1=`\[\033[01;36m\][docker] `$PS1
-        }
+    ps --no-headers --pid 1 | grep  --silent docker-init && in_docker=1 || in_docker=0
+    [ $in_docker = 1 ] && {
+        PS1=`\[\033[01;36m\][docker] `$PS1
+    }
     ```
 
 7. script exsample
