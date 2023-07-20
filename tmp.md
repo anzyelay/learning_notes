@@ -854,9 +854,8 @@ wallpapers
 patapua-default-settings
 metapackages
 
-## 7.26
+## 7.26 显示已安装软件及版本
 
-显示已安装软件及版本
 dpkg -l | awk '{ if(NR%5==4){printf "%s (<= %s)\n", $2, $3} else { printf "%s (<= %s)," , $2, $3 } }'
 
 ## GPU
