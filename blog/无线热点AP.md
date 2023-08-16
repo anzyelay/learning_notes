@@ -92,4 +92,5 @@ dnsmasq --conf-file=/data/dnsmasq.conf --dhcp-leasefile=/data/dnsmasq.leases --a
 ## iwpriv
 
 > iwpriv - configure optionals (private) parameters of a wireless network interface
-> 
+
+与wifi driver找交道的工具，通过IOCTL的实现来设置、获取驱动参数。

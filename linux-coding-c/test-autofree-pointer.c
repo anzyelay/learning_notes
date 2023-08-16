@@ -13,7 +13,8 @@ free_charp(char **ptr)
 
 #define autochar __attribute__((__cleanup__(free_charp))) char
 
-void test(){
- autochar *charp = alloc(1, 1024);
- // do something here
+void test()
+{
+	autochar *charp = alloc(1, 1024);
+	// do something here
 }
