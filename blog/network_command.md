@@ -59,3 +59,63 @@ NAT 操作只会修改回复方向（第二个）四元组，因为这是接受�
 - 对于 TCP 报文，连接跟踪可以配置为只有 TCP 报文设置了 SYN 标志位 才新建表项。
 
  默认情况下，连接跟踪会允许从流的中间报文开始创建，这是为了避免对启用连接跟踪之前就存在的流处理出现问题。
+
+## brctl
+
+> ethernet bridge administration, brctl is used to set up, maintain, and inspect the ethernet bridge configuration in the Linux kernel
+
+- 创建bridge
+
+    1. `brctl addbr <name>`
+    1. `brctl delbr <name>`
+    1. `brctl show`
+
+- PORTS
+普通网络设备只有两个端口， 一进（phy）一出(协议栈)， 但bridge可以有多个端口
+
+    1. `brctl addif <brname> <ifname>`
+    2. `brctl delif <brname> <ifname>`
+    3. `brctl show  <brname>`
+
+注：加某个ports前需要先`ifconfig <brname> down`关掉网桥才能设置
+
+此命令已经是过时了，使用`ip`操作如下
+
+```sh
+# 创建bridge
+ip link add [name] br_name type bridge 
+ip link set br_name up
+# 删除网桥可以用
+ip link delete br_name type bridge
+ip link del br_name
+
+# 想要添加Interface到网桥上，interface状态必须是Up
+ip link set eth0 up
+# 添加eth0 interface到网桥上
+ip link set eth0 master br_name
+# 从网桥解绑eth0
+ip link set eth0 nomaster
+
+# 关闭eth0
+ip link set eth0 down
+```
+
+## arp
+
+> Arp manipulates or displays the kernel's IPv4 network neighbour cache. It can add entries to the table, delete one or display the current content
+
+1. `arp -a`: 查询ip的mac地址
+
+## iptable
+
+flush清空、list查询、zero清数据：
+
+`iptable [-t table] {-F|-L|-Z} [chain [rulenum]] [options...]`
+
+tables有：
+
+- filter
+- mangle
+- nat
+- raw
+- security

@@ -985,3 +985,14 @@ ps --no-headers --pid 1 | grep --silent docker-init && in_docker=1 || in_docker=
 ## curl 7.58 under proxy issue ssl wrong version
 
 https_proxy代理设置错了，设置成与http_proxy一样即可
+
+## rmnet_data0及桥接上网
+
+1. "error: +brctl: bridge bridge0: Operation not supported"
+
+必须先关网桥才能设置
+
+```sh
+ifconfig bridge0 down
+```
+
