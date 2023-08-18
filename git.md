@@ -172,6 +172,8 @@ git config --global core.editor "vim" //修改commit的编辑器
 
 ---
 
+## blame--查询某行代码修改记录
+
 ## QA
 
 1. How to ignore a tracked file in git without deleting it?

@@ -11,10 +11,13 @@
 
 可以查看[qxdm脚本](../script/qxdm_log.sh)
 
+
 ## AT
 
 at command | descript
 -|-
+AT+ATI | 显示产品信息
+AT+GSN | get IMEI
 AT+CFUN=n | n为下值<li>0:最少功能模式, 不断电情况下，此模式下，射频和(U)SIM 卡不工作。 <li>4: 飞行模式 , 此模式下射频不工作。 <li> 1: 全功能模式
 AT+QPOWD=n | <li> 0: 立即关机 <li> 1: 正常关机
 
