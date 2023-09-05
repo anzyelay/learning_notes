@@ -77,8 +77,61 @@ hostapd_cli -i wlan0 -p /var/run/hostapd -B -a /usr/bin/QCMAP_StaInterface
 # --dhcp-hostsfile：保留IP地址文件,每行与--dhcp-host规则的"="右边的文本一样,与之不同
 # 之处在于，更改文件后，不需要重启进程，发送信号SIGHUP即可生效
 # --addn-hosts: 附加hosts文件，规则与/etc/hosts一样
+# --log-facility: 日志文件
 dnsmasq --conf-file=/data/dnsmasq.conf --dhcp-leasefile=/data/dnsmasq.leases --addn-hosts=/data/hosts --pid-file=/data/dnsmasq.pid -i bridge0 -I lo -z --dhcp-range=bridge0,192.168.10.9,192.168.10.100,255.255.255.0,86400 --dhcp-hostsfile=/data/dhcp_hosts --dhcp-option-force=6,192.168.10.1 --dhcp-option-force=26,1358 --dhcp-option-force=120,abcd.com --dhcp-script=/bin/dnsmasq_script.sh
 ```
+
+NOTE:
+
+> When it receives a **SIGHUP**, dnsmasq clears its cache and then re-loads /etc/hosts and /etc/ethers and any file given by --dhcp-hostsfile, --dhcp-hostsdir, --dhcp-optsfile,  --dhcp-optsdir,  --addn-
+> hosts  or  --hostsdir.   The  DHCP lease change script is called for all existing DHCP leases. If --no-poll is set SIGHUP also re-reads /etc/resolv.conf.  SIGHUP does NOT re-read the configuration
+> file.
+
+### leasefile
+
+使用`--dhcp-leasefile`指定leasefile文件。
+
+file format as follow:
+
+```txt
+expire  mac ip hostname(无为空或*) clid(无为*)
+1693468131 a4:cf:99:73:5d:d0 192.168.10.31 JBD-Vehicle-1-SW-MacBookPro 01:a4:cf:99:73:5d:d0
+1693468074 6e:f3:73:94:87:c3 192.168.10.30 F1339899-PC-1 01:6e:f3:73:94:87:c3
+```
+
+- expire: 为期望的租赁到期时间，如果时间走到该时刻存在两种情况：1）当节点不存在时，则释放占用的地址, 并发出del信号；2）当节点存在，则续租，更新期望时间。
+- 查看`lease_update_file(time_t now)`函数可知， 更新expire时，是清空原先内容，全部lease结点重写一遍。 故在程序运行中时，外部更改文件下次更新文件时又被还原。
+- 重启dnsmasq时，程序先读取该文件的信息以重新加入上次退出时的缓冲的结点信息。
+
+### dhcp-script
+
+> Whenever a new DHCP lease is created, or an old one destroyed, or a TFTP file transfer completes, the executable specified by this option is run.  <path> must be an  absolute  pathname,  no
+> PATH search occurs.  The arguments to the process are "add", "old" or "del", the MAC address of the host (or DUID for IPv6) , the IP address, and the hostname, if known. "add" means a lease
+> has been created, "del" means it has been destroyed, "old" is a notification of an existing lease when dnsmasq starts or a change to MAC address or hostname  of  an  existing  lease  (also,
+> lease  length or expiry and client-id, if --leasefile-ro is set and lease expiry if --script-on-renewal is set).  If the MAC address is from a network type other than ethernet, it will have
+> the network type prepended, eg "06-01:23:45:67:89:ab" for token ring. The process is run as root (assuming that dnsmasq was originally run as root) even if dnsmasq is configured  to  change
+> UID to an unprivileged user.
+
+- 无论何时，只要有DHCP节点被创建，销毁或者tftp文件传输完成， 指定的脚本就会运行，且路径必须是绝对路径。
+
+- 传入的参数： event mac ip [hostname](可能没有)
+
+- event有如下三种
+
+  - add: 有新节点创建则发生
+
+  - del: 结点被销毁则发生（结点离开超过expire time后则被销毁, eg:可以更改dnsmasq.lease中的时间记录然后重启dnsmasq演示该情况. 有新连接时会判断旧的结点情况并更新leases文件）
+
+  - old: 已存在的结点(在dnsmasq.lease)在重启dnsmasq时，mac或hostname变更
+
+  - 如果加了参数`--leasefile-ro`和`--script-on-renewal`，则结点期望时间和clid更新也会发出事件消息，可以参考dnsmasq工程中的contrib/wrt/lease_update.sh。
+
+注意：
+
+> At dnsmasq startup, the script will be invoked for all existing leases as they are read from the lease file. Expired leases will be called with "del" and others with "old". When dnsmasq re‐
+> ceives a HUP signal, the script will be invoked for existing leases with an "old" event.
+
+- lease file只是为重启dnsmasq时可以读取上次的lease信息做为启动的初始运行参数，但在运行中时，当lease file被外部更改后，dnsmasq在另一结点的期望时间到时会去同步该文件与自身保持一致。
 
 ## wpa_supplicant
 

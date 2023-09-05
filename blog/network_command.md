@@ -71,7 +71,7 @@ NAT 操作只会修改回复方向（第二个）四元组，因为这是接受�
     1. `brctl show`
 
 - PORTS
-普通网络设备只有两个端口， 一进（phy）一出(协议栈)， 但bridge可以有多个端口
+普通网络设备只有两个端口， 一进（phy）一出(协议栈)， 但bridge可以有多个端口, 下方的ifname即是端口的接口名称。
 
     1. `brctl addif <brname> <ifname>`
     2. `brctl delif <brname> <ifname>`
@@ -100,6 +100,89 @@ ip link set eth0 nomaster
 ip link set eth0 down
 ```
 
+## bridge
+
+### 说明
+
+> NAME
+> bridge - show / manipulate bridge addresses and devices
+>
+> SYNOPSIS
+> bridge [ OPTIONS ] OBJECT { COMMAND | help }
+>
+> OBJECT := { link | fdb | mdb | vlan | monitor }
+>
+> OPTIONS := { -V[ersion] | -s[tatistics] | -n[etns] name | -b[atch] filename | -c[olor] |
+> -p[retty] | -j[son] | -o[neline] }
+>
+
+- OBJECT:
+
+  - link: Bridge port. correspond to the port devices of the bridge.
+
+  - fdb : Forwarding Database entry. contain known Ethernet addresses on a link.
+
+  - mdb : Multicast group database entry. contain known IP or L2 multicast group addresses on a link
+
+  - vlan: VLAN filter list. contain known VLAN IDs for a link.
+
+### example
+
+1. bridge link show - 查询所有bridges的所有ports信息
+
+displays port configuration and flags for all bridges. 包括非活动端口
+
+如果要显示指定bridge的配置信息可用命令： `ip link show master <bridge_device>`
+
+```sh
+bridge link up
+22: wlan0 state UP : <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1358 master bridge0 state forwarding priority 32 cost 100
+23: rndis0 state DOWN : <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1358 master bridge0 state disabled priority 32 cost 100
+```
+
+22/23与`ip link`中的序号一致， wlan0/rndis0就是`ip link`中的接口名。
+
+1. bridge fdb show - 查询mac地址从哪个接口来的
+
+list forwarding entries
+
+```sh
+/ # bridge fdb show
+33:33:00:00:00:01 dev rmnet0 self permanent
+33:33:00:00:00:01 dev bridge0 self permanent
+01:00:5e:00:00:01 dev bridge0 self permanent
+33:33:ff:6b:7a:74 dev bridge0 self permanent
+33:33:00:00:00:02 dev bridge0 self permanent
+33:33:ff:00:00:00 dev bridge0 self permanent
+b6:e4:7d:6e:7d:77 dev bridge0 master bridge0 permanent（bridge0的MAC地址）
+9c:b2:b2:4e:bb:2c dev wlan0 master bridge0            （手机1通过wlan0连接过来）
+10:10:c6:eb:5c:d8 dev wlan0 master bridge0 permanent  （wlan0的MAC地址）
+a4:cf:99:73:5d:d0 dev wlan0 master bridge0            （手机2通过wlan0连接过来）
+33:33:00:00:00:01 dev wlan0 self permanent
+01:00:5e:00:00:01 dev wlan0 self permanent
+33:33:ff:eb:5c:d8 dev wlan0 self permanent
+a2:1d:93:58:0b:f7 dev rndis0 master bridge0 permanent （rndis0的MAC地址）
+33:33:00:00:00:01 dev rndis0 self permanent
+01:00:5e:00:00:01 dev rndis0 self permanent
+33:33:ff:58:0b:f7 dev rndis0 self permanent
+```
+
+上边"（）"的注解内容
+
+- LLADDR: 第一列, 即为mac地址(the Ethernet MAC address)
+- dev DEV: the interface to which this address is associated, 该mac地址关联的接口名
+  - local: is a local permanent fdb entry, 网桥遇到以该mac为目标地址和VLAN ID的数据帧将截止而不转发.
+                `bridge fdb add`时，这是默认选项，除非指定了"static"或"dynamic"
+  - permanent: "local"的代名词.
+  - static: is a static (no arp) fdb entry
+  - dynamic: is a dynamic reachable age-able fdb entry
+  - self: 标志表示这个操作是由指定的网络设备的驱动程序直接执行的。如果这个网络设备属于一个主设备（如一个桥），那么这个桥会被绕过，不会得到这个操作的通知（如果设备通知了桥，这是特定于驱动程序的行为，而不是由这个标志强制的，请检查驱动程序以获取更多详细信息），“bridge fdb add”命令也可以在桥设备自身上使用，在这种情况下，添加的FDB条目将在本地终止（不会被转发）。在后一种情况下，“self”标志是必需的。如果没有指定“master”，则该标志默认设置。
+  - master: 标志表示如果指定的网络设备是一个属于主设备（如一个桥）的端口，则该操作由主设备的驱动程序执行，该驱动程序可能还会向端口驱动程序通知地址。如果指定的设备本身就是一个主设备（如一个桥），则此标志无效。
+- brport DEV: 这个地址所关联的桥端口。与上面的dev相同。
+- br DEV:  这个地址所关联的桥。
+- self: 该地址与端口驱动程序的FDB相关联。通常与硬件相关。
+- master: 该地址与主设备FDB相关联。通常是软件（默认）
+
 ## arp
 
 > Arp manipulates or displays the kernel's IPv4 network neighbour cache. It can add entries to the table, delete one or display the current content
@@ -119,3 +202,7 @@ tables有：
 - nat
 - raw
 - security
+
+## ip
+
+1. ip monitor all -  watch for netlink messages
