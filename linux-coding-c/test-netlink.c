@@ -1,20 +1,33 @@
 #include <linux/rtnetlink.h>
 #include <linux/netlink.h>
 #include <sys/socket.h>
+#include <linux/if.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/fcntl.h>
+#include <errno.h>
+// #include <linux/in.h>
+#include <linux/in6.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <linux/rtnetlink.h>
+
+#define strlcpy strncpy
 
 #define ANZYE_NL_MSG_MAX_LEN 16384
 #define NLMSG_SEQ 1
 #define ANZYE_NL_GETNEIGH_SEQ 334455
 #define ANZYE_NL_PID (getpid() & 0x7FFFFFFF)
 #define ANZYE_NL_SOCK_PORTID ANZYE_NL_PID + ANZYE_NL_GETNEIGH_SEQ
-#define ANZYE_NL_FAILURE ANZYE_NL_FAILURE
+#define ANZYE_NL_FAILURE -1
 #define ANZYE_NL_SUCCESS 0
 #define ANZYE_GET_IFINDEX 1
 #define ANZYE_GET_IFNAME 2
+#define MAC_ADDR_NUM_CHARS 18
 
 #define ANZYE_NDA_RTA(r) ((struct rtattr *)(((char *)(r)) + NLMSG_ALIGN(sizeof(struct ndmsg))))
 #define ANZYE_IFA_RTA(r) ((struct rtattr *)(((char *)(r)) + NLMSG_ALIGN(sizeof(struct ifaddrmsg))))
@@ -25,6 +38,13 @@ typedef struct {
 	struct rtgenmsg gen;
 } nl_req_type;
 
+void anzye_nl_free_msg(struct msghdr *msg)
+{
+	free(msg->msg_iov->iov_base);
+	free(msg->msg_iov);
+	free(msg->msg_name);
+	free(msg);
+}
 struct msghdr *anzye_nl_alloc_msg(uint32_t msglen)
 {
 	unsigned char *buf = NULL;
@@ -35,30 +55,30 @@ struct msghdr *anzye_nl_alloc_msg(uint32_t msglen)
 	/*-------------------------------------------------------------------------*/
 
 	if (ANZYE_NL_MSG_MAX_LEN < msglen) {
-		LOG_MSG_ERROR("Netlink message exceeds maximum length", 0, 0, 0);
+		printf("Netlink message exceeds maximum length\n");
 		return NULL;
 	}
 
-	if ((msgh = malloc(sizeof(struct msghdr))) == NULL) {
-		LOG_MSG_ERROR("Failed malloc for msghdr", 0, 0, 0);
+	if ((msgh = (struct msghdr *)malloc(sizeof(struct msghdr))) == NULL) {
+		printf("Failed malloc for msghdr\n");
 		return NULL;
 	}
 
-	if ((nladdr = malloc(sizeof(struct sockaddr_nl))) == NULL) {
-		LOG_MSG_ERROR("Failed malloc for sockaddr", 0, 0, 0);
+	if ((nladdr = (struct sockaddr_nl *)malloc(sizeof(struct sockaddr_nl))) == NULL) {
+		printf("Failed malloc for sockaddr\n");
 		free(msgh);
 		return NULL;
 	}
 
-	if ((iov = malloc(sizeof(struct iovec))) == NULL) {
-		LOG_MSG_ERROR("Failed malloc for iovec", 0, 0, 0);
+	if ((iov = (struct iovec *)malloc(sizeof(struct iovec))) == NULL) {
+		printf("Failed malloc for iovec\n");
 		free(nladdr);
 		free(msgh);
 		return NULL;
 	}
 
-	if ((buf = malloc(msglen)) == NULL) {
-		LOG_MSG_ERROR("Failed malloc for buffer to store netlink message", 0, 0, 0);
+	if ((buf = (unsigned char *)malloc(msglen)) == NULL) {
+		printf("Failed malloc for buffer to store netlink message\n");
 		free(iov);
 		free(nladdr);
 		free(msgh);
@@ -80,6 +100,18 @@ struct msghdr *anzye_nl_alloc_msg(uint32_t msglen)
 
 	return msgh;
 }
+/**
+ * @brief: transfer max hex to mac string
+ * @return mac string
+ */
+char *anzye_mac_ntop(const uint8_t *mac, char *mac_addr_str)
+{
+	memset(mac_addr_str, 0, (size_t)MAC_ADDR_NUM_CHARS);
+	snprintf(mac_addr_str, (size_t)MAC_ADDR_NUM_CHARS, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0],
+			 mac[1], mac[2], mac[3], mac[4], mac[5]);
+	return mac_addr_str;
+}
+
 /**
 * @brief
   calls a system ioctl to get the interface details for the corresponding
@@ -112,7 +144,7 @@ int anzye_nl_get_interface_details(char *if_name, int *if_index, int interface_a
 			Call the ioctl to get the interface index
 		   --------------------------------------------------------------------------*/
 		if (ioctl(fd, SIOCGIFINDEX, &ifr) < 0) {
-			printf("call_ioctl_on_dev; ioctl failed error:%s\n", strerror(errno), 0, 0);
+			printf("call_ioctl_on_dev; ioctl failed error:%s\n", strerror(errno));
 
 			close(fd);
 			return ANZYE_NL_FAILURE;
@@ -128,10 +160,7 @@ int anzye_nl_get_interface_details(char *if_name, int *if_index, int interface_a
 			Call the ioctl to get the interface index
 		   --------------------------------------------------------------------------*/
 		if (ioctl(fd, SIOCGIFNAME, &ifr) < 0) {
-			printf("call_ioctl_on_dev; ioctl failed\
-                     error:%s\n",
-				   strerror(errno), 0, 0);
-
+			printf("call_ioctl_on_dev; ioctl failed error:%s\n", strerror(errno));
 			close(fd);
 			return ANZYE_NL_FAILURE;
 		}
@@ -179,7 +208,7 @@ int netlink_query_if(int sk_fd, unsigned int nl_groups)
 	   NLM_F_DUMP -  equivalent to NLM_F_ROOT|NLM_F_MATCH */
 	nl_req->hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
 	nl_req->hdr.nlmsg_seq = NLMSG_SEQ;
-	nl_req->hdr.nlmsg_pid = 0;
+	nl_req->hdr.nlmsg_pid = 0;	// send to kernel process init 0
 	nl_req->gen.rtgen_family = AF_PACKET;
 
 	if (sendmsg(sk_fd, (struct msghdr *)nl_msg_hdr, 0) <= 0) {
@@ -187,10 +216,7 @@ int netlink_query_if(int sk_fd, unsigned int nl_groups)
 		return ANZYE_NL_FAILURE;
 	}
 
-	free(nl_msg_hdr->msg_iov->iov_base);
-	free(nl_msg_hdr->msg_iov);
-	free(nl_msg_hdr->msg_name);
-	free(nl_msg_hdr);
+	anzye_nl_free_msg(nl_msg_hdr);
 
 	return ANZYE_NL_SUCCESS;
 }
@@ -200,7 +226,7 @@ int netlink_query_if(int sk_fd, unsigned int nl_groups)
   ANZYE_NL_SUCCESS on success
   ANZYE_NL_FAILURE on failure
 */
-int anzye_nl_send_getneigh_event(int fd)
+int anzye_nl_send_getneigh_event(int fd, char *dev_name)
 {
 	ssize_t sndbytes = 0;
 	int ifindex = ANZYE_NL_FAILURE;
@@ -211,8 +237,7 @@ int anzye_nl_send_getneigh_event(int fd)
 
 	printf("%s %d \n", __func__, __LINE__);
 
-	if (anzye_nl_get_interface_details("bridge0", &ifindex, ANZYE_GET_IFINDEX) ==
-		ANZYE_NL_SUCCESS) {
+	if (anzye_nl_get_interface_details(dev_name, &ifindex, ANZYE_GET_IFINDEX) == ANZYE_NL_SUCCESS) {
 		printf("Bridge Iface Index = %d\n", ifindex);
 	}
 	else {
@@ -223,12 +248,12 @@ int anzye_nl_send_getneigh_event(int fd)
 	/* Send the GETNEIGH message to the kernel*/
 	memset(&req, 0, sizeof(req));
 	req.n.nlmsg_len = NLMSG_LENGTH(sizeof(struct ndmsg));
-	req.n.nlmsg_flags = NLM_F_REQUEST | NLM_F_ROOT | NLM_F_REQUEST;
+	req.n.nlmsg_flags = NLM_F_REQUEST | NLM_F_ROOT | NLM_F_ACK;
 	req.n.nlmsg_seq = ANZYE_NL_GETNEIGH_SEQ;
 	req.n.nlmsg_pid = ANZYE_NL_SOCK_PORTID;
 	req.n.nlmsg_type = RTM_GETNEIGH;
-	req.r.ndm_state = NUD_REACHABLE | NUD_STALE | NUD_DELAY;
-	req.r.ndm_family = AF_INET6;
+	req.r.ndm_state = NUD_REACHABLE | NUD_STALE | NUD_DELAY | NUD_PERMANENT;
+	req.r.ndm_family = AF_INET;
 	req.r.ndm_ifindex = ifindex;
 
 	printf(" Dump getneigh len=%d , flags =%d, seq=%d, pid=%d, type=%d, family=%d ifindex %d\n",
@@ -241,12 +266,14 @@ int anzye_nl_send_getneigh_event(int fd)
 		return ANZYE_NL_FAILURE;
 	}
 	else {
-		printf("Send GETNEIGH succeded: %d bytes send \n", sndbytes);
+		printf("Send GETNEIGH succeded: %ld bytes send \n", sndbytes);
 	}
 
 	return ANZYE_NL_SUCCESS;
 }
-
+/**
+ * @brief: reference man 7 netlink
+ */
 int netlink_open_socket(unsigned int groups)
 {
 	struct sockaddr_nl addr;
@@ -261,7 +288,7 @@ int netlink_open_socket(unsigned int groups)
 	addr.nl_groups = groups;
 	addr.nl_pid = ANZYE_NL_PID;
 
-	if (bind(nl_skfd, &addr, sizeof(struct sockaddr_nl)) < 0) {
+	if (bind(nl_skfd, (struct sockaddr *)&addr, sizeof(struct sockaddr_nl)) < 0) {
 		printf("socket bind failed\n");
 		close(nl_skfd);
 		nl_skfd = -1;
@@ -318,13 +345,18 @@ int anzye_nl_decode_rtm_neigh(const char *buffer, unsigned int buflen)
 		rtah = RTA_NEXT(rtah, buflen);
 	}
 
-	anzye_nl_get_interface_details(dev_name, metainfo.ndm_ifindex, ANZYE_GET_IFNAME);
-	printf("the netlink msg is recved from dev: %s\n", dev_name);
-
+	anzye_nl_get_interface_details(dev_name, &metainfo.ndm_ifindex, ANZYE_GET_IFNAME);
+	char macstr[MAC_ADDR_NUM_CHARS];
+	char ipstr[INET6_ADDRSTRLEN];
+	printf("%s() the netlink msg is recved from dev: %s\n"
+		   "\tfamily: %d, the mac: %s, the ip: %s\n",
+		   __func__, dev_name, attr_info.local_addr.ss_family,
+		   anzye_mac_ntop(attr_info.lladdr_hwaddr.sa_data, macstr),
+		   inet_ntop(attr_info.local_addr.ss_family, attr_info.local_addr.__ss_padding, ipstr,
+					 INET6_ADDRSTRLEN));
 	return ANZYE_NL_SUCCESS;
 }
-int anzye_nl_decode_rtm_addr(const char *buffer, unsigned int buflen,
-							 anzye_nl_if_addr_t *if_addr_info)
+int anzye_nl_decode_rtm_addr(const char *buffer, unsigned int buflen)
 {
 	struct nlmsghdr *nlh = (struct nlmsghdr *)buffer; /* NL message header */
 	struct rtattr *rtah = NULL;
@@ -374,6 +406,16 @@ int anzye_nl_decode_rtm_addr(const char *buffer, unsigned int buflen,
 		/* Advance to next attribute */
 		rtah = RTA_NEXT(rtah, buflen);
 	}
+
+	char dev_name[16];
+	anzye_nl_get_interface_details(dev_name, &metainfo.ifa_index, ANZYE_GET_IFNAME);
+	char macstr[MAC_ADDR_NUM_CHARS];
+	char ipstr[INET6_ADDRSTRLEN];
+	printf("%s() the netlink msg is recved from dev: %s\n"
+		   "\tfamily: %d,  the ip: %s\n",
+		   __func__, dev_name, metainfo.ifa_family,
+		   metainfo.ifa_family == AF_INET ? inet_ntoa(attr_info.ifa_local_v4)
+										  : attr_info.ifa_local_v6.in6_u.u6_addr8);
 	return ANZYE_NL_SUCCESS;
 }
 /**
@@ -403,8 +445,10 @@ int anzye_nl_decode_rtm_route(const char *buffer, unsigned int buflen)
 		return ANZYE_NL_SUCCESS;
 	}
 
-	rtah = ANZYE_RTN_RTA(NLMSG_DATA(nlh));
+#define ANZYE_NL_ROUTE_INFO_DST_ADDR 1
+#define ANZYE_NL_ROUTE_INFO_IFINDEX 2
 
+	rtah = ANZYE_RTN_RTA(NLMSG_DATA(nlh));
 	while (RTA_OK(rtah, buflen)) {
 		switch (rtah->rta_type) {
 			case RTA_DST:
@@ -425,10 +469,31 @@ int anzye_nl_decode_rtm_route(const char *buffer, unsigned int buflen)
 
 	return ANZYE_NL_SUCCESS;
 }
+
+int anzye_nl_decode_rtm_link(const char *buffer, unsigned int buflen)
+{
+	struct nlmsghdr *nlh = (struct nlmsghdr *)buffer; /* NL message header */
+	/*---------------------------------------------------------------------------*/
+
+	/*----------------------------------------------------------------------------
+	  Extract the header data
+	-----------------------------------------------------------------------------*/
+	struct ifinfomsg metainfo = *(struct ifinfomsg *)NLMSG_DATA(nlh);
+	printf("%s() metainfo:  index = %d, family = %d, type = %d", __func__, metainfo.ifi_index,
+		   metainfo.ifi_family, metainfo.ifi_type);
+	printf("metainfo: link up/down = %d", metainfo.ifi_change);
+
+	return ANZYE_NL_SUCCESS;
+}
+
 void netlink_decode_nlmsg(unsigned int fd)
 {
-	struct msghdr msgh;
+	struct nlmsghdr buf[8192 / sizeof(struct nlmsghdr)];
+	struct iovec iov = {buf, sizeof(buf)};
+	struct sockaddr_nl sa;
+	struct msghdr msgh = {&sa, sizeof(sa), &iov, 1, NULL, 0, 0};
 	int rmsgl;
+
 	// Receive message over the socket
 	rmsgl = recvmsg(fd, &msgh, 0);
 	if (rmsgl <= 0) {
@@ -451,8 +516,6 @@ void netlink_decode_nlmsg(unsigned int fd)
 	while (NLMSG_OK(nlh, buflen)) {
 		switch (nlh->nlmsg_type) {
 			case RTM_NEWNEIGH:
-				anzye_nl_decode_rtm_neigh((char *)nlh, buflen);
-				break;
 			case RTM_DELNEIGH:
 				anzye_nl_decode_rtm_neigh((char *)nlh, buflen);
 				break;
@@ -461,6 +524,10 @@ void netlink_decode_nlmsg(unsigned int fd)
 				break;
 			case RTM_NEWROUTE:
 				anzye_nl_decode_rtm_route((char *)nlh, buflen);
+				break;
+			case RTM_NEWLINK:
+			case RTM_DELLINK:
+				anzye_nl_decode_rtm_link((char *)nlh, buflen);
 				break;
 			default:
 				break;
@@ -477,7 +544,7 @@ int main(void)
 		RTMGRP_NEIGH | RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_ROUTE | RTMGRP_IPV6_IFADDR;
 	int nl_fd = netlink_open_socket(groups);
 	if (nl_fd < 0) {
-		return 0
+		return 0;
 	}
 
 	/* -------------------------------------------------------------------------
@@ -486,13 +553,16 @@ int main(void)
 	Its Just a safe guard, since DHCP addresses wouldnt be assigned until DHCP server is bought
 	up
 	--------------------------------------------------------------------------*/
-	netlink_query_if(nl_fd, groups);
+	// netlink_query_if(nl_fd, groups);
 
-	while (TRUE) {
-		FD_ZERO(sets);
+	anzye_nl_send_getneigh_event(nl_fd, "docker0");
+
+	while (1) {
+		FD_ZERO(&sets);
 		FD_SET(nl_fd, &sets);
-		if ((select(nl_fd + 1, &sets, NULL, NULL, NULL)) < 0)
+		if ((select(nl_fd + 1, &sets, NULL, NULL, NULL)) < 0) {
 			continue;
+		}
 
 		if (FD_ISSET(nl_fd, &sets)) {
 			netlink_decode_nlmsg(nl_fd);
