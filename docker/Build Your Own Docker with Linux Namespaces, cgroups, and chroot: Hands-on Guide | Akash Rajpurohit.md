@@ -1,4 +1,6 @@
-# Build Your Own Docker with Linux Namespaces, cgroups, and chroot: Hands-on Guide | Akash Rajpurohit
+# Build_Your_Own_Docker_with_Linux_Namespaces_cgroups_and_chroot:_Hands-on_Guide_|_Akash_Rajpurohit
+
+- [Origin](https://akashrajpurohit.com/blog/build-your-own-docker-with-linux-namespaces-cgroups-and-chroot-handson-guide/)
 
 ## Introduction - 开篇介绍
 
@@ -43,6 +45,10 @@ unshare --uts --pid --net --mount --ipc --fork
 > Read more in depth about [unshare command on man page ↗️](https://man7.org/linux/man-pages/man1/unshare.1.html "unshare - run program in new namespaces")
 
 需要更深入的了解请参阅[unshare command on man page](https://man7.org/linux/man-pages/man1/unshare.1.html "unshare - run program in new namespaces")
+
+这些再提供另一篇参考文章： [Demystifying namespaces and containers in Linux](https://opensource.com/article/19/10/namespaces-and-containers-linux)
+
+- `lsns`: list namespaces
 
 ### Step 2: Configuring the cgroups
 
@@ -187,3 +193,4 @@ chroot ./ubuntu-rootfs /bin/bash
 [cgroups]: https://akashrajpurohit.com/blog/linux-control-groups-finetuning-resource-allocation-for-optimal-system-performance/
 
 [chroot]: https://akashrajpurohit.com/blog/how-to-create-a-restricted-environment-with-the-linux-chroot-command/
+
