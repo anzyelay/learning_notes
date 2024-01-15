@@ -9,6 +9,17 @@
 
 ------
 
+## 参考
+
+- [Docker - 从入门到实践](https://yeasy.gitbook.io/docker_practice/basic_concept/container)
+- [A sysadmin's guide to containers](https://opensource.com/article/18/8/sysadmins-guide-containers, "帮助理解容器镜像")
+- [docker CLI reference](https://docs.docker.com/engine/reference/run/)
+
+## 实现基础
+
+1. namespace: 实现不同命名空间的资源隔离
+2. cgroups： 实现系统资源的访问控制
+
 ## 名词解释
 
 - 镜像： Docker 镜像（Image），就相当于是一个 root 文件系统
