@@ -996,3 +996,31 @@ https_proxy代理设置错了，设置成与http_proxy一样即可
 ifconfig bridge0 down
 ```
 
+## CSI
+
+![Alt text](picture/blog/MIPI-multimedia-specifications.png "MIPI Multimedia Spec")
+
+- MIPI(Mobile Industry Processor Interface)
+  - protocol layers:
+    - CSI: camera serial interface
+    - DSI: display serial interface
+    - UFS: universal flash storage
+  - physical layers:
+    - C-PHY: C指的是Channel-limited，而不是Camera，通道被限制到3，C-PHY总共有**3条lanes**，**每条lane使用3线差分**的传输模式，无时钟源，嵌入式时钟（时钟隐藏在通信的时序之中）
+    - D-PHY: D-PHY是**每条lane是一对差分线**, 有同步时钟源
+    - M-PHY: UFS专用
+
+![Alt text](picture/blog/MIPI-CPHY-VS-DPHY.png "CPHY VS DPHY")
+
+### SUMMARY
+
+C-PHY、D-PHY、M-PHY属于物理接口层，同一协议可以使用不同的物理接口，比如CSI协议可以使用C-PHY、D-PHY、M-PHY输出，DSI协议可以使用C-PHY、D-PHY、M-PHY输出，UFS协议只能使用M-PHY输出。
+
+## linux kernel media
+
+### 说明文档
+
+> kernel/Documentation/devicetree/bindings/media
+> kernel/Documentation/userspace-api/media
+> kernel/Documentation/admin-guide/media
+> kernel/Documentation/driver-api/media
