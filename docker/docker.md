@@ -94,9 +94,10 @@
 
       1. 每一个指令都会在镜像上创建一个新的层，每一个指令的前缀都必须是大写的。
       2. 第一条FROM，指定使用哪个镜像源
-      3. RUN 指令告诉docker 在镜像内执行命令，安装了什么。。。
-      4. WORKDIR: 指示登录后的目录所在
-      5. CMD:容器启动后运行的指令
+      3. **RUN** 指令告诉docker 在镜像内执行命令，安装了什么。。。
+      4. **WORKDIR**: 指示登录后的目录所在
+      5. **CMD**:启动容器后提供默认执行的命令,会被`docker run`命令中给出的参数所覆盖, 最后一个有效
+      6. **ENTRYPOINT**: 用于定义容器启动时要执行的命令或程序, 与**CMD**不同，不会被`docker run`命令中给出的参数所覆盖, 相反，这些参数会被作为ENTRYPOINT命令的参数传递给容器, 最后一个有效
 
 1. 设置镜像标签: `docker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]`
 
@@ -232,8 +233,12 @@
     RUN mkdir -p /home/jide/rk3588_sdk
     RUN chown -R jide:jide /home/jide/rk3588_sdk
     WORKDIR /home/jide/rk3588_sdk
-
+    # 默认启动命令
     CMD     /usr/sbin/sshd -D
+    ## 启动命令
+    ## entrypoint.sh需和Dockerfile文件放同一目录内
+    #COPY entrypoint.sh /usr/bin/entrypoint.sh
+    #ENTRYPOINT ["/usr/bin/entrypoint.sh"]
    ```
 
 2. 使用Dockerfile生成 "**ubuntu:rk3588**" 镜像：
@@ -269,8 +274,87 @@
     ```
 
 7. script exsample
+    将entrypoint.sh与Dockefile放一起，创建好镜像，后用start_docker.sh创建启动容器实例
 
-   ```sh
+    ```sh
+    #!/bin/bash
+    set -e
+
+    # User config
+    msg="docker_entrypoint: Setup user config"
+    echo $msg
+    echo "export DEBIAN_FRONTEND=noninteractive" >> /etc/bash.bashrc
+    echo $msg - "done"
+
+    # Example:
+    #  docker run -it -e USER_ID=$(id -u) -e GROUP_ID=$(id -g) -e USER_NAME=$(whoami) imagename bash
+
+    # Reasonable defaults if no USER_ID/GROUP_ID environment variables are set.
+    if [ -z ${USER_ID+x} ]; then USER_ID=9999; fi
+    if [ -z ${GROUP_ID+x} ]; then GROUP_ID=9999; fi
+    if [ -z ${USER_NAME+x} ]; then USER_NAME=docker; fi
+    if [ -z ${GROUP_NAME+x} ]; then GROUP_NAME=docker; fi
+    if [ -z ${HOME_PATH+x} ]; then HOME_PATH=/home2/$USER_NAME; fi
+
+    msg="docker_entrypoint: Creating user UID/GID [$USER_ID/$GROUP_ID]"
+    echo $msg
+    groupadd -g $GROUP_ID -r $GROUP_NAME && \
+    useradd -u $USER_ID -r -g $GROUP_NAME -d "$HOME_PATH" $USER_NAME
+    echo "$msg - done"
+
+    msg="Change account $USER_NAME shell from csh to bash"
+    echo $msg
+    chsh -s /bin/bash $USER_NAME
+    echo "$msg - done"
+
+    # Default to 'bash' if no arguments are provided
+    args="$@"
+    if [ -z "$args" ]; then
+    args="bash"
+    fi
+    export HOME="$HOME_PATH"
+
+    msg="Load color scheme"
+    echo $msg
+    if [ -e ~/.bashrc ] ; then
+    test1=`grep  "alias ls" -l ~/.bashrc | wc -l`
+    if [ $test1 = 0 ] ; then
+        echo 'alias ls="ls --color"' >> ~/.bashrc
+        echo "Load ls color successfully"
+    fi
+
+    test2=`grep  "alias ll" -l ~/.bashrc | wc -l`
+    if [ $test2 = 0 ] ; then
+        echo 'alias ll="ls -al --color"' >> ~/.bashrc
+        echo "Load ll color successfully"
+    fi
+
+    echo "Load PS1 color successfully"
+    else
+    echo "Notice: ~/.bashrc is missing. please add a new one."
+    fi
+    msg="Load color scheme done"
+    echo $msg
+
+    msg="Welcom to AG35 build world..."
+    echo $msg
+
+    # Execute command as 'docker' user
+    cd $HOME
+
+    #msg=`pwd`
+    echo "Enter $msg. args: $args"
+    chown -R $USER_NAME:$GROUP_NAME /opt/crosstool
+
+    #exec sudo -u $USER_NAME $args
+    exec su $USER_NAME
+
+    $args
+    ```
+
+    start_docker.sh
+
+    ```sh
     #!/bin/bash
 
     target=$1
