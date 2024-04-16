@@ -27,7 +27,8 @@ ex_flash()
 	target=${1:-'target'}
 	fastboot.exe flash aboot ${target}/appsboot.mbn || exit 0
 	fastboot.exe flash boot ${target}/mdm9607-boot.img || exit 0
-	fastboot.exe flash system ${target}/mdm9607-sysfs.ubi
+	fastboot.exe flash system ${target}/mdm9607-sysfs.ubi || exit 0
+	fastboot.exe flash oemapp ${target}/oemapp.ubi || exit 0
 	fastboot.exe reboot
 
 }
