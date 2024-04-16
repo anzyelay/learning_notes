@@ -28,12 +28,12 @@ struct timeval tv_timeout;
 tv_timeout.tv_sec = 60;
 tv_timeout.tv_usec = 0;
 if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (void *) &tv_timeout, sizeof(struct timeval)) < 0) {
-    perror("setsockopt");
+	perror("setsockopt");
 }
 tv_timeout.tv_sec = 60;
 tv_timeout.tv_usec = 0;
 if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (void *) &tv_timeout, sizeof(struct timeval)) < 0) {
-    perror("setsockopt");
+	perror("setsockopt");
 }
 
 man connect
@@ -52,32 +52,30 @@ ing the reason for the failure).
 */
 void tcp_connect_noblock(char *domain, int port)
 {
-    //文件标记
-    int server_fd;
-    //服务器的ip为本地，端口号
-    struct sockaddr_in server_addr;
+	// 文件标记
+	int server_fd;
+	// 服务器的ip为本地，端口号
+	struct sockaddr_in server_addr;
 
-    //创建套接字
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0)
-    {
-        printf("[%s;%d]:F Create socket fail: %s.\n",\
-             __FUNCTION__, __LINE__, strerror(errno));
-        return -1;
-    }
+	// 创建套接字
+	server_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (server_fd < 0) {
+		printf("[%s;%d]:F Create socket fail: %s.\n", __FUNCTION__, __LINE__, strerror(errno));
+		return -1;
+	}
 
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family      = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(domain);
-    server_addr.sin_port        = htons(port);
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = inet_addr(domain);
+	server_addr.sin_port = htons(port);
 
-    if (0) {// 与下面一种对比设计no block
-        //获取客户端文件标记
-        int fl_flag = 0;
-        fl_flag = fcntl(server_fd, F_GETFL, 0);
-        //将客户端文件标记设置为非阻塞的方式
-        fcntl(server_fd, F_SETFL, fl_flag | O_NONBLOCK);
-    }
+	if (0) {  // 与下面一种对比设计no block
+		// 获取客户端文件标记
+		int fl_flag = 0;
+		fl_flag = fcntl(server_fd, F_GETFL, 0);
+		// 将客户端文件标记设置为非阻塞的方式
+		fcntl(server_fd, F_SETFL, fl_flag | O_NONBLOCK);
+	}
 
 	int opt = 1;
 	// set non-blocking
@@ -88,7 +86,6 @@ void tcp_connect_noblock(char *domain, int port)
 	}
 
 	if (connect(server_fd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1) {
-
 		if (errno == EINPROGRESS) {
 			int error;
 			int len = sizeof(int);
