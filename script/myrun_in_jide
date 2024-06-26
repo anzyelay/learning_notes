@@ -39,7 +39,8 @@ build_install(){
 #func help	:show help information
 help(){
 	echo -e "========help======\tuse cmd like this --> `basename $0` func"
-	grep ^#func $0 | grep -v grep  
+	grep ^#func $0 | grep -v grep
+	# sed -rn 's/$extern_(.*)\(\){$/\t\1/p' $0
 	echo "========end======="
 }
 # -----------  extern function bellow --------------

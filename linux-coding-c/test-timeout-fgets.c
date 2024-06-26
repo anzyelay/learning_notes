@@ -17,7 +17,7 @@ void tfgets_handler(int sig)
 char *tfgets(char *buf, int bufsize, FILE *stream)
 {
   static const int TimeLimitSecs = 5;
-  signal(SIGALRM, tfgets_handler)
+  signal(SIGALRM, tfgets_handler);
   alarm(TimeLimitSecs);
   int rc = sigsetjmp(env, 1);
   if (rc == 0) {

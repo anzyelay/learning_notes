@@ -1,14 +1,17 @@
+# git
+
 ## Git全局设置
 
 ```sh
 git config --global user.name "leixa"
 git config --global user.email "leixa@jideos.com"
 git config --global core.editor "vim" //修改commit的编辑器
+git config --global alias.st status
 ```
 
 ## 仓库的建立
 
-1. 创建一个新仓库
+1. 从一个空仓库拉取创建
 
     ```bash
     git clone git@192.168.16.198:leixa/test.git
@@ -19,7 +22,7 @@ git config --global core.editor "vim" //修改commit的编辑器
     git push -u origin master
     ```
 
-2. 推送现有文件夹
+1. 在本地现有文件夹创建仓库并推送
 
     ```bash
     cd existing_folder
@@ -30,7 +33,7 @@ git config --global core.editor "vim" //修改commit的编辑器
     git push -u origin master
     ```
 
-3. 推送现有的 Git 仓库
+1. 推送现有的 Git 仓库
 
     ```bash
     cd existing_repo
@@ -117,7 +120,7 @@ git config --global core.editor "vim" //修改commit的编辑器
 
 ---
 
-## 标签  
+## 标签
 
 1. 显示所有tag标签
 
@@ -172,7 +175,9 @@ git config --global core.editor "vim" //修改commit的编辑器
 
 ---
 
-## blame--查询某行代码修改记录
+## blame -- 查询某行代码修改记录
+
+## format-patch/am/apply -- 补丁操作
 
 ## QA
 
