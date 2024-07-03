@@ -23,6 +23,8 @@ public:
     static qint64 abtimeUs();
     static int usSleep(int us);
     static void startOnce(qint64 microseconds, std::function<void ()> task);
+    // start to creat a separate thread to run task in microseconds repeatly until the task return false.
+    static void start(qint64 microseconds, std::function<bool ()> task);
 
     void checkHighPrecisionTimeout(const qint64 &currentTime);
 
@@ -49,6 +51,7 @@ protected:
 private:
     explicit HighPreTimerWorker(QObject *parent = nullptr);
     QList<HighPrecisionTimer *> m_timers;
+    QQueue<HighPrecisionTimer *> m_deleteCache;
 };
 
 #endif // HIGHPRECISIONTIMER_H

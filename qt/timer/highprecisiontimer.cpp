@@ -74,6 +74,15 @@ void HighPrecisionTimer::startOnce(qint64 microseconds, std::function<void ()> t
     });
 }
 
+void HighPrecisionTimer::start(qint64 microseconds, std::function<bool ()> task)
+{
+    QtConcurrent::run([=](){
+        do {
+            usSleep(microseconds);
+        } while (task());
+    });
+}
+
 void HighPrecisionTimer::stop() {
     if (timerId <= 0)
         return;
@@ -117,7 +126,7 @@ int HighPreTimerWorker::addTimer(HighPrecisionTimer *timer)
 
 void HighPreTimerWorker::delTimer(HighPrecisionTimer *timer)
 {
-    m_timers.removeOne(timer);
+    m_deleteCache.enqueue(timer);
 }
 
 void HighPreTimerWorker::run()
@@ -128,6 +137,9 @@ void HighPreTimerWorker::run()
             timer->checkHighPrecisionTimeout(currentTime);
         }
         yieldCurrentThread();
+        while (!m_deleteCache.isEmpty()) {
+            m_timers.removeOne(m_deleteCache.dequeue());
+        }
         if (m_timers.empty()) {
             break;
         }

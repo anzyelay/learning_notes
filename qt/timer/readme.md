@@ -23,13 +23,35 @@ for example:
     ```cpp
     #include "highprecisiontimer.h"
 
-    for (auto i : {15, 150}) {
+    int index=0;
+    for (auto i : {1, 10, 20, 2}) {
         auto t = new HighPrecisionTimer();
-        connect(t, &HighPrecisionTimer::timeout, [=](){
-            qDebug() << t->id() << ":" << i << "==" << HighPrecisionTimer::abtimeUs();
+        auto old = HighPrecisionTimer::abtimeUs();
+        auto c = connect(t, &HighPrecisionTimer::timeout, [=](){
+            static int j[4] = {0};
+            j[index]++;
+            if (j[index]>=100000) {
+                auto nt = HighPrecisionTimer::abtimeUs();
+                qDebug () << t->id() << ":" << i*j[index] << "=="  << nt - old << old << nt;
+                t->stop();
+            }
         });
+        index++;
         t->start(i);
     }
+
+    auto old = HighPrecisionTimer::abtimeUs();
+    int interval = 1;
+    HighPrecisionTimer::start(interval, [=](){
+        static int i = 0;
+        if (i>=100000) {
+            auto nt = HighPrecisionTimer::abtimeUs();
+            qDebug () << i*interval << nt - old ;
+            return false;
+        }
+        i++;
+        return true;
+    });
     ```
 
 ## chrono implemetion
