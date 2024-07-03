@@ -92,3 +92,12 @@ do
     fi
   done
 done
+
+# the source.list used by remote amazon s3 as bellow:
+#deb [trusted=yes] http://ppa.ai.jideos.com/patapua/daily/ubuntu/ focal main
+#deb-src [trusted=yes] http://ppa.ai.jideos.com/patapua/daily/ubuntu/ focal main
+#deb [trusted=yes] http://ppa.ai.jideos.com/patapua/os-patches/ubuntu/ focal main
+#deb-src [trusted=yes] http://ppa.ai.jideos.com/patapua/os-patches/ubuntu/ focal main
+#deb [trusted=yes] http://ppa.ai.jideos.com/patapua/stable/ubuntu/ focal main
+#deb-src [trusted=yes] http://ppa.ai.jideos.com/patapua/stable/ubuntu/ focal main
+#
