@@ -70,3 +70,10 @@ So you will have the following values for each variable:
 
 ## vscode remote debug
 
+[参考blog](../blog/vscode-adb-gdb-wsl-debug.md)
+
+1. vscode配置对应连接,配置**miDebuggerPath**,**miDebuggerServerAddress**
+
+    ```json
+    "miDebuggerServerAddress": "remote_ip:port"
+    ```

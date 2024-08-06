@@ -11,9 +11,20 @@ tools |  purpose
 wsl | 用于模拟相应的linux调试环境
 [platform-tools](https://github.com/awake558/adb-win) | 安装版本兼容的 ADB/FASTBOOT 工具
 [USBIPD-WIN](https://learn.microsoft.com/zh-cn/windows/wsl/connect-usb) | WSL本身并不支持连接 USB 设备，因此你需要安装开源 usbipd-win 项目,用于在wsl中连接win主机上的USB设备
-xxx-gdb/gcc | 对应设备的gdb/gcc，编译时需加上-g和-fPIC选项
+xxx-gdb/gcc/gdbserver | 对应设备的gdb/gcc/gdbserver，编译时需加上-g和-fPIC选项
 
 ## 环境搭建
+
+### gdb/gdbserver
+
+1. 在目标机有安装gdbserver
+1. 在local host机上安装好gdb
+1. 通过网络方式测试是否可连接调试
+   1. 在目标机上运行gdbserver： `gdbserver :port-number app`
+   2. 记录下目标机的**ip**，后面连接时要用
+   3. 在local主机上运行gdb: `gdb app`
+   4. 在gdb下输入连接目标：`target remote ip:port-number`
+   5. 查看gdbserver是否打印连接消息？
 
 ### wsl安装linux
 
