@@ -7,6 +7,8 @@ git config --global user.name "leixa"
 git config --global user.email "leixa@jideos.com"
 git config --global core.editor "vim" //修改commit的编辑器
 git config --global alias.st status
+# 设置github.com的镜像替换仓库加速访问
+git config --global url."https://git.homegu.com".insteadOf https://github.com
 ```
 
 ## 仓库的建立
