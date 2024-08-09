@@ -1,6 +1,9 @@
 # [Cairo's Drawing Model](https://www.cairographics.org/tutorial/)
+
 ## 涉及到的几个概念
+
 ### 名词概念
+
 1. Destination（目标） ：将要绘制到的平面（**surface**）,此平面可以绑定到一个二维像素矩阵(ImageSurface),PDF(PdfSurface),Svg(SvgSurface)等
    - 从PNG创建： `ImageSurface.from_png (string filename)`
    - 保存成PNG：`Surface.writo_to_png (string filename)`
@@ -17,6 +20,7 @@
    - 任何一个操作动作都必须先准备一个context
 
 ### 操作动作
+
 1. Stroke: mask允许线路为path的source绘制到destination上   --need path
 1. Fill: mask允许通过边界为path的洞，将source填充到destination上 -- need path
 1. Show Text: text_path+fill操作     -- need 坐标位置
@@ -24,17 +28,21 @@
 1. Mask: 以一个pattern或surface为mask的遮罩操作source到destination -- need second pattern/surface
 
 ### summary:
+
 所谓的操作动作其实就是更改mask让source如何绘制到destination，path就是mask上可穿透的路线
+
 ```xml
 source ---> mask(path) ---> destination
 ```
 
 ## cairo绘图
+
 1. 创建目标surface
 1. 为surface创建一个context
 1. 设置source
 1. 构造好mask(path,pattern,surface)
 1. 绘制操作
+
     ```vala
     public static int main (string[] args) {
         // Create a context:
@@ -61,6 +69,6 @@ source ---> mask(path) ---> destination
 
         return 0;
     }
-    ``` 
+    ```
 
 note:关于clear一个surface,cairo的默认合成操作是**OVER**,将一个完全透明的色混合后无任何效果，更改合成操作为**SOURCE**可替换原来色
