@@ -135,6 +135,15 @@ options:
     add_executable(myExe myExe.c "myPlugin-hash-$<CONFIG>.c")
     ```
 
+1. `get_filename_component`, 获取文件信息
+
+   ```cmake
+   # hw_proto = /absolute/path/to/helloworld.proto
+   get_filename_component(hw_proto "../../protos/helloworld.proto" ABSOLUTE)
+   # hw_proto_path = /absolute/path/to/
+   get_filename_component(hw_proto_path "${hw_proto}" PATH)
+   ```
+
 ## Cross Compiling With CMake
 
 - 参考[toolchain file]和[cmake-toolchains](https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html)
