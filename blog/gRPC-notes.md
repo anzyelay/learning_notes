@@ -52,6 +52,7 @@ flowchart LR
 
 ## protocol buffer
 
+1. 参考文档: [protocol buffers documentation](https://protobuf.dev/overview/)
 1. what: Google成熟的开源结构化数据序列化机制
 1. purpose:
     - IDL: 接口定义语言(Interface Definition Language)，用于定义负载消息结构和服务接口
@@ -95,12 +96,98 @@ message HelloResponse {
 
 ## API的使用
 
-gRPC提供了一个protocol buffer编译插件，它可以将`.proto`文件转化生成对应的客户端和服务端代码.
+gRPC提供了一个[`protocol buffer`](https://protobuf.dev/reference/cpp/cpp-generated/)编译插件，它可以将`.proto`文件转化生成对应的客户端和服务端代码.
 
-gRPC使用者通常在客户端调用这些API，并在服务端实现相应的API接口
+命令行方法： `protoc --proto_path=src --cpp_out=build/gen src/foo.proto src/bar/baz.proto`
 
-- 在服务端: 实现服务声明定义的方法，并运行gRPC服务（用来处理客户端请求）
-- 在客户端: 有一个称为stub的本地对象（在一些语言中，首选术语为client），该对象实现了与服务端相同的方法，客户端只需要在本地封装参数，调用这些方法发送请求获取回复即可
+- `--cpp_out`: 指定输出C++代码和生成代码输出的目录，指定目录必须存在
+- `--proto_path`: 或者用`-I`代替，
+- `src/*.proto`: 可以有多个proto文件，protoc编译器会分别为这些文件生成对应代码，其将`src`替代为`--cpp_out`指定的内容即为输出路径（src之下的子目录也会自动创建）
+- 生成的文件命名： 将扩展名`.proto`更换为`.ph.h`和`.ph.cc`,其分别对应头文件和实现文件
+- 以上生成的只是**消息类型**和其操作接口代码，对应grpc**服务类型**和其接口的实现需要再指定`--plugin=protoc-gen-grpc=`生成，后缀名为`grpc.pb.h`和`grpc.pb.cc`
+
+    示例:
+
+    ```sh
+    $ protoc -I ../../protos --grpc_out=. --plugin=protoc-gen-grpc=`which grpc_cpp_plugin` ../../protos/route_guide.proto
+    $ protoc -I ../../protos --cpp_out=. ../../protos/route_guide.proto
+    ```
+
+    VS python
+
+    ```py
+    python -m grpc_tools.protoc -I../../protos --python_out=. --pyi_out=. --grpc_python_out=. ../../protos/route_guide.proto
+    ```
+
+代码生成后，gRPC使用者通常在客户端调用这些API，并在服务端实现相应的API接口
+
+### 服务端要做的事
+
+1. 实现服务接口中声明定义的方法
+
+    ```c++
+    class GreeterServiceImpl final : public Greeter::Service {
+        Status SayHello(ServerContext* context, const HelloRequest* request,
+                        HelloReply* reply) override {
+            //do something with request and response with reply
+            std::string prefix("Hello ");
+            reply->set_message(prefix + request->name());
+            return Status::OK;
+        }
+    };
+    ```
+
+1. 创建gRPC服务监听在某个IP端口上，并运行（用来处理客户端请求）
+
+    ```c++
+    void RunServer() {
+        std::string server_address("0.0.0.0:50051");
+        GreeterServiceImpl service;
+
+        ServerBuilder builder;
+        // Listen on the given address without any authentication mechanism.
+        builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+        // Register "service" as the instance through which we'll communicate with
+        // clients. In this case it corresponds to an *synchronous* service.
+        builder.RegisterService(&service);
+        // Finally assemble the server.
+        std::unique_ptr<Server> server(builder.BuildAndStart());
+
+        // Wait for the server to shutdown. Note that some other thread must be
+        // responsible for shutting down the server for this call to ever return.
+        server->Wait();
+    }
+    ```
+
+### 客户端要做的事
+
+1. **channels**: 提供一个到指定主机和端口上的gRPC server的连接， 用来创建客户端stub时使用
+
+    ```c++
+    Channel channel = grpc::CreateChannel(
+      "localhost:50051", grpc::InsecureChannelCredentials());
+    Greeter::Stub stub_ = Greeter::NewStub(channel);
+    ```
+
+1. **stub**: 代表远端服务的本地对象（在一些语言中，首选术语为client），该对象实现了与服务端相同的方法，客户端只需要在本地封装参数，调用这些方法发送请求获取回复即可
+
+    ```c++
+    HelloRequest request;
+    request.set_name("world");
+    HelloReply reply;
+
+    // Context for the client. It could be used to convey extra information to
+    // the server and/or tweak certain RPC behaviors.
+    ClientContext context;
+    Status status = stub_->SayHello(&context, request, &reply);
+    if (status.ok()) {
+      return reply.message();
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      return "RPC failed";
+    }
+    ```
 
 ## 代码编译
 
