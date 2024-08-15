@@ -4,7 +4,6 @@
 
 ```mermaid
 flowchart LR
-%% flowchart TD
     subgraph com[gRPC generate client/server-side codes]
         file[.proto file]
         compiler((protoc))
@@ -53,20 +52,20 @@ flowchart LR
 ## protocol buffer
 
 1. 参考文档: [protocol buffers documentation](https://protobuf.dev/overview/)
-1. what: Google成熟的开源结构化数据序列化机制
+1. what: Google一套成熟开源的、数据结构序列化机制
 1. purpose:
     - IDL: 接口定义语言(Interface Definition Language)，用于定义负载消息结构和服务接口
     - message interchange Format: 传输数据格式
 
 1. how:
-    - 在一个proto file中定义数据结构及服务，该文件是一个后缀扩展名为`.proto`的普通文本文件
-    - 使用protocol buffer编译器`protoc`生成对应编程语言的数据访问类和gRPC服务接口代码, 生成代码包括了server和client code
+    - 在一个proto file中定义**数据结构**(proto文件中称为**消息**)及**服务**，该文件是一个后缀扩展名为`.proto`的普通文本文件
+    - 使用protocol buffer编译器`protoc`生成对应编程语言的**消息访问类**和gRPC**服务类接口**代码, 生成代码包括了server和client code
 
     ![How do Protocol Buffers Work](../picture/blog/protocol_buffer.svg)
 
-## service definition
+## 服务的定义
 
-服务的4种方法类型
+服务定义有消息和服务两个概念，提供了4种接口服务类型，如下表所述：
 
 |类型|译名|说明|
 |----|----|---|
@@ -75,12 +74,12 @@ flowchart LR
 |Client streaming RPCs|客户端流式RPC|客户端向提供的可写数据流输入一系列的消息并将其发送给服务端，客户端输入完后处于等待状态，直到服务端读取完并给出回应。gRPC可以保证调用中消息的排序|
 |Bidirectional streaming RPCs|双向流式RPC|客户端和服务端都可以向各自的可写数据流来发送序列化的消息给对方，两条数据流是各自独立的，所以双方可以各自收发而不用等待对方处理，当然每一条流中的数据仍是依序收发的|
 
-示例如下， 你可以在[RPC life cycle](https://grpc.io/docs/what-is-grpc/core-concepts/#rpc-life-cycle)章节了解更多
+示例如下，四个服务从上到下分别对应表中的一元RPC、服务端流式RPC、 客户端酒店式RPC和双向流式RPC， 你可以在[RPC life cycle](https://grpc.io/docs/what-is-grpc/core-concepts/#rpc-life-cycle)章节了解更多
 
 ```proto
 service HelloService {
   rpc SayHello (HelloRequest) returns (HelloResponse);
-  rpc LotsOfReplies (HelloRequest) returns (stream HelloResponse);
+  rpc LotsOfReplies (HelloRequest) returns (stream HelloResponse); 
   rpc LotsOfGreetings (stream HelloRequest) returns (HelloResponse);
   rpc BidiHello (stream HelloRequest) returns (stream HelloResponse);
 }
@@ -93,6 +92,8 @@ message HelloResponse {
   string reply = 1;
 }
 ```
+
+定义的消息中 `= 1`并不是赋值1，而是用来告诉protoc编译器这个成员在消息体中的位置信息。
 
 ## API的使用
 
@@ -161,15 +162,24 @@ gRPC提供了一个[`protocol buffer`](https://protobuf.dev/reference/cpp/cpp-ge
 
 ### 客户端要做的事
 
-1. **channels**: 提供一个到指定主机和端口上的gRPC server的连接， 用来创建客户端stub时使用
+1. 创建**channels**
+
+   作用：提供一个到指定主机和端口上的gRPC server的连接， 用来创建客户端stub时使用
 
     ```c++
     Channel channel = grpc::CreateChannel(
       "localhost:50051", grpc::InsecureChannelCredentials());
+    ```
+
+1. 通过**channel**申请一个**stub**对象出来
+
+    作用: 代表远端服务的本地对象（在一些语言中，首选术语为client），该对象实现了与服务端相同的方法，
+
+    ```c++
     Greeter::Stub stub_ = Greeter::NewStub(channel);
     ```
 
-1. **stub**: 代表远端服务的本地对象（在一些语言中，首选术语为client），该对象实现了与服务端相同的方法，客户端只需要在本地封装参数，调用这些方法发送请求获取回复即可
+1. 客户端只需要在本地封装参数，调用stub中的方法，发送请求获取回复即可
 
     ```c++
     HelloRequest request;
