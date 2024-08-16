@@ -24,7 +24,8 @@ lb config
 - ~/live-build/config/chroot【跳过】
 
   ```sh
-  LB_LINUX_FLAVOURS="generic"                      LB_LINUX_PACKAGES="linux-image-3.13.0-11"               
+  LB_LINUX_FLAVOURS="generic"
+  LB_LINUX_PACKAGES="linux-image-3.13.0-11"
   LB_PACKAGE_LISTS="standard"
   ```
 

@@ -78,7 +78,7 @@
     RUN     /bin/echo 'root:123456' |chpasswd
 
     # customize
-    # adduser leixa 
+    # adduser leixa
     RUN useradd leixa -u 1001 -d /home/leixa -m -s /bin/bash
     # change password
     RUN echo "leixa:lxa123" | chpasswd
@@ -182,73 +182,101 @@
 
 - 创建的容器内的代理设置： [Configure Docker to use a proxy server](https://docs.docker.com/network/proxy/)
 
+## Dockerfile
+
+用于创建docker image, 示例文件如下：
+
+```Dockerfile
+############################################################
+# Dockerfile to build KunLun complie container images
+# Based on Ubuntu 16.04
+############################################################
+
+# Set the base image to Ubuntu
+FROM ubuntu:21.04
+
+# File Author / Maintainer
+MAINTAINER Lei xiaoan, leixa@jideos.com
+
+################## BEGIN INSTALLATION ######################
+RUN sed -i 's/archive.ubuntu.com/repo.huaweicloud.com/g' /etc/apt/sources.list
+RUN apt update && apt install -y sudo \
+    openssh-server \
+    vim bash-completion \
+    man bc \
+    repo git ssh make gcc libssl-dev liblz4-tool  \
+    expect g++ patchelf chrpath gawk texinfo  \
+    chrpath diffstat binfmt-support  \
+    qemu-user-static live-build bison flex \
+    fakeroot cmake gcc-multilib g++-multilib \
+    unzip device-tree-compiler ncurses-dev time
+# dont use mutilpline RUN apt install -y xxx
+# because of that every RUN command is a new layer of container
+
+RUN mkdir -p /var/run/sshd
+
+RUN useradd jide -u 1000 -d /home/jide -m -s /bin/bash
+RUN echo "jide:123" | chpasswd
+#############################################################
+
+# Expose ports
+EXPOSE 22
+
+# customize
+# adduser leixa
+RUN useradd leixa -u 1001 -d /home/leixa -m -s /bin/bash
+
+# change password
+RUN echo "leixa:lxa123" | chpasswd
+
+# create directory
+RUN mkdir -p /home/jide/rk3588_sdk
+RUN chown -R jide:jide /home/jide/rk3588_sdk
+WORKDIR /home/jide/rk3588_sdk
+
+# 设置切换当前用户
+USER leixa
+# 默认启动命令
+CMD     /usr/sbin/sshd -D
+## 启动命令
+## entrypoint.sh需和Dockerfile文件放同一目录内
+#COPY entrypoint.sh /usr/bin/entrypoint.sh
+#ENTRYPOINT ["/usr/bin/entrypoint.sh"]
+```
+
+1. 使用Dockerfile生成 "**ubuntu:rk3588**" 镜像：
+
+    ```sh
+    docker build -t ubuntu:rk3588 /your/dockerfile/path（不是文件名，只是路径名，会自动搜索Dockerfile）
+    ```
+
+    - 镜像基于ubuntu 21.04构建，包含一个缺省用户root，密码123，编译rk3588需要的基本环境
+    - 建议修改Dockerfile中customize部分，添加一个与host主机上用户同名的用户和uid，否则下面共享文件会出现权限问题，可以创建自己需要的用于共享的目录
+    - 可以将所有RUN命令写到一个脚本中执行一次RUN即可,这样达到layer层次最小化的目的
+
+        ```Dockerfile
+        ADD run.sh /tmp/run.sh
+        RUN cd /tmp && chmod +x run.sh && run.sh && rm run.sh
+        ```
+
+    - 在Docker镜像中创建一个用户，我们可以在Dockerfile使用`ARG`, `RUN`和 `USER` 指令达成目的:
+
+        ```sh
+        FROM alpine:latest
+        ARG DOCKER_USER=default_user
+        RUN addgroup -S $DOCKER_USER && adduser -S $DOCKER_USER -G $DOCKER_USER
+        USER $DOCKER_USER
+        CMD ["whoami"]
+        ```
+
+        在创建时也可以方便的修改用户名:
+        `$ docker build --build-arg DOCKER_USER=baeldung -t dynamicuser .`
+
+    - path里面的所有内容在创建时都要发送给docker daemon,所以不要放太多无关的文件在path目录下，不然影响创建效率
+
 ## 示例
 
-1. Dockerfile文件如下:
-
-   ```Dockerfile
-   ############################################################
-    # Dockerfile to build KunLun complie container images
-    # Based on Ubuntu 16.04
-    ############################################################
-
-    # Set the base image to Ubuntu
-    FROM ubuntu:21.04
-
-    # File Author / Maintainer
-    MAINTAINER Lei xiaoan, leixa@jideos.com
-
-    ################## BEGIN INSTALLATION ######################
-    RUN sed -i 's/archive.ubuntu.com/repo.huaweicloud.com/g' /etc/apt/sources.list
-    RUN apt update && apt install -y sudo \
-        openssh-server \
-        vim bash-completion \
-        man bc \
-        repo git ssh make gcc libssl-dev liblz4-tool  \
-        expect g++ patchelf chrpath gawk texinfo  \
-        chrpath diffstat binfmt-support  \
-        qemu-user-static live-build bison flex \
-        fakeroot cmake gcc-multilib g++-multilib \
-        unzip device-tree-compiler ncurses-dev time
-    # dont use mutilpline RUN apt install -y xxx
-    # because of that every RUN command is a new layer of container
-
-    RUN mkdir -p /var/run/sshd
-
-    RUN useradd jide -u 1000 -d /home/jide -m -s /bin/bash
-    RUN echo "jide:123" | chpasswd
-    #############################################################
-
-    # Expose ports
-    EXPOSE 22
-
-    # customize
-    # adduser leixa 
-    RUN useradd leixa -u 1001 -d /home/leixa -m -s /bin/bash
-
-    # change password
-    RUN echo "leixa:lxa123" | chpasswd
-
-    # create directory
-    RUN mkdir -p /home/jide/rk3588_sdk
-    RUN chown -R jide:jide /home/jide/rk3588_sdk
-    WORKDIR /home/jide/rk3588_sdk
-    # 默认启动命令
-    CMD     /usr/sbin/sshd -D
-    ## 启动命令
-    ## entrypoint.sh需和Dockerfile文件放同一目录内
-    #COPY entrypoint.sh /usr/bin/entrypoint.sh
-    #ENTRYPOINT ["/usr/bin/entrypoint.sh"]
-   ```
-
-2. 使用Dockerfile生成 "**ubuntu:rk3588**" 镜像：
-
-    `docker build -t ubuntu:rk3588 /your/dockerfile/path（不是文件名，只是路径名，会自动搜索Dockerfile）`
-
-    镜像基于ubuntu 21.04构建，包含一个缺省用户root，密码123123，编译rk3588需要的基本环境
-    建议修改Dockerfile中customize部分，添加一个与20上自己用户同名的用户和uid，否则下面共享文件会出现权限问题，可以创建自己需要的用于共享的目录
-
-3. 以镜像**ubuntu:rk3588**创建容器**rk3588_sdk_env**：
+1. 以镜像**ubuntu:rk3588**创建容器**rk3588_sdk_env**：
 
    - 无共享文件夹:
 
@@ -258,13 +286,13 @@
 
      `docker run --name rk3588_sdk_env --privileged -v /dev:/dev -v /proc:/proc -v /dev/pts:/dev/pts -d -p 10088:22 -v /home/jide/rk3588:/home/jide/rk3588_sdk ubuntu:rk3588 /usr/sbin/sshd -D`
 
-4. ssh进入容器**rk3588_sdk_env**
+1. ssh进入容器**rk3588_sdk_env**
 
     `ssh -p 10088 yourname@localhost`
 
-5. 容器有变更可先以当前容器生成新镜像，再从新创建容器
+1. 容器有变更可先以当前容器生成新镜像，再从新创建容器
 
-6. 如何判断是否在容器中,并更改PS标记？
+1. 如何判断是否在容器中,并更改PS标记？
 
     ```sh
     ps --no-headers --pid 1 | grep  --silent docker-init && in_docker=1 || in_docker=0
@@ -273,7 +301,7 @@
     }
     ```
 
-7. script exsample
+1. script example
     将entrypoint.sh与Dockefile放一起，创建好镜像，后用start_docker.sh创建启动容器实例
 
     ```sh
