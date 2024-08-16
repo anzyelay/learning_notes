@@ -12,7 +12,8 @@ sudo apt install -y docker.io
 
 ### 2. 下载debian镜像
 
-Patapua/elementary使用Debian版本的live-build进行构建，而不是Ubuntu修改过的版本，因此可以非常容易的在Debian虚机或container里构建Patapua/elementary的iso安装镜像（live cd）。 如何获取arm镜像可参考[如何在amd平台上跑arm64的docker](./%E5%A6%82%E4%BD%95%E5%9C%A8amd%E5%B9%B3%E5%8F%B0%E4%B8%8A%E8%B7%91arm64%E7%9A%84docker.md)
+Patapua/elementary使用Debian版本的live-build进行构建，而不是Ubuntu修改过的版本，因此可以非常容易的在Debian虚机或container里构建Patapua/elementary的iso安装镜像（live cd）。 如何获取arm镜像可参考[如何在amd平台上跑arm64的docker](../docker/如何在amd平台上跑arm64的docker.md)
+
 
 ```sh
 docker pull --platform=arm64 debian:unstable
