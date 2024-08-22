@@ -85,11 +85,16 @@ service HelloService {
 }
 
 message HelloRequest {
-  string greeting = 1;
+  string name = 1;
+  int age = 2;
+  int heavy = 3;
+  message SubRequest {
+    string sub_name = 1;
+  }
 }
 
 message HelloResponse {
-  string reply = 1;
+  string message = 1;
 }
 ```
 
