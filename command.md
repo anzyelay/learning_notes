@@ -138,3 +138,45 @@ done < filename
     set -e # If not interactive, exit immediately if any untested command fails.
     trap  finish ERR
     ```
+
+1. 脚本中输出多行提示文字
+
+    ```sh
+    cat << EOM
+    hello world,
+    i love u!
+    EOM
+    ```
+
+1. cp进度和解压进度
+
+   ```sh
+    #Precentage function
+    untar_progress ()
+    {
+        TARBALL=$1;
+        DIRECTPATH=$2;
+        BLOCKING_FACTOR=$(($(xz --robot --list ${TARBALL} | grep 'totals' | awk '{print $5}') / 51200 + 1));
+        tar --blocking-factor=${BLOCKING_FACTOR} --checkpoint=1 --checkpoint-action='ttyout=Written %u%  \r' -Jxf ${TARBALL} -C ${DIRECTPATH}
+    }
+    untar_progress ./boot_partition.tar.xz tmp/
+
+    #copy/paste programs
+    cp_progress ()
+    {
+            CURRENTSIZE=0
+            while [ $CURRENTSIZE -lt $TOTALSIZE ]
+            do
+                    TOTALSIZE=$1;
+                    TOHERE=$2;
+                    CURRENTSIZE=`sudo du -c $TOHERE | grep total | awk {'print $1'}`
+                    echo -e -n "$CURRENTSIZE /  $TOTALSIZE copied \r"
+                    sleep 1
+            done
+    }
+    TOTALSIZE=`sudo du -c tmp/* | grep total | awk {'print $1'}`
+    cp -rf tmp/* start_here/ &
+    cp_progress $TOTALSIZE start_here/
+    sync;sync
+
+   ```

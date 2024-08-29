@@ -1104,3 +1104,141 @@ remove)
 esac
 
 ```
+
+## TI
+
+1. 如果在本机开发，则linux Host 需要装的包
+
+    ```sh
+    host# sudo apt-get install build-essential autoconf automake bison flex libssl-dev bc u-boot-tools swig python3 python3-pip
+    host# pip3 install jsonschema pyelftools PyYAML Mako
+    ```
+
+1. 解决docker中的administrator权限问题
+
+    ```sh
+    sudo adduser f1339899 sudo && usermod -aG sudo f1339899 && echo "f1339899 ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+    ```
+
+1. make install时要指定位置才可安装, 且安装目录必须存在，不会自动创建
+
+    ```sh
+    DESTDIR=`pwd`/output make install
+    ```
+
+1. piglit的lib占用2G ，主要是`targetNFS/usr/lib/piglit/generated_tests`
+1. MLO: 保存在emmc里，指示first boot up选项为emmc，清除这部分才能改boot up 行为
+
+### 文件目录说明
+
+**PSDK_PATH**假设此目录为sdk安装目录
+
+dir | description
+-|-
+<PSDK_PATH>/filesystem/ | 镜像文件存放位置，<li>*.wic.xz: SD卡镜像烧录用的文件（烧录工具：**balenaEtcher**,将其解压后用**bmap-tools**烧录）</li><li></li>
+<PSDK_PATH>/bin  | 工具目录，如`create-sdcard.sh`为烧写脚本
+<PSDK_PATH>/setup.sh | 在环境中安装配置一些开发工具：tftp, nfs, u-boot, telnet等
+<PSDK_PATH>/Makefile | 可用于构建**SDK**中的某些子组件。它使用`Rules.make`文件，并给出了如何构建各种组件以及要使用的参数的示例. 使用它时不能source过linux-devkit下的`environment-setup`脚本, 因为在source后有些make目标会不能被make
+<PSDK_PATH>/Rules.make | 共享变量和设置配置文件，它不仅被顶层Makefile使用，还被许多子组件 Makefile 使用，以访问常见的共享变量和设置
+<PSDK_PATH>/linux-devkit |  toolchain的安装目录,  针对ARMv8 -- Cortex-A53 SOC
+<PSDK_PATH>/k3r5-devkit |  toolchain的安装目录，针对ARMv7 -- Cortex-M4F MCU
+
+来源：[GP to HS-FS Migration Guide](https://software-dl.ti.com/processor-sdk-linux/esd/AM62X/08_06_00_42/exports/docs/linux/Foundational_Components_Migration_Guide.html#k3-image-gen)
+Device types | 释义 | desc
+-|-|-
+GP|General Purpose|这是 SoC/主板状态，其中没有设备保护并且未启用用于启动设备的身份验证。
+HS-FS|High Security - Field Securable|这是客户在设备中烧毁密钥之前的 SoC/电路板状态。即 HS 设备离开 TI 工厂时的状态。在此状态下，设备保护 ROM 代码、TI 密钥和某些安全外围设备。在此状态下，设备不会强制进行启动身份验证，但 DMSC 已锁定。
+HS-SE|High Security - Security Enforced|这是客户成功烧毁密钥并设置“客户密钥启用”后的SoC/电路板状态。在 HS-SE 设备中，所有安全功能均已启用。设备内的所有机密均受到全面保护，所有安全目标均已全面实施。该设备还强制执行安全启动。
+
+  注：更改设备类型只需要修改分区目录下的tiboot3.bin为对应设备类型的image即可
+
+image | description
+-|-
+tiboot3-am62x-xxx-evm.bin | xxx可为：**gp,hs,hs-fs**, 其中hs:HS-SE, hs-fs: HS-FS, Initial boot image
+tispl.bin | **HS-FS**类型需要，其它两种不需要
+u-boot.img | **GP,HS-FS,HS-SE**三者比需要
+tiboot3.bin | 依据**GP,HS-FS,HS-SE**设备类型，由上方的tiboot3-am62x-xxx-evm.bin重命名而来
+
+Target Types | description
+-|-
+target | 编译目标的release版本， target有哪些参见下一个表格，用法`make <target>`
+target_stage | 拷贝目标文件到`<TISDK_path>/board-support/built-images`目录
+target_install | 安装目标文件到**DESTDIR**指定目录, `sudo DESTDIR=/media/$USER/rootfs make linux_install`
+target_clean | 清除目标编译文件
+
+make target | description
+-|-
+linux | 使用默认配置`tisdk_<PLATFORM>_defconfig`编译内核
+linux-dtbs | 编译设备树，生成blob文件
+u-boot | 编译u-boot和u-boot SPL(MLO)
+arm-benchmarks |构建 ARM 基准
+cryptodev | 构建加密硬件加速器模块
+ti-img-rogue-driver | 构建GPU内核模块
+jailhouse | 构建支持hypervisor平台所需模块
+
+以下这些环境变量都在**Rules.make**文件中有指定
+env variants | desc
+-|-
+PLATFORM |AM62x installer支持`am62xx-evm`和`am62xx-lp-evm`, 前者是默认平台
+ARCH | 
+UBOOT_MACHINE |
+TI_SDK_PATH |
+DESTDIR |
+LINUX_DEVKIT_PATH |
+CROSS_COMPILE |
+ENV_SETUP |
+LINUXKERNEL_INSTALL_DIR | 
+
+1. 用`bmap-tools`烧录SD卡
+
+```sh
+# install bmap-tools
+sudo apt-get install bmap-tools
+
+cd <PSDK_PATH>/filesystem
+# decompress *.wic.xz to *.wic
+unxz tisdk-default-image-<machine>.wic.xz
+
+# generate a bmap file from the decompressed WIC image
+bmaptool create -o tisdk-default-image.bmap tisdk-default-image-<machine>.wic
+
+# umount sd card
+$ lsblk
+NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+:
+:
+sdc      8:32   1    15G  0 disk
+├─sdc1   8:33   1 131.8M  0 part /media/localUser/boot
+└─sdc2   8:34   1 765.9M  0 part /media/localUser/root
+
+$ sudo umount /media/localUser/boot
+$ sudo umount /media/localUser/root
+$ lsblk
+NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+:
+:
+sdc      8:32   1    15G  0 disk
+├─sdc1   8:33   1 131.8M  0 part
+└─sdc2   8:34   1 765.9M  0 part
+
+# write the WIC image to the SD card
+sudo bmaptool copy --bmap tisdk-default-image.bmap tisdk-default-image-<machine>.wic /dev/sdc
+
+```
+
+1. GCC ToolChain setup
+
+[参考](https://software-dl.ti.com/processor-sdk-linux/esd/AM62X/09_02_01_10/exports/docs/linux/Overview/GCC_ToolChain.html#yocto-built-sdk-toolchains)
+
+```sh
+host# CROSS_COMPILE_64="${SDK_INSTALL_DIR}/linux-devkit/sysroots/x86_64-arago-linux/usr/bin/aarch64-oe-linux/aarch64-oe-linux-"
+host# SYSROOT_64="${SDK_INSTALL_DIR}/linux-devkit/sysroots/aarch64-oe-linux"
+host# CC_64="${CROSS_COMPILE_64}gcc --sysroot=${SYSROOT_64}"
+host# CROSS_COMPILE_32="${SDK_INSTALL_DIR}/k3r5-devkit/sysroots/x86_64-arago-linux/usr/bin/arm-oe-eabi/arm-oe-eabi-"
+```
+
+Variable| Location| Description
+-|-|-
+CROSS_COMPILE_64| linux-devkit/sysroots/x86_64-arago-linux/usr/bin/aarch64-oe-linux/aarch64-oe-linux-| Cross compiler toolchain for the ARMv8 architecture
+SYSROOT_64| linux-devkit/sysroots/aarch64-oe-linux/ | Sysroot with the cross compiled libraries and headers for the ARMv8 architecture with Linux OS
+ENV_SETUP_64 | linux-devkit/environment-setup-aarch64-oe-linux | Shell script that sets environment variables to compile binaries for the ARMv8 linux target
