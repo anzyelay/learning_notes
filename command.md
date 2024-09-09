@@ -40,6 +40,19 @@
 1. ssh
     - 远客机首先安装有openssh-server
     - 可以运行界面的ssh连接 `DISPLAY=:0 ssh -X username@ip`
+    - "sign_and_send_pubkey: signing failed for RSA “/root/.ssh/id_rsa“ from agent: agent refused operation"
+
+    ```sh
+    #way 1
+    eval "$(ssh-agent -s)" && ssh-add
+    ssh user@ip
+    #way 2
+    ssh-agent ssh user@ip 
+    # way 1 and way 2 is temporary,新开一个终端就无效了,永久性的方法如下 
+    ssh-add  [OpenSSH private key]
+    ssh-add -l //查看是否加入
+    ssh user@ip //新开终端也有效
+    ```
 
 1. pkg-config:查找编译前置条件或依赖等
 
@@ -56,13 +69,13 @@
 
 1. read读文件，每次读取一行，直到读取不到返回非0：
 
-```sh
-cat tmp.txt  | while read line; do echo $line; done
+    ```sh
+    cat tmp.txt  | while read line; do echo $line; done
 
-while read name; do
-    # Do what you want to $name
-done < filename
-```
+    while read name; do
+        # Do what you want to $name
+    done < filename
+    ```
 
 1. `pmap`查看内存使用情况
 

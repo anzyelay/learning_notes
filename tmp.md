@@ -1107,6 +1107,17 @@ esac
 
 ## TI
 
+### [SDK origin 资料](https://www.ti.com.cn/tool/cn/PROCESSOR-SDK-AM62X?keyMatch=am62x&tisearch=universal_search#related-design-resources)
+
+dir|where|url
+-|-|-
+AM62xAM62xSIP SK Quick Start Guide | AM62xAM62xSIP SK Quick Start Guide | 开发板Guide
+AM62 Academy | online |academy^[https://dev.ti.com/tirex/explore/node?node=A__AEIJm0rwIeU.2P1OBWwlaA__AM62-ACADEMY__uiYMDcq__LATEST], Learn how to build embedded systems using AM62 processors
+Yocto SDK user manual | Yocto-SDK-user-manual--processor-sdk-linux-docs | sdk手册, 可以下离线版
+Yocto Build Instructions | Yocto-SDK-user-manual--processor-sdk-linux-docs |与上一个是同一份指导
+Debian SDK user manual | online | Debian Developer’s Guide^[https://software-dl.ti.com/processor-sdk-linux/esd/AM62X/10_00_07_Debian/exports/docs/devices/AM62X/debian/Getting_Started_Guide.html]
+Buildroot SDK user manual | online | Buildroot Developer’s Guide^[https://software-dl.ti.com/processor-sdk-linux/esd/AM62X/10_00_07_Buildroot/exports/docs/devices/AM62X/buildroot/index.html]
+
 1. 如果在本机开发，则linux Host 需要装的包
 
     ```sh
@@ -1242,3 +1253,5 @@ Variable| Location| Description
 CROSS_COMPILE_64| linux-devkit/sysroots/x86_64-arago-linux/usr/bin/aarch64-oe-linux/aarch64-oe-linux-| Cross compiler toolchain for the ARMv8 architecture
 SYSROOT_64| linux-devkit/sysroots/aarch64-oe-linux/ | Sysroot with the cross compiled libraries and headers for the ARMv8 architecture with Linux OS
 ENV_SETUP_64 | linux-devkit/environment-setup-aarch64-oe-linux | Shell script that sets environment variables to compile binaries for the ARMv8 linux target
+
+
