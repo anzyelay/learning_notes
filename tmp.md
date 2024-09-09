@@ -1254,4 +1254,60 @@ CROSS_COMPILE_64| linux-devkit/sysroots/x86_64-arago-linux/usr/bin/aarch64-oe-li
 SYSROOT_64| linux-devkit/sysroots/aarch64-oe-linux/ | Sysroot with the cross compiled libraries and headers for the ARMv8 architecture with Linux OS
 ENV_SETUP_64 | linux-devkit/environment-setup-aarch64-oe-linux | Shell script that sets environment variables to compile binaries for the ARMv8 linux target
 
+### 编译第三方库
 
+#### dconf
+
+1. 使用meson + ninja编译方式
+
+TI的meson有问题，其并非真实meson,而是封装了一层，设置的meson.cross.template文件有问题。即使cross file设置正确也会报**meson ERROR: Malformed value in machine file variable \'c\'**,在variable前后要加单引号 **''**。
+
+自己设置交叉编译配置文件`aarch64-oe-linux.txt`,内容如下
+
+```txt
+[binaries]
+c = '/home/anzye/ti/ti-sdk/linux-devkit/sysroots/x86_64-arago-linux/usr/bin/aarch64-oe-linux/aarch64-oe-linux-gcc'
+cpp = '/home/anzye/ti/ti-sdk/linux-devkit/sysroots/x86_64-arago-linux/usr/bin/aarch64-oe-linux/aarch64-oe-linux-g++'
+ar = '/home/anzye/ti/ti-sdk/linux-devkit/sysroots/x86_64-arago-linux/usr/bin/aarch64-oe-linux/aarch64-oe-linux-ar'
+nm = '/home/anzye/ti/ti-sdk/linux-devkit/sysroots/x86_64-arago-linux/usr/bin/aarch64-oe-linux/aarch64-oe-linux-nm'
+strip = '/home/anzye/ti/ti-sdk/linux-devkit/sysroots/x86_64-arago-linux/usr/bin/aarch64-oe-linux/aarch64-oe-linux-strip'
+pkg-config = 'pkg-config'
+
+[built-in options]
+c_args = '-mbranch-protection=standard --sysroot=/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+c_link_args = '--sysroot=/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+cpp_args = '-mbranch-protection=standard --sysroot=/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+cpp_link_args = '--sysroot=/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+
+[properties]
+needs_exe_wrapper = true
+sys_root = '/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+
+[host_machine]
+system = 'linux'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
+```
+
+1. 配置编译, man编译需要其它库，禁用
+
+```sh
+meson.real setup --cross-file aarch64-oe-linux.txt builddir -D man=false
+ninja -C builddir
+```
+
+1. 安装
+
+```sh
+DESTDIR=`pwd`/installed ninja install
+```
+
+## minicom 无法输入
+
+> 发现无法回车进入到命令行模式输入命令了，通过查找资料发现关键点就在串口的配置中有个Serial port setup-->Hardware Flow Contorl选项被改成了Yes，这样就造成了键盘没有用了，接受不了任何输入。
+>
+> (1)sudo minicom -s
+(2)进入Serial port setup界面
+(3)时F - Hardware Flow Contorl项为Yes，按下F键就修改为No了，即关闭硬件流控，回车回到上级菜单
+(4)选择| Save setup as dfl |，然后选择 Exit from Minicom  重启minicom,这样就可以输入命令了。

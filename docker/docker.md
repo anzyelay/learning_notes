@@ -328,6 +328,7 @@ CMD     /usr/sbin/sshd -D
     echo $msg
     groupadd -g $GROUP_ID -r $GROUP_NAME && \
     useradd -u $USER_ID -r -g $GROUP_NAME -d "$HOME_PATH" $USER_NAME
+    adduser $USER_NAME sudo && usermod -aG sudo $USER_NAME && echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
     echo "$msg - done"
 
     msg="Change account $USER_NAME shell from csh to bash"
@@ -368,11 +369,11 @@ CMD     /usr/sbin/sshd -D
     echo $msg
 
     # Execute command as 'docker' user
-    cd $HOME
+    #cd $HOME
 
     #msg=`pwd`
-    echo "Enter $msg. args: $args"
-    chown -R $USER_NAME:$GROUP_NAME /opt/crosstool
+    #echo "Enter $msg. args: $args"
+    #chown -R $USER_NAME:$GROUP_NAME /opt/crosstool
 
     #exec sudo -u $USER_NAME $args
     exec su $USER_NAME

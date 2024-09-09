@@ -26,7 +26,42 @@
 
 1. 查看当前配置状态 (build为构建目录)
 `meson configure build`
-2. 添加lib `dependency('libcanberra')`
+1. 交叉编译--[1](https://mesonbuild.com/Cross-compilation.html)
+
+    cross_meson.txt
+
+    ```txt
+    [binaries]
+    c = 'aarch64-oe-linux-gcc'
+    cpp = 'aarch64-oe-linux-g++'
+    ar = 'aarch64-oe-linux-ar'
+    nm = 'aarch64-oe-linux-nm'
+    strip = 'aarch64-oe-linux-strip'
+    pkg-config = 'pkg-config'
+
+    [built-in options]
+    c_args = '-mbranch-protection=standard --sysroot=/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+    c_link_args = '--sysroot=/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+    cpp_args = '-mbranch-protection=standard --sysroot=/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+    cpp_link_args = '--sysroot=/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+
+    [properties]
+    needs_exe_wrapper = true
+    sys_root = '/home/anzye/ti/ti-sdk/linux-devkit/sysroots/aarch64-oe-linux'
+
+    [host_machine]
+    system = 'linux'
+    cpu_family = 'x86_64'
+    cpu = 'x86_64'
+    endian = 'little'
+    ```
+
+    ```sh
+    meson setup --cross-file cross_meson.txt builddir
+    meson compile -C builddir
+    ```
+
+1. 添加lib `dependency('libcanberra')`
    - `pkg-config --list-all` 列出所有可用库
    - `pkg-config --libs libname`, 去掉-l就是要添加到dependency中间的名字，大小写敏感
    - 都找不到就用meson查找命令：
@@ -37,8 +72,8 @@
         # 其中posix是由valadoc中的某个函数的 Package:posix 字段得到。比如查找Posix.sleep就能看到
         ```
 
-3. 获取参数值：`get_option('prefix')`
-4. foreach
+1. 获取参数值：`get_option('prefix')`
+1. foreach
 
    ```meson.build
     schemas = [ '...', '...' ]
