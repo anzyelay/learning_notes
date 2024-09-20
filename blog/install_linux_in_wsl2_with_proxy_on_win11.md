@@ -94,6 +94,7 @@ wsl --install -d Ubuntu
         export http_proxy=http://username:passwd@$proxy_ip:port
         export HTTP_PROXY=http://username:passwd@$proxy_ip:port
         export https_proxy=http://username:passwd@$proxy_ip:port
+        export no_proxy="localhost,127.0."
     }
     ```
 
@@ -103,6 +104,13 @@ wsl --install -d Ubuntu
     anzye@F9899-PC-1:~/curl$ cat /etc/apt/apt.conf.d/80proxy.conf
     Acquire::http::proxy "http://username:passwd@proxy_ip:port";
    ```
+
+1. set snap proxy
+
+  ```sh
+  sudo snap set system proxy.http="http://username:passwd@ip:port"
+  sudo snap set system proxy.https="http://username:passwd@ip:port"
+  ```
 
 ## 设置开发环境
 

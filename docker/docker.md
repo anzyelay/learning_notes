@@ -26,13 +26,25 @@
 - 容器： 容器是镜像运行时的实体
 - 仓库（Repository）：仓库可看成一个代码控制中心，用来保存镜像。
 
+## 安装
+
+```sh
+curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
+```
+
 ## docker 配置
 
-1. Add user to group
+1. Add user to docker group
 
     ```sh
+    sudo groupadd docker
     sudo usermod -aG docker $USER
     ```
+
+    > Log out and log back in so that your group membership is re-evaluated
+    > If you're running Linux in a virtual machine, it may be necessary to restart the virtual machine for changes to take effect.
+    > You can also run the following command to activate the changes to groups:
+    > `newgrp docker`
 
 ## Docker 镜像使用
 

@@ -335,7 +335,7 @@ we need copies of executables that can be run natively.
         Linking C executable cmTC_21477
         /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_21477.dir/link.txt --verbose=1
         /working_dir/ql-ol-crosstool/sysroots/x86_64-oesdk-linux/usr/bin/arm-oe-linux-gnueabi/arm-oe-linux-gnueabi-gcc --sysroot=/working_dir/ql-ol-crosstool/sysroots/armv7ahf-neon-oe-linux-gnueabi   -O3 -DNDEBUG    CMakeFiles/cmTC_21477.dir/testCCompiler.c.o  -o cmTC_21477
-        /working_dir/ql-ol-crosstool/sysroots/x86_64-oesdk-linux/usr/bin/arm-oe-linux-gnueabi/../../libexec/arm-oe-linux-gnueabi/gcc/arm-oe-linux-gnueabi/6.4.0/real-ld: error: CMakeFiles/cmTC_21477.dir/testCCompiler.c.o uses VFP register arguments, output does not
+        /working_dir/ql-ol-crosstool/sysroots/x86_64-omake -DCMAKE_INSTALL_PREFIX=`pwd`/installed -DCMAKE_BUILD_TYPE=Release -DCARES_STATIC:BOOL=ON -DCARES_SHARED:BOOL=ON -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=packageesdk-linux/usr/bin/arm-oe-linux-gnueabi/../../libexec/arm-oe-linux-gnueabi/gcc/arm-oe-linux-gnueabi/6.4.0/real-ld: error: CMakeFiles/cmTC_21477.dir/testCCompiler.c.o uses VFP register arguments, output does not
         collect2: error: ld returned 1 exit status
         CMakeFiles/cmTC_21477.dir/build.make:86: recipe for target 'cmTC_21477' failed
         make[1]: *** [cmTC_21477] Error 1
@@ -359,3 +359,143 @@ we need copies of executables that can be run natively.
     set(CMAKE_CXX_FLAGS "-march=armv7-a -marm -mfpu=neon -mfloat-abi=hard")
     set(CMAKE_C_FLAGS "-march=armv7-a -marm -mfpu=neon -mfloat-abi=hard")
     ```
+
+1. 1.27.0版本在ubuntu22.04中遇到的问题
+
+编译环境：
+
+  tools/src   |   version
+  ----------  |  --------
+  GCC         |   11.4.0
+  cmake       |   3.22.1
+  grpc        |   1.27.0
+
+- 问题1：abseil-cpp库编译错 -- "error: ‘numeric_limits’ is not a member of ‘std’"
+
+    ```sh
+    grpc/third_party/abseil-cpp/absl/synchronization/internal/graphcycles.cc:451:26: error: ‘numeric_limits’ is not a member of ‘std’
+    ```
+
+    这个问题上网查阅之后，需要在third_party/abseil-cpp/absl/synchronization/internal/graphcycles.cc这个.cc文件下添加limits头文件，[参考](https://github.com/abseil/abseil-cpp/issues/1467)
+
+    ```diff
+    diff --git a/absl/synchronization/internal/graphcycles.cc b/absl/synchronization/internal/graphcycles.cc
+    index 6a2bcdf6..30f81443 100644
+    --- a/absl/synchronization/internal/graphcycles.cc
+    +++ b/absl/synchronization/internal/graphcycles.cc
+    @@ -37,6 +37,7 @@
+    
+    #include <algorithm>
+    #include <array>
+    +#include <limits>
+    #include "absl/base/internal/hide_ptr.h"
+    #include "absl/base/internal/raw_logging.h"
+    #include "absl/base/internal/spinlock.h"
+    ```
+
+- 问题2：abseil-cpp库编译错 -- “error: no matching function for call to ‘max(long int, int)’”
+
+    ```sh
+    /home/anzye/Desktop/5tbox/wnc/grpc/third_party/abseil-cpp/absl/debugging/failure_signal_handler.cc:128:32: error: no matching function for call to ‘max(long int, int)’
+    128 |   size_t stack_size = (std::max(SIGSTKSZ, 65536) + page_mask) & ~page_mask;
+
+    ```
+
+    查阅资料，需要将std::max改成std::max<size_t>，如下：
+
+    ```diff
+    diff --git a/absl/debugging/failure_signal_handler.cc b/absl/debugging/failure_signal_handler.cc
+    index 470d6768..3893aaae 100644
+    --- a/absl/debugging/failure_signal_handler.cc
+    +++ b/absl/debugging/failure_signal_handler.cc
+    @@ -125,7 +125,7 @@ static bool SetupAlternateStackOnce() {
+    #else
+    const size_t page_mask = sysconf(_SC_PAGESIZE) - 1;
+    #endif
+    -  size_t stack_size = (std::max(SIGSTKSZ, 65536) + page_mask) & ~page_mask;
+    +  size_t stack_size = (std::max<size_t>(SIGSTKSZ, 65536) + page_mask) & ~page_mask;
+    #if defined(ADDRESS_SANITIZER) || defined(MEMORY_SANITIZER) || \
+        defined(THREAD_SANITIZER)
+
+    ```
+
+- 问题3： abseil-cpp库交叉编译arm版出现"#include_next"问题
+
+    ```sh
+    #include_next 导致 cstdlib:fatal error:stdlib.h :No such file or directiry
+    ```
+
+    按后面Pre-requisites要求安装需要的包
+
+- 问题4： boringssl库代码在此环境下编译有问题
+
+    不使用此库，直接使用libssl系统库。
+    `cmake -DgRPC_SSL_PROVIDER=package .`
+
+- 问题5: abseil-cpp编译问题: extension.h 中"use of enum 'Id' without previous declaration"
+
+    ```c++
+        /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:141:8: error: use of enum 'Id' without previous declaration
+    141 |   enum Id : uint8_t {
+        |        ^~
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:141:13: error: 'uint8_t' was not declared in this scope
+    141 |   enum Id : uint8_t {
+        |             ^~~~~~~
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:28:1: note: 'uint8_t' is defined in header '<cstdint>'; did you forget to '#include <cstdint>'?
+    27 | #include "absl/strings/internal/str_format/output.h"
+    +++ |+#include <cstdint>
+    28 | #include "absl/strings/string_view.h"
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:141:21: error: default member initializer for unnamed bit-field
+    141 |   enum Id : uint8_t {
+        |                     ^
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:144:36: error: 'none' was not declared in this scope
+    144 |   static const size_t kNumValues = none + 1;
+        |                                    ^~~~
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:154:27: error: 'Id' has not been declared
+    154 |   static LengthMod FromId(Id id) { return LengthMod(id); }
+        |                           ^~
+    [ 21%] Building CXX object CMakeFiles/gpr.dir/src/core/lib/gpr/string_windows.cc.o
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:162:3: error: 'Id' does not name a type
+    162 |   Id id() const { return id_; }
+        |   ^~
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:176:5: error: 'Id' does not name a type
+    176 |     Id value;
+        |     ^~
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:182:24: error: expected ')' before 'id'
+    182 |   explicit LengthMod(Id id) : id_(id) {}
+        |                     ~  ^~~
+        |                        )
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:184:3: error: 'Id' does not name a type
+    184 |   Id id_;
+        |   ^~
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h: In constructor 'absl::str_format_internal::LengthMod::LengthMod()':
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:146:17: error: class 'absl::str_format_internal::LengthMod' does not have any field named 'id_'
+    146 |   LengthMod() : id_(none) {}
+        |                 ^~~
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:146:21: error: 'none' was not declared in this scope
+    146 |   LengthMod() : id_(none) {}
+        |                     ^~~~
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h: In static member function 'static absl::str_format_internal::LengthMod absl::str_format_internal::LengthMod::FromIndex(size_t)':
+    /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:151:32: error: 'const struct absl::str_format_internal::LengthMod::Spec' has no member named 'value'
+    151 |     return LengthMod(kSpecs[i].value);
+    ```
+
+    GCC-13.3的版本回有此问题，按提示在文件中加以下头文件即可
+    27 | #include "absl/strings/internal/str_format/output.h"
+    +++ |+#include <cstdint>
+    28 | #include "absl/strings/string_view.h"
+
+一个可编译的配置如下：
+
+Pre-requisites:
+
+```sh
+sudo apt-get install -y build-essential autoconf libtool pkg-config cmake libc++-dev 
+sudo apt-get install -y libgflags-dev libgtest-dev clang golang automake make g++ libssl-dev
+```
+
+```sh
+cd grpc && mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=`pwd`/installed -DCMAKE_BUILD_TYPE=Release -DCARES_STATIC:BOOL=ON -DCARES_SHARED:BOOL=ON -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=package ..
+```

@@ -959,6 +959,13 @@ ITX-3588J，Linux sdk：
     sudo systemctl show --property=Environment docker
     ```
 
+4. snap proxy
+
+  ```sh
+  sudo snap set system proxy.http="http://username:passwd@ip:port"
+  sudo snap set system proxy.https="http://username:passwd@ip:port"
+  ```
+
 ### window
 
 1. powershell
@@ -1303,6 +1310,46 @@ ninja -C builddir
 DESTDIR=`pwd`/installed ninja install
 ```
 
+### debian
+
+参考[debian build](https://software-dl.ti.com/processor-sdk-linux/esd/AM62X/10_00_07_Debian/exports/docs/debian/Building_Debian_Image.html)
+
+1. 安装环境中的两个pip3命令要用root用户执行, 不然报toml命令找不到的错
+
+   ```sh
+   pip3 install yamllint
+   pip3 install toml-cli
+   ```
+
+   > Since the build script is run as root user, toml-cli and yamllint should also be installed with sudo for root user to be able to access it.
+
+1. 执行build时会先安装arm和aarch64 toolchain, 网络不行，建议自行安装解压到tools目录下。
+
+   ```sh
+   # download 
+   host_arch=x86_64 && wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-${host_arch}-aarch64-none-linux-gnu.tar.xz
+   host_arch=x86_64 && wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-${host_arch}-aarch64-none-linux-gnu.tar.xz 
+   # decompress
+   cd tools && tar -Jxf toolchain
+   # rm
+   rm *.tar.xz
+   ```
+
+1. build.sh里的构建rootfs时，apt无法下载，需要修改设置proxy才行
+
+  ```patch
+  @@ -81,6 +80,8 @@ mmdebstrap:
+        # Setup Apt repository preferences
+      - 'mkdir -p $1/etc/apt/preferences.d/'
+      - 'printf "Package: *\nPin: origin TexasInstruments.github.io\nPin-Priority: 1001" >> $1/etc/apt/preferences.d/ti-debpkgs'
+  +      # Setup proxy
+  +    - 'printf "Acquire::http::proxy "http://804537:foxconn168!!@10.191.131.105:3128";" >> $1/etc/apt/apt.conf.d/80proxy'
+        # Setup Kernel post-install scripts
+      - 'mkdir -p $1/etc/kernel/postinst.d/'
+      - 'echo "PWD = $PWD"'
+
+  ```
+
 ## minicom 无法输入
 
 > 发现无法回车进入到命令行模式输入命令了，通过查找资料发现关键点就在串口的配置中有个Serial port setup-->Hardware Flow Contorl选项被改成了Yes，这样就造成了键盘没有用了，接受不了任何输入。
@@ -1311,3 +1358,6 @@ DESTDIR=`pwd`/installed ninja install
 (2)进入Serial port setup界面
 (3)时F - Hardware Flow Contorl项为Yes，按下F键就修改为No了，即关闭硬件流控，回车回到上级菜单
 (4)选择| Save setup as dfl |，然后选择 Exit from Minicom  重启minicom,这样就可以输入命令了。
+
+
+
