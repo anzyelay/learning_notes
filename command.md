@@ -82,8 +82,13 @@
     - 也可以指定一个pc文件名加上其全路径。
 
     ```sh
-
     gcc -o test test.c `pkg-config --cflags --libs gtk+-3.0`
+    ```
+
+    在makefile中添加搜索路径要像如下添加：
+
+    ```sh
+    export PKG_CONFIG_PATH=$(PWD)/../lib/pkgconfig:$(shell printenv PKG_CONFIG_PATH)
     ```
 
 1. 命令行行为

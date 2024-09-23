@@ -143,6 +143,40 @@ options:
    # hw_proto_path = /absolute/path/to/
    get_filename_component(hw_proto_path "${hw_proto}" PATH)
    ```
+  
+1. 使用`pkg-config`配置第三方库和头文件
+
+   假设有一个名为/usr/local/Cellar/glew/2.1.0_1/lib/pkgconfig/glew.pc的文件。则在cmakelist中可如下写法：
+  
+   ```cmake
+   set(ENV{PKG_CONFIG_PATH} "/usr/local/Cellar/glew/2.1.0_1/lib/pkgconfig")
+   find_package(PkgConfig)
+   # GLEW是变量名，后面XXX_INCLUDE_DIRS, XXX_LIBRARIES等都是以其为前缀
+   pkg_search_module(GLEW REQUIRED glew)    
+   MESSAGE(STATUS "glew dirs:" ${GLEW_INCLUDE_DIRS})
+   MESSAGE(STATUS "glew lib:" ${GLEW_LIBRARIES})
+   include_directories(${GLEW_INCLUDE_DIRS})
+   link_directories(${GLEW_LIBRARY_DIRS})
+   ... ...
+   target_link_libraries(main ${GLUT_LIBRARY} ${OPENGL_LIBRARY} ${GLEW_LIBRARIES})
+   ```
+  
+  pkg-config方式查找的名称引用如上为
+  
+  ```txt
+  GLEW_INCLUDE_DIRS 
+  GLEW_LIBRARY_DIRS
+  GLEW_LIBRARIES
+  ```
+
+  如果是使用`find_package()`方式，则为
+
+  ```txt
+  GLEW_INCLUDE_DIR
+  GLEW_LIBRARY_DIR
+  GLEW_LIBRARY
+  ```
+
 
 ## Cross Compiling With CMake
 
