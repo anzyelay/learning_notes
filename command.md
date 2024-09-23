@@ -56,8 +56,34 @@
 
 1. pkg-config:查找编译前置条件或依赖等
 
+    pkg-config从一个特指的metadata文件中(\<pkgname\>.pc)获取一个包的信息，示例内容如下:
+
+    ```metadata
+    # This is a comment
+    prefix=/home/hp/unst   # this defines a variable
+    exec_prefix=${prefix}  # defining another variable in terms of the first
+    libdir=${exec_prefix}/lib
+    includedir=${prefix}/include
+
+    Name: GObject                            # human-readable name
+    Description: Object/type system for GLib # human-readable description
+    Version: 1.3.1
+    URL: http://www.gtk.org
+    Requires: glib-2.0 = 1.3.1
+    Conflicts: foobar <= 4.5
+    Libs: -L${libdir} -lgobject-1.3
+    Libs.private: -lm
+    Cflags: -I${includedir}/glib-2.0 -I${libdir}/glib/include
+    ```
+
+    - 文件名构成： <pkgname\>.pc, 后缀扩展为**pc**， 文件名**pkgname**为输入给命令`pkg-config`的包名称
+    - 上述文件一般默认存放在：/usr/lib/pkgconfig, /usr/share/pkgconfig,  /usr/local/lib/pkgconfig 和 /usr/local/share/pkgconfig
+    - 文件寻找目录也可以由环境变量`PKG_CONFIG_PATH`指定，所个文件用“：”分隔（WINDOW为“；”）。
+    - 也可以指定一个pc文件名加上其全路径。
+
     ```sh
-     gcc -o test test.c `pkg-config gtk+-3.0 --cflags --libs`
+
+    gcc -o test test.c `pkg-config --cflags --libs gtk+-3.0`
     ```
 
 1. 命令行行为
