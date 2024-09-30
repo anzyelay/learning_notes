@@ -107,11 +107,13 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
       1. 每一个指令都会在镜像上创建一个新的层，每一个指令的前缀都必须是大写的。
       2. 第一条FROM，指定使用哪个镜像源
       3. **RUN** 指令告诉docker 在镜像内执行命令，安装了什么。。。
-      4. **WORKDIR**: 指示登录后的目录所在
-      5. **CMD**:启动容器后提供默认执行的命令,会被`docker run`命令中给出的参数所覆盖, 最后一个有效
-      6. **ENTRYPOINT**: 用于定义容器启动时要执行的命令或程序, 与**CMD**不同，不会被`docker run`命令中给出的参数所覆盖, 相反，这些参数会被作为ENTRYPOINT命令的参数传递给容器, 最后一个有效
+      4. **WORKDIR**: 指示Dockerfile中后续RUN， CMD， ENTRYPOINT， COPY和ADD指令执行时的目录所在
+      5. **CMD**:启动容器后提供默认执行的命令,会被`docker run`命令中给出的参数所覆盖。 多个CMD时最后一个有效, 
+      6. **ENTRYPOINT**: 用于定义容器启动时要执行的命令或程序同，相当于直接将其指令append到`docker run <image>`后面, 与**CMD**不同，不会被`docker run`命令中给出的参数所覆盖, 相反，这些参数会被作为传递给ENTRYPOINT命令apppend的参数。多个ENTRYPOINT时最后一个有效, 可以使用`docker run --entrypoint`覆盖创建时的ENTRYPOINT
+      7. **ENV**: 环境变量设置生效不只在dockerfile中，后续创建的容器也生效
+      8. **ARG**: 环境变量只在dockerfile中有效，后续创建容器无效
 
-1. 设置镜像标签: `docker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]`
+2. 设置镜像标签: `docker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]`
 
     eg: 镜像id为860c279d2fec多了一个dev的tag
 
@@ -271,7 +273,7 @@ CMD     /usr/sbin/sshd -D
         RUN cd /tmp && chmod +x run.sh && run.sh && rm run.sh
         ```
 
-    - 在Docker镜像中创建一个用户，我们可以在Dockerfile使用`ARG`, `RUN`和 `USER` 指令达成目的:
+    - 在Docker镜像中创建一个用户，我们可以在Dockerfile使用`ARG`指定变量, `RUN`和 `USER` 指令达成目的:
 
         ```sh
         FROM alpine:latest
@@ -283,6 +285,21 @@ CMD     /usr/sbin/sshd -D
 
         在创建时也可以方便的修改用户名:
         `$ docker build --build-arg DOCKER_USER=baeldung -t dynamicuser .`
+
+        有一些默认的`ARG`变量设置代理如下：
+
+        ```sh
+        HTTP_PROXY
+        http_proxy
+        HTTPS_PROXY
+        https_proxy
+        FTP_PROXY
+        ftp_proxy
+        NO_PROXY
+        no_proxy
+        ALL_PROXY
+        all_proxy
+        ```
 
     - path里面的所有内容在创建时都要发送给docker daemon,所以不要放太多无关的文件在path目录下，不然影响创建效率
 
@@ -430,3 +447,29 @@ CMD     /usr/sbin/sshd -D
             docker exec -it -u $(whoami) "$target" /bin/bash
     fi
    ```
+
+   - **localtime**映射的问题，由于localtime是一个软链接，映射到docker里面后会改变UTC内容，导致设置环境变量TZ后运行命令（如：`TZ=UTC date`）时得不到正确结果，因此不建议这么做，可以在DockerfileL中加入`ENV TZ=Asia/Shanghai`来更改docker中的时区
+
+1. Running a multi-line script
+
+    ```sh
+    # syntax=docker/dockerfile:1
+    FROM debian
+    RUN <<EOT bash
+    set -ex
+    apt-get update
+    apt-get install -y vim
+    EOT
+    ```
+
+1. 创建脚本文件
+
+    ```sh
+    # syntax=docker/dockerfile:1
+    FROM alpine
+    ARG FOO=bar
+    COPY <<-EOT /script.sh
+    echo "hello ${FOO}"
+    EOT
+    ENTRYPOINT ash /script.sh
+    ```
