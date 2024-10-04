@@ -425,7 +425,9 @@ we need copies of executables that can be run natively.
     #include_next 导致 cstdlib:fatal error:stdlib.h :No such file or directiry
     ```
 
-    按后面Pre-requisites要求安装需要的包
+  - 使用`-DCMAKE_NO_SYSTEM_FROM_IMPORTED=1`可解决。
+
+  - 使用CMAKE_TOOLCHAIN_FILE配置的方式可解决
 
 - 问题4： boringssl库代码在此环境下编译有问题
 
@@ -460,7 +462,7 @@ we need copies of executables that can be run natively.
         |   ^~
     /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:176:5: error: 'Id' does not name a type
     176 |     Id value;
-        |     ^~
+        |     ^-DCMAKE_BUILD_TYPE=Release -DCARES_STATIC:BOOL=ON -DCARES_SHARED:BOOL=ON -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=package ..~
     /working_dir/grpc-1.27.0/grpc/third_party/abseil-cpp/absl/strings/internal/str_format/extension.h:182:24: error: expected ')' before 'id'
     182 |   explicit LengthMod(Id id) : id_(id) {}
         |                     ~  ^~~
@@ -497,5 +499,5 @@ sudo apt-get install -y libgflags-dev libgtest-dev clang golang automake make g+
 ```sh
 cd grpc && mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=`pwd`/installed -DCMAKE_BUILD_TYPE=Release -DCARES_STATIC:BOOL=ON -DCARES_SHARED:BOOL=ON -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=package ..
+cmake -DCMAKE_INSTALL_PREFIX=`pwd`/installed -DCMAKE_BUILD_TYPE=Release -DCARES_STATIC:BOOL=ON -DCARES_SHARED:BOOL=ON -DgRPC_SSL_PROVIDER=package -DgRPC_ZLIB_PROVIDER=package -DCMAKE_NO_SYSTEM_FROM_IMPORTED=1 ..
 ```
