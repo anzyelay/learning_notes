@@ -226,9 +226,14 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
     b -. X .-> h
     ```
 
-2. 应用其它分支的某个commit
+1. 应用其它分支的某个commit
 
     ```sh
     git cherry-pick commits -e # -e[dit] 是重新编辑commit
     ```
 
+1. 删除本地存在但远程已删除的分支
+
+   ```sh
+   git remote prune origin
+   ```
