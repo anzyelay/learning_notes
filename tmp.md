@@ -1350,6 +1350,18 @@ DESTDIR=`pwd`/installed ninja install
 
   ```
 
+### yocto
+
+|file | description|
+|-|-|
+*.bbclass | classes目录中存放的bblcass文件，append to BBPATH
+layer.conf | We have a conf and classes directory, append to BBPATH, 配置了BBFILES的属性，包涵的文件， 依赖关系等
+recipes-* | 目录中存放*.bb或bbappend文件
+*.bb | recipes files
+*.bbappend | recipes files
+
+- 编译出的image在目录**deploy-ti**下
+
 ## minicom 无法输入
 
 > 发现无法回车进入到命令行模式输入命令了，通过查找资料发现关键点就在串口的配置中有个Serial port setup-->Hardware Flow Contorl选项被改成了Yes，这样就造成了键盘没有用了，接受不了任何输入。

@@ -432,7 +432,8 @@ CMD     /usr/sbin/sshd -D
             docker run --init -it --net=host \
                     -e USER_ID=$(id -u) -e USER_NAME=$(id -un) -e GROUP_ID=$(id -g) -e GROUP_NAME=$(id -gn) \
                     -e HOME_PATH=$HOME \
-                    -v $HOME:$HOME -v /etc/localtime:/etc/localtime $mount_dir \
+                    -e TZ=Asia/Shanghai \
+                    -v $HOME:$HOME $mount_dir \
                     --name "$target" "$target_image$([ -z $image_ver ] || echo :$image_ver)" /bin/bash
     else
             echo "Container $target exist"
@@ -448,7 +449,7 @@ CMD     /usr/sbin/sshd -D
     fi
    ```
 
-   - **localtime**映射的问题，由于localtime是一个软链接，映射到docker里面后会改变UTC内容，导致设置环境变量TZ后运行命令（如：`TZ=UTC date`）时得不到正确结果，因此不建议这么做，可以在DockerfileL中加入`ENV TZ=Asia/Shanghai`来更改docker中的时区
+   - **localtime**映射的问题，由于localtime是一个软链接，映射到docker里面后会改变UTC内容，导致设置环境变量TZ后运行命令（如：`TZ=UTC date`）时得不到正确结果，因此不建议这么做，可以在DockerfileL中加入`ENV TZ=Asia/Shanghai`来更改docker中的时区, 或者使用-e指定
 
 1. Running a multi-line script
 
