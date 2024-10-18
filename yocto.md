@@ -7,6 +7,10 @@
 1. 标准目标文件系统的路径变量和构建过程的变量定义的文件所在(Standard target filesystem paths)
 
    - sources/oe-core/meta/conf/bitbake.conf
+  
+1. 常见错误和警告参考文档
+
+   - https://docs.yoctoproject.org/ref-manual/qa-checks.html
 
 ## yocto
 
@@ -33,10 +37,16 @@ bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说�
 
   - PROVIDES：主要是为了起别名
 
-- 加调试信息：
-  - bbnote
-  - bbwarn
-  - bbfatal
+- 在BB中加调试信息：
+  - bbnote：用来打印
+  - bbwarn：用来打印
+  - bbfatal：用来打印
+  - eval:用来执行语句
+  
+  ```bb
+    bbnote ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}' --target test -- ${EXTRA_OECMAKE_BUILD}
+    eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}' --target test -- ${EXTRA_OECMAKE_BUILD}
+  ```
 
 ### 编译的情况
 
@@ -149,3 +159,117 @@ bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说�
     1. 可针对某个recipe寻找变量信息
 
        `bitbake -e recipe-name | grep -e '\bKERNEL_VERSION\b'`
+
+### [从基础出发构建自己的recipes](https://wiki.yoctoproject.org/wiki/Building_your_own_recipes_from_first_principles)
+
+1. Build an example package based on a git repository commit
+1. Build an example package based on a remote source archive
+1. Build an example package based on a local source archive
+
+  ```sh
+  # 前提：
+  # 1. 假设bb文件所以:   yocto/poky-jethro-14.0.0/meta-example/recipes-example/bbexample/bbexample-lt_1.0.bb
+  # 2. 假设包所在：      yocto/poky-jethro-14.0.0/meta-example/recipes-example/bbexample/bbexample-lt-1.0/bbexample-v1.0.tar.gz
+  
+  # 指定本地包
+  SRC_URI = "file://bbexample-${PV}.tar.gz"
+  # 指定bitbake搜索路径, 使用_prepend会报new bitbake不兼营错误
+  FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}-${PV}:"
+  # 确保构建的源目录与tarball中的目录结构匹配, 即跟压缩包中的目录名一样
+  S = "${WORKDIR}/bbexample-${PV}"
+
+  ```
+
+   1. Make sure our source directory (for the build) matches the directory structure in the tarball
+   2. We provide a search path to ensure bitbake can find the archive
+   3. There is no SRC_REV here or check-sum for the local archive.
+  
+
+
+### 修改kernel使用本地文件
+
+新建目录，在其中新建对应内核的bb的bbapend文件。内容如下
+
+1. 如果内核编译的recipe为`linux-ti-staging_6.6.bb`，则在自己目录下新建`recipes-kernel`目录，下放`files`目录和`linux-ti-staging_6.6.bbappend`文件,
+内核代码linux-6.6放到files目录下。
+
+  ```sh
+  ti_yocto$ tree sources/meta-demo/recipes-kernel/linux/  -L 2
+  sources/meta-demo/recipes-kernel/linux/
+  ├── files
+  │   └── linux-6.6
+  └── linux-ti-staging_6.6.bbappend
+
+  2 directories, 1 file
+  ```
+
+1. linux-ti-staging_6.6.bbapend内容如下，将files加到搜寻目录变量中去，以便可以找到, "**:**"不要丢，跟PATH变量一样以“:”分隔追加的
+
+  ```sh
+  FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
+  ```
+
+1. 修改linux-ti-staging_6.6.bb, 也可以bbappend中修改它， 一定要将**S**的名字改成与**SRC_URL**一致的名称，否则没有链接过去，编译报错
+
+  ```sh
+
+  S = "${WORKDIR}/linux-6.6"
+
+  SRC_URI += "file://linux-6.6"
+  ```
+
+### CMAKE的使用
+
+示例`powervr-graphics_5.11.1.bb`内容如下：
+
+```bb
+PR = "r0"
+
+DESCRIPTION = "Imagination PowerVR SDK binaries/examples"
+HOMEPAGE = "https://docs.imgtec.com"
+
+COMPATIBLE_MACHINE = "am62xx|am62pxx"
+
+SRC_URI = " \
+    gitsm://github.com/powervr-graphics/Native_SDK.git;protocol=https;branch=${BRANCH} \
+    file://0001-PATCH-use-library-so-names-for-linking.patch \
+"
+
+BRANCH = "master"
+SRCREV = "3576dbd5c651c4c92517af83dbd9fdf394a16b22"
+
+LICENSE = "MIT"
+LIC_FILES_CHKSUM = "file://LICENSE.md;md5=402476d9302b00251cc699d23264b191"
+
+S = "${WORKDIR}/git"
+SRC_DIR = "arm"
+SRC_DIR:k3 = "armv8_64"
+
+inherit cmake pkgconfig
+
+export http_proxy
+export https_proxy
+
+EXTRA_OECMAKE += " -DPVR_WINDOW_SYSTEM=Wayland -DCMAKE_LIBRARY_PATH= -DPVR_BUILD_OPENGLES_EXAMPLES=On -DPVR_BUILD_VULKAN_EXAMPLES=Off"
+
+do_install () {
+    CP_ARGS="-Prf --preserve=mode,timestamps --no-preserve=ownership"
+
+    install -d ${D}${bindir}/SGX/demos/Wayland/
+
+    cp ${CP_ARGS} ${WORKDIR}/build/bin/Assets_OpenGLESSkinning ${D}${bindir}/SGX/demos/Wayland/
+    cp ${CP_ARGS} ${WORKDIR}/build/bin/OpenGLESSkinning ${D}${bindir}/SGX/demos/Wayland/
+
+    cp ${CP_ARGS} ${WORKDIR}/build/bin/Assets_OpenGLESBinaryShaders ${D}${bindir}/SGX/demos/Wayland/
+    cp ${CP_ARGS} ${WORKDIR}/build/bin/OpenGLESBinaryShaders ${D}${bindir}/SGX/demos/Wayland/
+}
+
+DEPENDS = "wayland wayland-native wayland-protocols"
+RDEPENDS:${PN} = "wayland libegl wayland-protocols"
+
+FILES:${PN} += " \
+    /opt/img-powervr-sdk/* \
+    ${bindir}/SGX/demos/Wayland/* \
+"
+
+```

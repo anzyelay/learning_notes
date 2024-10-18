@@ -1362,6 +1362,46 @@ recipes-* | 目录中存放*.bb或bbappend文件
 
 - 编译出的image在目录**deploy-ti**下
 
+- bb中写注释一定要顶行的**#**字符才起作用
+
+yocto 
+
+bbclass类型文件 c++类型，使用`inherit bbclassname`引入，bbclassname即为bbclass文件不带后缀的名字
+bb文件类似一个bbclass实例，里面可以继承重载bbclass方法`do_configure, do_compile, do_install`等，可以用`xxx.inc`引用xxx文件变量，
+每一个方法都可以在其后加 **":suffix"** 后缀修饰动作如 `do_confiure:append ()`, 这些后缀有如下动作
+
+- prepend: 在当前任务中前插动作
+- append: 在当前任务中后缀动作
+
+插入任务`do_run_xxx`
+
+```bb
+addtask do_run_xxx before do_run_test after do_compile
+```
+
+
+##### error
+
+1. 报“Files/directories were installed but not shipped in any package”
+
+```sh
+ERROR: grpc-1.27.0-1.0-r0 do_package: QA Issue: grpc-1.27.0: Files/directories were installed but not shipped in any package:
+  /usr/share
+  /usr/share/grpc
+  /usr/share/grpc/roots.pem
+Please set FILES such that these items are packaged. Alternatively if they are unneeded, avoid installing them or delete them within do_install.
+grpc-1.27.0: 3 installed and not shipped files. [installed-vs-shipped]
+ERROR: grpc-1.27.0-1.0-r0 do_package: Fatal QA errors were found, failing task.
+ERROR: Logfile of failure stored in: /working_dir/build/arago-tmp-default-glibc/work/aarch64-oe-linux/grpc-1.27.0/1.0/temp/log.do_package.39231
+ERROR: Task (/working_dir/sources/meta-foxconn/recipes-grpc/grpc/grpc-1.27.0.bb:do_package) failed with exit code '1'
+```
+
+  错误说明下方的文件没有被打包，可以在`FILES`变量中加入这些文件，比如 
+
+  `FILES:{PN} += "${datadir}"`
+
+  为什么share目录是datadir?可以参考“sources/oe-core/meta/conf/bitbake.conf”中的变量查找
+
 ## minicom 无法输入
 
 > 发现无法回车进入到命令行模式输入命令了，通过查找资料发现关键点就在串口的配置中有个Serial port setup-->Hardware Flow Contorl选项被改成了Yes，这样就造成了键盘没有用了，接受不了任何输入。
