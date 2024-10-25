@@ -197,11 +197,44 @@ options:
         - 动态库 **libmylib** 安装到${CMAKE_INSTALL_PREFIX}/lib 目录
         - 静态库 **libmystaticlib** 安装到${CMAKE_INSTALL_PREFIX}/libstatic 目录
 
-   1. 普通文件安装
+   1. 普通文件安装, 可用于安装一般文件，并可以指定访问权限，文件名是此指令所在路径下的相对路径。默认权限为：OWNER_WRITE, OWNER_READ,GROUP_READ,和 WORLD_READ，即 644 权限。
 
-   ```cmake
+      ```cmake
+      INSTALL(FILES files... DESTINATION <dir>
+          [PERMISSIONS permissions...]
+          [CONFIGURATIONS [Debug|Release|...]]
+          [COMPONENT <component>]
+          [RENAME <name>] [OPTIONAL])
+      ```
 
-   ```
+   1. 非目标文件的可执行程序安装(比如脚本之类),跟上面的 FILES 指令使用方法一样，唯一的不同是安装后权限为:OWNER_EXECUTE, GROUP_EXECUTE, 和 WORLD_EXECUTE，即 755 权限
+
+      ```cmake
+      INSTALL(PROGRAMS files... DESTINATION <dir>
+      [PERMISSIONS permissions...]
+      [CONFIGURATIONS [Debug|Release|...]]
+      [COMPONENT <component>]
+      [RENAME <name>] [OPTIONAL])
+      ```
+
+   1. 目录的安装
+
+      ```cmake
+      INSTALL(DIRECTORY dirs... DESTINATION <dir>
+      [FILE_PERMISSIONS permissions...]
+      [DIRECTORY_PERMISSIONS permissions...]
+      [USE_SOURCE_PERMISSIONS]
+      [CONFIGURATIONS [Debug|Release|...]]
+      [COMPONENT <component>]
+      [[PATTERN <pattern> | REGEX <regex>]
+      [EXCLUDE] [PERMISSIONS permissions...]] [...])
+      ```
+
+      - **DIRECTORY**后面连接的是所在**Source**目录的相对路径，但务必注意："abc"和 "abc/"有很大的区别。如果目录名不以"/"结尾，那么这个目录将被安装为目标路径下的abc，如果目录名以/结尾，
+代表将这个目录中的内容安装到目标路径，但不包括这个目录本身.
+      - PATTERN用于使用正则表达式进行过滤
+      - PERMISSIONS 用于指定 PATTERN 过滤后的文件权限
+  
 
 ## Cross Compiling With CMake
 
