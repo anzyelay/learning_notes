@@ -149,6 +149,7 @@ xxx-gdb/gcc/gdbserver | 对应设备的gdb/gcc/gdbserver，编译时需加上-g�
 - `adb pull device_path local_file`: 下载文件
 - `adb shell [cmd]`: 登录设备shell或在dev上执行的命令
 - `adb forward LOCAL REMOTE`:转发本地socket与设备上的socket通信的服务，local和remote可用tcp:\<port\>形式，如`adb forward tcp:9090 tcp:9090`
+- `adb tcpip PORT`: 设置adbd监听端口,启动adbd的tcp连接服务，如`adb tcpip 5555`，之后可以通过网络ip:port连接设备，如`adb connect 192.168.1.1:5555`，然后`adb devices -l`查看设备状态，adb shell登录设备。
 
 #### 注意要点
 
