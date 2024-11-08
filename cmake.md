@@ -232,9 +232,19 @@ options:
 
       - **DIRECTORY**后面连接的是所在**Source**目录的相对路径，但务必注意："abc"和 "abc/"有很大的区别。如果目录名不以"/"结尾，那么这个目录将被安装为目标路径下的abc，如果目录名以/结尾，
 代表将这个目录中的内容安装到目标路径，但不包括这个目录本身.
+      - **USE_SOURCE_PERMISSIONS**表示使用源文件目录中文件的权限
       - PATTERN用于使用正则表达式进行过滤
-      - PERMISSIONS 用于指定 PATTERN 过滤后的文件权限
+      - PERMISSIONS 用于指定 PATTERN 过滤后的文件权限, 
   
+      eg: 这将为所有 ".sh" 脚本文件设置读、写和执行权限
+
+      ```cmake
+      install(DIRECTORY data/icons DESTINATION share/myproject
+            PATTERN "*.sh"
+            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+            GROUP_READ GROUP_EXECUTE
+            WORLD_READ WORLD_EXECUTE)
+      ```
 
 ## Cross Compiling With CMake
 

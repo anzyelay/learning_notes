@@ -274,3 +274,20 @@ FILES:${PN} += " \
 "
 
 ```
+
+### systemd
+
+添加systemd服务和自动启动
+
+```sh
+
+S = "${WORKDIR}/${BPN}"
+
+SRC_URI = " file://pvr.service "
+
+inherit systemd
+
+SYSTEMD_SERVICE:${PN} = "pvr.service"
+SYSTEMD_AUTO_ENABLE:${PN} = "enable"
+
+```
