@@ -277,7 +277,7 @@ FILES:${PN} += " \
 
 ### systemd
 
-添加systemd服务和自动启动
+添加systemd服务和自动启动, 参考wpa-supplicant
 
 ```sh
 
@@ -286,6 +286,32 @@ S = "${WORKDIR}/${BPN}"
 SRC_URI = " file://pvr.service "
 
 inherit systemd
+
+do_install () {
+
+	install -d ${D}/${sysconfdir}/dbus-1/system.d
+	install -m 644 ${S}/wpa_supplicant/dbus/dbus-wpa_supplicant.conf ${D}/${sysconfdir}/dbus-1/system.d
+	install -d ${D}/${datadir}/dbus-1/system-services
+	install -m 644 ${S}/wpa_supplicant/dbus/*.service ${D}/${datadir}/dbus-1/system-services
+
+	if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
+		install -d ${D}/${systemd_system_unitdir}
+		install -m 644 ${S}/wpa_supplicant/systemd/*.service ${D}/${systemd_system_unitdir}
+	fi
+
+	install -d ${D}/etc/default/volatiles
+	install -m 0644 ${WORKDIR}/99_wpa_supplicant ${D}/etc/default/volatiles
+
+	install -d ${D}${includedir}
+	install -m 0644 ${S}/src/common/wpa_ctrl.h ${D}${includedir}
+
+	if [ -z "${DISABLE_STATIC}" ]; then
+		install -d ${D}${libdir}
+		install -m 0644 wpa_supplicant/libwpa_client.a ${D}${libdir}
+	fi
+}
+
+FILES:${PN} += "${datadir}/dbus-1/system-services/* ${systemd_system_unitdir}/*"
 
 SYSTEMD_SERVICE:${PN} = "pvr.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"

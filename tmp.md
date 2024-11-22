@@ -1411,5 +1411,116 @@ ERROR: Task (/working_dir/sources/meta-foxconn/recipes-grpc/grpc/grpc-1.27.0.bb:
 (3)时F - Hardware Flow Contorl项为Yes，按下F键就修改为No了，即关闭硬件流控，回车回到上级菜单
 (4)选择| Save setup as dfl |，然后选择 Exit from Minicom  重启minicom,这样就可以输入命令了。
 
+-------
 
+# kernel debug
+
+1. 反向编译设备树文件： `dtc -I dtb -O dts k3-am625-<boardname>.dtb -o <boardname>-reversed.dts`
+   
+2. dmesg中内核打印信息
+
+  ```sh
+  [time] am65-cpsw-nuss 8000000.ethernet: Use random MAC address
+  ```
+
+  am65-cpsw-nuss说的是哪个模块，8000000.ethernet是哪个设备，模块在文件夹`/drivers/net/ethernet/ti/`下，设备在`/arch/arm64/boot/dts/`下
+  模块对应的文件是`am65-cpsw-nuss.c`
+
+1. TI MAC TO MAC [参考文档](https://www.ticom/cn/lit/an/zhcaae4/zhcaae4.pdf?ts=1623414228626)
+
+1. 在TI AM62X中实现mac to mac的转发，需要配置`am65-cpsw-nuss`模块的`mac_to_mac`属性为`1`，在`am65-cpsw-nuss.dtsi`文件中添加如下配置：
+
+  将mdio接口导出到sysfs中，这样就可以通过sysfs来配置mdio接口的寄存器了。
+
+  ```c
+  &mdio {
+          compatible = "ti,mdio-gmii";
+          ti,mdio-mux-phy-mode = "mdio-gmii";
+          ti,mdio-mux-slave-id = <0>; // 0: MDIO slave 0, 1: MDIO slave 1
+          ti,mdio-mux-slave-addr = <0>; // MDIO slave address
+          ti,mdio-mux-slave-addr-mask = <0>; // MDIO slave address mask
+          ti,mdio-mux-master-addr = <0>; // MDIO master address
+
+          // Export MDIO interface to sysfs
+          mdio-export = <1>;
+  };
+  ```
+
+  在`am65-cpsw-nuss.c`文件中添加如下配置：
+
+  ```c
+  static int am65_cpsw_nuss_probe(struct platform_device *pdev)
+  {
+          struct am65_cpsw_nuss *priv;
+          struct resource *res;
+          int ret;
+
+          priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+          if (!priv)
+                  return -ENOMEM;
+
+          platform_set_drvdata(pdev, priv);
+
+
+          res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+          priv->base = devm_ioremap_resource(&pdev->dev, res);
+          if (IS_ERR(priv->base))
+                  return PTR_ERR(priv->base);
+
+          // Export MDIO interface to sysfs
+          priv->mdio_export = devm_of_property_read_bool(&pdev->dev, "mdio-export");
+          if (priv->mdio_export) {
+                  priv->mdio_bus = devm_mdio_bus_alloc_data(&pdev->dev, priv);
+                  if (IS_ERR(priv->mdio_bus))
+                          return PTR_ERR(priv->mdio_bus);
+
+                  priv->mdio_bus->name = "am65-cpsw-nuss-mdio";
+                  priv->mdio_bus->priv = priv;
+                  priv->mdio_bus->read = am65_cpsw_nuss_mdio_read;
+                  priv->mdio_bus->write = am65_cpsw_nuss_mdio_write;
+
+                  ret = devm_mdio_bus_register(&pdev->dev, priv->mdio_bus);
+                  if (ret)
+                          return ret;
+          }
+
+          return 0;
+  }
+
+  static int am65_cpsw_nuss_remove(struct platform_device *pdev)
+  {
+          struct am65_cpsw_nuss_priv *priv = platform_get_drvdata(pdev);
+
+          if (priv->mdio_export)
+                  devm_mdio_bus_unregister(&pdev->dev, priv->mdio_bus);
+
+          return 0;
+  }
+
+  static const struct of_device_id am65_cpsw_nuss_of_match[] = {
+
+          { .compatible = "ti,am65-cpsw-nuss", },
+          { },
+  };
+  MODULE_DEVICE_TABLE(of, am65_cpsw_nuss_of_match);
+
+  static struct platform_driver am65_cpsw_nuss_driver = {
+          .driver = {
+                  .name = "am65-cpsw-nuss",
+                  .of_match_table = am65_cpsw_nuss_of_match,
+          },
+          .probe = am65_cpsw_nuss_probe,
+          .remove = am65_cpsw_nuss_remove,
+  };
+
+  module_platform_driver(am65_cpsw_nuss_driver);
+
+  MODULE_AUTHOR("Texas Instruments");
+  MODULE_DESCRIPTION("AM65 CPSW Nuss MDIO driver");
+  MODULE_LICENSE("GPL v2");
+
+  
+  }
+
+  
 
