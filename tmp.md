@@ -1430,7 +1430,32 @@ ERROR: Task (/working_dir/sources/meta-foxconn/recipes-grpc/grpc/grpc-1.27.0.bb:
 
 1. 在TI AM62X中实现mac to mac的转发，需要配置`am65-cpsw-nuss`模块的`mac_to_mac`属性为`1`，在`am65-cpsw-nuss.dtsi`文件中添加如下配置：
 
-  将mdio接口导出到sysfs中，这样就可以通过sysfs来配置mdio接口的寄存器了。
+   1. 如果只有一个PHY， 可以去掉 MDIO 的配置， 如果其它PHY用到了，则不去：
+
+     ```c
+       // &davinci_mdio {
+        // phy0: ethernet-phy@0 {
+        // reg = <0>;
+        // ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+        // ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_4_B_NIB>;
+        // };
+      // };
+     ```
+
+    1. CPSW PORT 的配置去掉 PHY， 增加fixed-link配置， 添加 mac_to_mac 属性：
+
+    ```c
+    &cpsw_port1 {
+      phy-mode = "rgmii-rxid";
+      fixed-link {
+          speed = <1000>;
+          full-duplex;
+      };
+      // phy-handle = <&phy0>;
+    };
+    ```
+
+1. 将mdio接口导出到sysfs中，这样就可以通过sysfs来配置mdio接口的寄存器了。
 
   ```c
   &mdio {
@@ -1524,3 +1549,14 @@ ERROR: Task (/working_dir/sources/meta-foxconn/recipes-grpc/grpc/grpc-1.27.0.bb:
 
   
 
+## ipk 解压缩
+
+```sh
+mkdir /tmp/pluginname
+cd /tmp/pluginname
+ar -x plugin.ipk 
+mkdir ./CONTROL
+## je nach Komprimierungsmethode mit z, j oder J dekomprimieren, bei den alten .ipk's meist mit z
+tar vxzf control.tar.gz -C ./CONTROL
+tar vxzf data.tar.gz  -C ./
+```
