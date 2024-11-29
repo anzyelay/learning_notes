@@ -1546,17 +1546,53 @@ ERROR: Task (/working_dir/sources/meta-foxconn/recipes-grpc/grpc/grpc-1.27.0.bb:
 
   
   }
+```
 
-  
+1. `DEVICE_ATTR`的宏定义: 内核驱动与文件系统的交互
 
-## ipk 解压缩
+  >> DEVICE_ATTR是Linux内核中用于声明设备属性文件的一个宏，它定义在<linux/device.h>头文件中。通过DEVICE_ATTR，可以在sys文件系统（sysfs）中自动创建文件，这些文件代表了设备的属性。用户空间的应用程序可以通过标准的文件操作（如cat和echo命令）来读取和写入这些属性文件，从而实现与内核驱动的交互。
+
+  ```c
+  static DEVICE_ATTR(my_device_test, S_IWUSR | S_IRUSR, show_my_device, set_my_device); // my_device_test是属性文件名，S_IWUSR | S_IRUSR是文件权限，show_my_device和set_my_device是读取和写入属性文件的回调函数。
+  static ssize_t show_my_device(struct device *dev, struct device_attribute *attr, char *buf)
+  {
+      // 实现读取数据的逻辑，并将结果存储在buf中
+      return sprintf(buf, "%s\n", "some_data");
+  }
+
+  static ssize_t set_my_device(struct device *dev, struct device_attribute *attr, const char *buf, size_t len)
+  {
+      // 实现写入数据的逻辑
+      // 例如，将buf中的数据保存到某个变量中
+      return len; // 返回写入的字节数
+  }
+  // 在probe函数中添加以下代码：
+  device_create_file(&pdev->dev, &dev_attr_my_device_test);
+  // 在remove函数中添加以下代码：
+  device_remove_file(&pdev->dev, &dev_attr_my_device_test);
+  ```
+
+  还有`DEVICE_ATTR_RO`
+
+  ```c
+  static ssize_t phy_state_show(struct device *dev, struct device_attribute *attr, char *buf)
+  {
+    struct phy_device *phydev = to_phy_device(dev);
+    return sprintf(buf, "0x%.8lx\n", (unsigned long)phydev->phy_id);
+  }
+  static DEVICE_ATTR_RO(phy_state);
+
+  ```
+
+-----
+
+## ipk包的解压缩
 
 ```sh
 mkdir /tmp/pluginname
 cd /tmp/pluginname
 ar -x plugin.ipk 
 mkdir ./CONTROL
-## je nach Komprimierungsmethode mit z, j oder J dekomprimieren, bei den alten .ipk's meist mit z
 tar vxzf control.tar.gz -C ./CONTROL
 tar vxzf data.tar.gz  -C ./
 ```

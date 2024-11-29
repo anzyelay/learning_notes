@@ -238,7 +238,7 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
    git remote prune origin
    ```
 
-1. 克隆空的仓库
+1. 克隆基仓库
 
     ```sh
     git -c gc.autoDetach=false -c core.pager=cat -c safe.bareRepository=all clone --bare --mirror https://git.ti.com/git/ipc/ipc-examples.git ./downloads/git2/git.ti.com.git.ipc.ipc-examples.git --progress
