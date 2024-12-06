@@ -317,3 +317,16 @@ SYSTEMD_SERVICE:${PN} = "pvr.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 ```
+
+### 手动下载源码包
+
+先手动下载源码包，然后放到`dl`目录下， 再执行`bitbake -c fetch package`，这样就可以避免下载源码包了
+
+### 修改hostname
+
+在build/conf/local.conf中添加
+
+```sh
+#Set the hostname, the value will be written to /etc/hostname in target device
+hostname:pn-base-files = "fvt-5g-tbox"
+```
