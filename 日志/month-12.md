@@ -24,10 +24,111 @@
 3. `iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE` 设置eth1为出口
 4. `iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 80 -j DNAT --to-destination 192.168.1.1:80` 设置eth0的80端口转发到192.168.1.1的80端口
 5. `iptables -t nat -A PREROUTING -i eth1 -p tcp --dport 80 -j DNAT --to-destination 192.168.1.1:80` 设置eth1的80端口转发到192.168.1.1的80端口
-6. 如果还有一个eth2,在eth1与eth2之间，需要优先转发到eth2, 则使用命令 
+6. 如果还有一个eth2,在eth1与eth2之间，需要优先转发到eth2, 则使用命令
 
 此时发现电脑仍不通，需要设置电脑的网关。
 
 ### yocto下载包后编译仍会重新fetch的问题
 
-1. 要执行`bitbake -c package`
+1. 要执行`bitbake -c package`, 完成xxx.done文件创建
+
+## 12/9
+
+1. modemserver运行在后台时popen(cmd)指令执行无输出, 抓取SIGCHLD信号可见。
+2. modemserver需要等待grpc启动时间，测量方法
+3. 设置UART打印不suspend
+
+    ```sh
+    root@fvt-5g-tbox:/# ls /sys/module/printk/parameters/ -l
+    -rw-r--r--    1 root     root          4096 Jan  1 00:20 always_kmsg_dump
+    -rw-r--r--    1 root     root          4096 Jan  1 00:20 console_no_auto_verbose
+    -rw-r--r--    1 root     root          4096 Jan  1 00:22 console_suspend
+    -rw-r--r--    1 root     root          4096 Jan  1 00:20 ignore_loglevel
+    -rw-r--r--    1 root     root          4096 Jan  1 00:20 time
+    ```
+
+4. 解决log后续的parse来不及时已经由log service exit()了的问题
+
+## 12/10
+
+1. systemctl hostapd-ap0服务启动异常
+   1. /etc/hostapd_ap0.conf配置异常
+   2. ap0开机后有可能拉不起来，导致hostapd程序异常退出，原因未知
+
+1. 撰写《SOA》
+
+## 12/11
+
+1. modem setslot打印太多，屏蔽
+
+1. hostapd-ap0服务启动异常原因
+   1. wifi驱动是以module的形式加载，其加载是在uevent事件触发wlan设备发现事件之后，时间比较靠后，故hostapd服务启动太快而ko仍未加载成功导致ap0拉不起来
+
+1. 编写`fii-coredump.sh`
+
+    ```sh
+    #!/bin/bash
+
+    core_down()
+    {
+        sed -i '/ulimit -c 2048/culimit -c 0' /root/.bashrc
+        echo "Set off coredump"
+        echo "logout and login again to make it work"
+    }
+
+    core_up()
+    {
+        grep 'ulimit -c' /root/.bashrc >> /dev/null
+        if [ $? -eq 0 ];then
+            sed -i '/ulimit -c 0/culimit -c 2048' /root/.bashrc
+        else
+            echo "ulimit -c 2048" >> /root/.bashrc
+        fi
+        echo "/home/logs/core-%e-%p-%t" > /proc/sys/kernel/core_pattern
+        echo "Set on coredump, the coredump log will place in /home/logs"
+        echo "logout and login again to make it work"
+    }
+
+    case "$1" in
+        "up")
+                core_up
+                ;;
+        "down")
+                core_down
+                ;;
+        *)
+                echo $0 up/down
+                ;;
+    esac
+   ```
+
+1. 解决客户端无法获取dns的问题
+   1. TI板子服务端使用的是udhcpd做dhcp和dns服务，但配置文件未设置分配dns功能如下：
+
+   ```sh
+   [docker] f1339899@lhbvm176:working_dir$ cat fii-rootfs/etc/udhcpd_ap0.conf   
+    start 192.168.1.2
+    end 192.168.1.254
+    interface ap0
+    max_leases 250
+    opt router 192.168.1.1
+    option subnet 255.255.255.0
+   ```
+
+   1. 在文件中加入如下字段，则分配8.8.8.8 or 114.114.114.114给客户端：
+
+   ```sh
+   option dns 8.8.8.8,114.114.114.114
+   ```
+
+1. 协助解决GNSS tcp包问题
+
+## 12/12
+
+1. 修改cn.fii --> org.fii
+
+1. emac rx handle 计数
+
+## shcedule
+
+TODO: 休眠唤醒策略
