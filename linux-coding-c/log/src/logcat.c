@@ -110,7 +110,7 @@ static int connect_logcat_service(const char * host, int port)
 	return sock;
 }
 
-// 设置日志verbose级别，禁用日志前缀和时间戳
+// 禁用日志前缀和时间戳
 static void logcat_set_verbose(void)
 {
 	extern unsigned int log_verbose_level;
@@ -137,6 +137,7 @@ static char * get_loglevel_from_prefix(char * s, unsigned int * level)
 		case 'I': lvl = _LOG_LEVEL_INFO;     break;
 		case 'X': lvl = _LOG_LEVEL_EMERG;    break;
 		case 'E': lvl = _LOG_LEVEL_ERR;      break;
+		case 'W': lvl = _LOG_LEVEL_WARN;     break;
 		case 'V': lvl = _LOG_LEVEL_VERBOSE;  break;
 		case 'D':
 			switch (*(s+1)) {
@@ -356,32 +357,42 @@ void set_log_dir(char * dir_path)
 		return;
 	}
 	log_dir = dir_path;
-	log_info("%s: set log dir: %s\n", tag, log_dir);
+	log_debug("%s: set log dir: %s\n", tag, log_dir);
 }
 
+/**
+ * return: 0 as a service or run in block as a client until exit
+*/
 int log_run()
 {
 	setup_signals();
 
 	if (logcat_mode()){
-		log_info("log client!\n");
+		log_info("====log client====\n");
 		logcat_main();
-		return 0;
+		exit(EXIT_SUCCESS);
 	}
 
 	log_info("log server!\n");
-    start_log_service();
+	start_log_service();
+	usleep(10000);
 	return 0;
 }
 
-int log_init(int argc, char *argv[])
+int log_init(int argc, char *argv[], int (*p_parse_fun)(int, char**))
 {
-	int ret = parse_args(argc, argv);
-
+	int ret = 0;
+	ret = parse_args(argc, argv);
 	if (ret < 0){
-		log_err("parse args failed\n");
+		log_err("parse args in log parse failed\n");
 		return -1;
 	}
-	log_run();
-	return 0;
+	if (ret==0 && p_parse_fun) {
+		ret = p_parse_fun(argc, argv);
+		if (ret < 0){
+			log_debug_vv("stop from user parse func\n");
+			return ret;
+		}
+	}
+	return log_run();
 }

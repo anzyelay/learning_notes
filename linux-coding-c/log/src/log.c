@@ -125,6 +125,8 @@ static int log_color_start(char * buf, int level)
 	} else if (level & _LOG_LEVEL_ERR) {
 		ret += log_attr_set_fg_color(buf + ret, __LOG_RED);
 		ret += log_attr_set(buf + ret, __LOG_REVERSE);
+	} else if (level & _LOG_LEVEL_WARN) {
+		ret += log_attr_set_fg_color(buf + ret, __LOG_YELLOW);
 	} else if (level & _LOG_LEVEL_INFO) {
 		ret += log_attr_reset(buf + ret);
 	} else if (level & _LOG_LEVEL_VERBOSE) {
@@ -181,6 +183,8 @@ static int log_prefix(char * buf, int level, const char *func, int line)
 		prefix = "X";
 	else if (level & _LOG_LEVEL_ERR)
 		prefix = "E";
+	else if (level & _LOG_LEVEL_WARN)
+		prefix = "W";
 	else if (level & _LOG_LEVEL_INFO)
 		prefix = "I";
 	else if (level & _LOG_LEVEL_VERBOSE)
@@ -225,6 +229,8 @@ const char * log_get_extra_prefix(unsigned int level)
 		prefix = "X";
 	else if (level & _LOG_LEVEL_ERR)
 		prefix = "E";
+	else if (level & _LOG_LEVEL_WARN)
+		prefix = "W";
 	else if (level & _LOG_LEVEL_INFO)
 		prefix = "I";
 	else if (level & _LOG_LEVEL_VERBOSE)
@@ -298,7 +304,6 @@ int do_log_common(unsigned int request_level, const char *func, int line, const 
 		timestamp_start = get_timestamp_start();
 
 	// If has any log, enable the Error level
-	// 如果已有日志记录，开启错误和紧急级别的日志记录
 	if (log_verbose_level > 0)
 		log_verbose_level |= _LOG_LEVEL_ERR | _LOG_LEVEL_EMERG;
 

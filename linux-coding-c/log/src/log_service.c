@@ -280,6 +280,7 @@ static int do_logcat_service()
 	if (tmp >= 0) {
 		service_unix_sock_close(tmp);
 		log_emerg("%s: logcat service already exist.\n", tag);
+		exit(EXIT_SUCCESS);
 		return -1;
 	}
 

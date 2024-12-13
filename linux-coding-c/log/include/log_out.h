@@ -3,6 +3,7 @@
 
 #define CONFIG_BASIC_LOG_LEVEL    (_LOG_LEVEL_EMERG | \
                                    _LOG_LEVEL_ERR | \
+                                   _LOG_LEVEL_WARN | \
                                    _LOG_LEVEL_INFO | \
                                    _LOG_LEVEL_DEVICE | \
                                    _LOG_LEVEL_SYSTEM | \
@@ -27,12 +28,13 @@
 
 #define _LOG_LEVEL_EMERG          (0x1 << 0)
 #define _LOG_LEVEL_ERR            (0x1 << 1)
-#define _LOG_LEVEL_INFO           (0x1 << 2)
-#define _LOG_LEVEL_VERBOSE        (0x1 << 3)
-#define _LOG_LEVEL_DEBUG          (0x1 << 4)
-#define _LOG_LEVEL_DEBUG_V1       (0x1 << 5)
-#define _LOG_LEVEL_DEBUG_V2       (0x1 << 6)
-#define _LOG_LEVEL_DEBUG_VV       (0x1 << 7)
+#define _LOG_LEVEL_WARN           (0x1 << 2)
+#define _LOG_LEVEL_INFO           (0x1 << 3)
+#define _LOG_LEVEL_VERBOSE        (0x1 << 4)
+#define _LOG_LEVEL_DEBUG          (0x1 << 5)
+#define _LOG_LEVEL_DEBUG_V1       (0x1 << 6)
+#define _LOG_LEVEL_DEBUG_V2       (0x1 << 7)
+#define _LOG_LEVEL_DEBUG_VV       (0x1 << 8)
 
 #define _LOG_LEVEL_DEVICE         (0x1 << 9)
 #define _LOG_LEVEL_SYSTEM         (0x1 << 10)
@@ -63,6 +65,7 @@
 #define log_device(...)           do_log_common(_LOG_LEVEL_DEVICE,   FC, LN, __VA_ARGS__)
 #define log_system(...)           do_log_common(_LOG_LEVEL_SYSTEM,   FC, LN, __VA_ARGS__)
 #define log_err(...)              do_log_common(_LOG_LEVEL_ERR,      FC, LN, __VA_ARGS__)
+#define log_warn(...)             do_log_common(_LOG_LEVEL_WARN,     FC, LN, __VA_ARGS__)
 #define log_info(...)             do_log_common(_LOG_LEVEL_INFO,     FC, LN, __VA_ARGS__)
 #define log_verbose(...)          do_log_common(_LOG_LEVEL_VERBOSE,  FC, LN, __VA_ARGS__)
 #define log_debug(...)            do_log_common(_LOG_LEVEL_DEBUG,    FC, LN, __VA_ARGS__)
@@ -78,6 +81,20 @@ int do_log_common(unsigned int request_level, const char * func, int line, const
 
 void set_log_dir(char * dir_path);
 
-int log_init(int argc, char *argv[]);
+/**
+ * log_init: init the log service, you can use log_get_help_info
+ * to get the support options argv
+ * p_parse_fun: user can add self parse function to handle the args,
+ *              or give NULL do nothing.
+ *              the return val is: 0 = Ok , and the negtive return val will
+ *  			return upper to log_init directly, which stop log run
+ * Return Value:
+ *  0           - run as a log service thread, use to product logs
+ *  -1          - error parse, stop run log init
+ *  negtive val - return from p_parse_fun, defined by user
+ *  no return   - if there has a '--logcat' option ,it run as a logcat client,
+ *                block here and exit the program until the end of life or be killed
+*/
+int log_init(int argc, char *argv[], int (*p_parse_fun)(int, char**));
 
 #endif /* _LOG_OUT_H */

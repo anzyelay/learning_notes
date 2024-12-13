@@ -15,7 +15,7 @@
 static const char * me_copyright = "JBD-CAR-1. 2024.";
 // static const char * name_for_logcat = "fx-log";
 
-static const char * conf_file = "/data/mifi-cmdline.conf";
+static const char * conf_file = "/etc/tbox-cmdline.conf";
 
 static int do_save_config = 0;
 
@@ -37,6 +37,7 @@ const char * log_get_help_info(void)
 {
 	sprintf(output_buf,
 			"\t[--verbose=log-level]\n"
+			"\t[--logcat]\n"
 			"\t[--save-config] [--config-file=conf-file-path]\n"
 			"\n"
 			"\t[--log-write-file=0/1] [--logcat-service=0/1]\n"
@@ -48,7 +49,6 @@ const char * log_get_help_info(void)
 			"\n"
 			"\t[--log-dir=<log-file-dir>]\n"
 			"\n"
-			"\t[--logcat start logcat client] [host] [port]\n"
 			"\t[--logcat-file=<log-file>]\n"
 			"\t[--logcat-clear | -c ]\n"
 			"\n"
@@ -111,7 +111,7 @@ static int parse_arg_common(char * arg)
 
 	if (0) {}
 	parse_arg_xint("--verbose=",                 log_verbose_level,       0,       0xffffff)
-	// parse_arg_string("--config-file=",           conf_file,               1)
+	parse_arg_string("--config-file=",           conf_file,               1)
 	// parse_arg_int("--int-example=",           int_options,             min,     max)
 	parse_arg_xint("--log-write-file=",          has_log_file_service,    0,       1)
 	parse_arg_xint("--logcat-service=",          has_log_logcat_service,  0,       1)
@@ -157,11 +157,15 @@ static int parse_arg_common(char * arg)
 
 	return 1;
 }
-
+/*
+ * Return Value:
+ * 1 = Ok, 0 = Not found, -1 = Error Happened
+ */
 static int parse_args_once(int argc, char **argv)
 {
 	int logcat_host = 0, logcat_port = 0;
 	int ret;
+	int unfound = 0;
 
 	// if (!strcmp(me, name_for_logcat))
 	// 	set_logcat_mode();
@@ -194,12 +198,15 @@ static int parse_args_once(int argc, char **argv)
 				}
 				continue;
 			}
+			else {
+				unfound = 1;
+			}
 			// usage("Invalid option: ", argv[0]);
 			// return -1;
 		}
 	}
 
-	return 0;
+	return unfound == 1 ? 0 : 1;
 }
 
 static int read_conf_file(const char* filename, char* buf, int bytes)
@@ -249,7 +256,7 @@ int read_from_conf_file(void)
 	char buf[1024], *head, *next = buf;
 	int ret;
 
-	log_verbose("Config file: %s\n", conf_file);
+	log_debug("Config file: %s\n", conf_file);
 
 	memset(buf, 0, sizeof(buf));
 	ret = read_conf_file(conf_file, buf, sizeof(buf) - 1);
@@ -282,8 +289,13 @@ int read_from_conf_file(void)
 			next++;    // Point the next line
 		}
 
+		// skip the line begin with #
+		if (*head == '#') {
+			continue;
+		}
+
 		// Now, we got the line, parse it!
-		log_verbose("Config data: %s\n", head);
+		log_debug("Config data: %s\n", head);
 		ret = parse_arg_common(head);
 		if (ret < 0)
 			return ret;
@@ -316,16 +328,16 @@ int write_to_conf_file(void)
 
 	return 0;
 }
-
+/*
+ * Return Value:
+ * 1 = Ok, 0 = Not found, -1 = Error Happened
+ */
 int parse_args(int argc, char **argv)
 {
 	int ret;
 
 	// Save this program name
 	set_me(argv[0]);
-
-	// Set the default log dir path
-	set_default_log_dir(argv[0]);
 
 	// Set the log service name
 	set_log_service_name(me);
@@ -359,14 +371,11 @@ int parse_args(int argc, char **argv)
 	}
 
 	// Set the log dir path
-	if (NULL == log_dir)
+	if (strlen(default_log_dir) > 0)
 		set_log_dir(default_log_dir);
 
 	// Overwrite the configs with command line
 	ret = parse_args_once(argc, argv);
-	if (ret < 0)
-		return ret;
 
-	return 0;
+	return ret;
 }
-

@@ -29,6 +29,7 @@
 
 #define tag            "Log File"
 
+#define LOG_DIR        "/home/log"
 unsigned int log_file_verbose_level = CONFIG_LOG_FILE_LEVEL;// 日志文件打印级别
 long log_file_write_period = 3600 * 24;            // Write to log file every 24 hours or ERR / Emergency log issued
 static long log_file_max_number = 5;				// Maximum number of log files
@@ -36,9 +37,8 @@ static size_t log_file_max_size = (1024 * 1024 * 2);// Maximum size of each log 
 #define LOG_FILE_SN_FILENAME  "%s/%s.log.sn"
 #define LOG_FILE_FILENAME_FMT "%s/%s.%d.log"
 
-#define LOG_FILE_DIR "%s/log"
-char default_log_dir[64];		// 日志文件默认存放的目录
-char * log_dir = NULL;
+char default_log_dir[64];
+char * log_dir = LOG_DIR;
 
 const char * me = NULL;			// program name
 
@@ -75,7 +75,7 @@ void set_me(char * name)
 	log_debug("%s: set program name: %s\n", tag, me);
 }
 
-int set_default_log_dir(char * name)
+/*int set_default_log_dir(char * name)
 {
 	char tmp[64];
 
@@ -87,22 +87,50 @@ int set_default_log_dir(char * name)
 	sprintf(default_log_dir, LOG_FILE_DIR, dirname(tmp));
 	log_debug("%s: set default log dir: %s\n", tag, default_log_dir);
 	return 0;
+}*/
+
+// 递归地创建目录
+static int create_dir_recursively(const char *dir)
+{
+    char tmp[512];
+    char *p = NULL;
+
+    // 复制路径到临时变量中
+    snprintf(tmp, sizeof(tmp), "%s", dir);
+
+    // 遍历每个目录层级
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0'; // 临时终止字符串
+            // 创建目录
+            if (mkdir(tmp, 0777) < 0) {
+                if (errno != EEXIST) {
+                    fprintf(stderr, "mkdir(%s) failed, errno = %d (%s)\n", tmp, errno, strerror(errno));
+                    return -1;
+                }
+            }
+            *p = '/'; // 还原字符串
+        }
+    }
+    // 创建最后一级目录
+    if (mkdir(tmp, 0777) < 0) {
+        if (errno != EEXIST) {
+            fprintf(stderr, "mkdir(%s) failed, errno = %d (%s)\n", tmp, errno, strerror(errno));
+            return -1;
+        }
+    }
+    return 0;
 }
 
 // 创建日志目录，如果目录已经存在则不进行操作
 static int try_create_log_dir(void)
 {
-	int ret;
-
-	if(log_dir != NULL && strlen(log_dir) > 0){
-		ret = mkdir(log_dir, 0777);
-		if (ret < 0 && errno != EEXIST) {
-			log_err("%s: mkdir(%s) failed, errno = %d (%s)\n", tag, log_dir, errno, strerror(errno));
-			return -1;
-		}
-		log_debug("%s: log directory is ready: %s\n", tag, log_dir);
-	}
-	return 0;
+    if (log_dir != NULL && strlen(log_dir) > 0) {
+        if (create_dir_recursively(log_dir) < 0) {
+            return -1;
+        }
+    }
+    return 0;
 }
 
 // 初始化日志文件服务
@@ -132,6 +160,7 @@ static void log_file_service_init(void)
 	if (ret < 0)
 		goto try_get_early_log;
 	log_file_ready = 1;
+    log_debug("%s: log directory is ready: %s\n", tag, log_dir);
 
 try_get_early_log:
 	if (log_file_ready)
@@ -276,7 +305,7 @@ static void write_to_log_file(void)
 
 	while (1) {
 		bytes = pipe_read(&saved_log_pipe, buf, sizeof(buf), 0, 0);
-		log_debug_v2("%s: write file, %d bytes\n", tag, bytes);
+		log_never("%s: write file, %d bytes\n", tag, bytes);
 		if (bytes > 0) {
 			ret = write(fd, buf, bytes);
 			if (ret < 0)

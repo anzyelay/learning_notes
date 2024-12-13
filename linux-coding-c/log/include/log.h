@@ -41,7 +41,6 @@ void set_logcat_mode();
 void set_logcat_mode_host(const char * host);
 void set_logcat_mode_port(int port);
 void set_me(char * name);
-int set_default_log_dir(char * name);
 void set_log_service_name(const char * me);
 
 #ifdef __cplusplus
