@@ -30,7 +30,8 @@
 
 ### yocto下载包后编译仍会重新fetch的问题
 
-1. 要执行`bitbake -c package`, 完成xxx.done文件创建
+1. 执行build时下载包会被先清理掉了，导致重新下载
+1. 要执行`bitbake -c fetch package`, 完成xxx.done文件创建
 
 ## 12/9
 
@@ -129,6 +130,15 @@
 
 1. emac rx handle 计数
 
+## 12/13
+
+1. gpio引脚在deep sleep后的悬浮问题，确认SOC侧正常，由电路设计导致
+
+1. 指导新人编程
+
+1. 升级hostapd和wpa_supplicant。
+
 ## shcedule
 
 TODO: 休眠唤醒策略
+
