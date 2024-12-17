@@ -138,6 +138,45 @@
 
 1. 升级hostapd和wpa_supplicant。
 
+
+## 12/16
+
+1. 无法切换DFU， 直接将EMMC clk关闭，让其无法进入EMMC模式，从而进入DFU模式。短接C140即可
+1. 协助查看拔号异常，拔号时间过早，WNC拔号需要时间。
+1. 如何开启WNC的ADB调试功能
+
+    ```sh
+    root# devmem2 0x000F40c0 w 0x00010007
+
+    root# grep 6000000.gpio /sys/class/gpio/*/label
+    /sys/class/gpio/gpiochip512/lable:600000.gpio
+    root# echo $((512+47))
+    559
+    root# echo 559 > /sys/class/gpio/export
+    root# echo out > /sys/class/gpio/gpio559/direction
+    root# echo 1 > /sys/class/gpio/gpio559/value
+    ```
+
+    or
+
+    ```sh
+    root# devmem2 0x000F40c0 w 0x00010007
+    root# gpiodetect
+    gpiochip0 [0-0020] (8 lines)
+    gpiochip1 [tps65219-gpio] (3 lines)
+    gpiochip2 [600000.gpio] (92 lines)
+    gpiochip3 [601000.gpio] (52 lines)
+    root# gpioset -z -c gpiochip2 47=1
+    root# lsusb
+    ```
+
+    如果还不生效检查电阻是否rework
+
+1. 
+
+## 12/17
+
+
 ## shcedule
 
 TODO: 休眠唤醒策略
