@@ -172,10 +172,61 @@
 
     如果还不生效检查电阻是否rework
 
-1. 
-
 ## 12/17
 
+1. DFU_flash_Tool问题：
+   1. 查找烧录固件无法启动原因 ，dfutool.exe的uEnv.txt配置文件中的烧写area大小不够，导致烧录失败。更新后可以。
+   2. 烧录新固件无法reboot问题review，问询是`mmc rst-function 0 1`指令在最后未执行，需放在前面执行。
+   3. `mmc rst-function 0 1`指令作用，使能mmc卡复位功能，使能后mmc卡复位功能有效，否则mmc卡复位功能无效。但该指令会导致烧录原ti板失败。烧写原厂TI板需去除
+
+1. 协助解决wifi热点连接但无网络问题， 路由设置不对，多个路由同时存在，路由只走排在首位的一个，且无论首个路由规则的网路是否有效。
+
+   `route add default gw IP metric N INTERFACE`，metric越小优先级越高，interface为网卡名，如eth0, IP为网关IP，N为优先级，默认为1024。加入后metric越小的使用`route -n`显示的越靠前。
+   或者
+   `ip route add default via IP dev INTERFACE`，默认网关，dev为网卡名，IP为网关IP，INTERFACE为网卡名。metric同前。
+
+1. 查找解决tbox_manager调用gnss接口异常， 初始定义变量未初始化，导致调用gnss接口异常仍判断对， proxy调用判断错误。
+
+1. 协助解决海东的板子无法启动问题，直接强制进入dfu模式烧录。
+
+## 12/18
+
+1. IO_EXPAND处理，增加未挂载时reboot机制，确保io_expand正确挂载上以便phy能正常工作。 指导处理
+
+1. 在uboot阶段，切换分区到A `mmc erase 800 1`
+
+1. 协助解决codec编码错误问题
+
+1. 协助查找PHY master 自动切成slave异常
+
+1. log去重功能
+
+1. 接uart时下reboot指令会进DFU模式
+
+## 12/19
+
+1. 开机启动脚本修改
+1. 解决uart终端只读不可写异常
+
+## 12/20
+
+1. HELIX 静态扫描工具会议
+1. yocto linux下如何通过/etc/systemd/network/ 配置静态ip systemd
+
+   ```sh
+    ti_yocto# vi sources/meta-arago/meta-arago-distro/recipes-core/systemd/systemd/10-eth.network
+
+    ti_yocto$ cat sources/meta-arago/meta-arago-distro/recipes-core/systemd/systemd/10-eth.network
+    [Match]
+    Name=eth0
+    KernelCommandLine=!root=/dev/nfs
+
+    [Network]
+    DHCP=no
+    Address=192.168.225.1/24
+   ```
+
+   只加ip不加“/24”， 则route -n 中不显示网关，加/24则显示网关
 
 ## shcedule
 
