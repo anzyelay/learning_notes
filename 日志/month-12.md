@@ -228,6 +228,20 @@
 
    只加ip不加“/24”， 则route -n 中不显示网关，加/24则显示网关
 
+## 12/23
+
+1. 指导gnss模块开发
+2. 修改tboxmanager模块代码
+3. 指导休眠唤醒开发, 如何使用wnc模组唤醒SOC
+
+## 12/24
+
+1. 编写wifi dbus demo,制造fake data给DDS
+
+## 12/25
+
+1. 优化wifi dbus demo, 增加wifi模块的接口和实现scan真实数据
+
 ## shcedule
 
 TODO: 休眠唤醒策略
