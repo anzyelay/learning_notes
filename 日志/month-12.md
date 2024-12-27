@@ -242,6 +242,17 @@
 
 1. 优化wifi dbus demo, 增加wifi模块的接口和实现scan真实数据
 
+## 12/26
+
+1. 优化wifi dbus demo
+2. 协助DDS dbus开发
+3. 协助解决git 问题
+
+## 12/27
+
+1. 代码审查
+1. 申请FORTIFY服务
+
 ## shcedule
 
 TODO: 休眠唤醒策略
