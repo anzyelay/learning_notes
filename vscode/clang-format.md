@@ -2,7 +2,8 @@
 
 1. 打开vscode设置面板
 1. 找到C_Cpp.clang_format_style设置项
-1. 设置`.clang-format`文件路径名，其内容如下
+   1. 直接设置路径名，其内容如下“file:/home2/f1339899/.clang-format”
+   2. 设置为"file"自动寻找当前和父路径中的`.clang-format`文件，其内容如下
 
 ## content
 
