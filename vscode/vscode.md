@@ -77,3 +77,9 @@ So you will have the following values for each variable:
     ```json
     "miDebuggerServerAddress": "remote_ip:port"
     ```
+
+## 配置项
+
+| 配置项 | 说明 |
+| :----: | :----: |
+| vimvim.foldfix | 移动鼠标不自动展开折叠代码, enable它 |
