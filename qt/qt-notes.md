@@ -1,5 +1,50 @@
 # QT NOTES
 
+## lambada
+
+1. 传参说明
+
+- 使用`&`号传的是引用， 如果传指针，可能外面的指针已删，此时继续使用引用值会发生段错误
+  - 可以用`QPointer<type> ptr = new type()`来弱指针来处理，这样可以在内部判断其是否已被销毁，因为QPointer会自行将销毁的指针赋`nullptr`,经测试还是不行，推荐使用=传值吧。
+- 使用`=`号传的是值, 不存在引用的段错误。
+
+1. code分析
+
+    ```c++
+    QPointer<QMessageBox> msgBox = new QMessageBox(this);
+    msgBox->setText("face test");
+    msgBox->setInformativeText(tr("are u %1").arg(user.name()));
+    QTimer::singleShot(1000, this, [&](){
+        if (msgBox)
+            delete msgBox;
+        inner = false;
+    });
+    msgBox->exec();
+    ```
+
+    > 在你的代码中，存在一个典型的 悬空指针（Dangling Pointer） 问题。具体来说，QTimer::singleShot 中的 Lambda 表达式捕获了 msgBox 的引用（[&]），并在 1 秒后尝试删除 msgBox。然而，msgBox->exec() 是一个阻塞调用，它会一直运行直到用户关闭对话框。在此期间，如果 QTimer 触发了删除操作，msgBox 会被删除，但 exec() 仍在运行，导致访问已删除的对象，从而引发段错误（Segmentation Fault）。
+
+    解决方法：使用智能指针（推荐）
+
+    ```c++
+    QSharedPointer<QMessageBox> msgBox(new QMessageBox(this));
+    msgBox->setText("face test");
+    msgBox->setInformativeText(tr("are u %1").arg(user.name()));
+
+    // 使用 QTimer 关闭对话框
+    QTimer::singleShot(1000, this, [msgBox]() {
+        if (msgBox) {
+            msgBox->close();  // 关闭对话框
+        }
+    });
+
+    msgBox->exec();  // 阻塞直到用户关闭对话框
+    ```
+
+    1. 使用 `msgBox->close()` 关闭对话框，而不是直接删除 `msgBox`
+    1. 在 `exec()` 结束后再删除 `msgBox`
+    1. 使用 `QSharedPointer` 自动管理对象生命周期，无需手动删除。
+
 ## 控件介绍
 
 ### QRubberBand
@@ -78,9 +123,9 @@ QPainter的变换矩阵的保存的恢复有以下两个方法:
 
         p->setRenderHint(QPainter::Antialiasing);
         //1. 原点平移到窗口中心为绘制原点
-        p->translate(width() / 2, height() / 2); 
+        p->translate(width() / 2, height() / 2);
 
-        //2. 缩放坐标系大小， side是原始窗体widthxheight转换成正方形的大小， 
+        //2. 缩放坐标系大小， side是原始窗体widthxheight转换成正方形的大小，
         //200是转换成的绘制目标区域的大小, 即后续的绘制区域为200X200
         int side = qMin(width(), height());
         p->scale(side / 200.0, side / 200.0);
@@ -164,7 +209,7 @@ QPainter的变换矩阵的保存的恢复有以下两个方法:
       - 下载dbus、expat
       - 编译安装
       - qt中，最好将lib库安装到编译器库下，比如“C:/Qt/Qt5.14.2/Tools/mingw730_64”, 这样在编译QT时demo时无需额外引入dbus库
-  
+
 2. 启动dbus服务
     - linux下使用`systemctl start dbus.service`等启动dbus-daemon
     - window下启动dbus-launch.exe服务即可。
@@ -194,7 +239,7 @@ adaptor是附加到任何QObject派生类上的特殊类, 它是一个轻量的�
 1. 接口中的参数类型有特定要求，如下:
     Qt type | D-Bus equivalent type | 说明
     -|-|-
-    uchar | BYTE 
+    uchar | BYTE
     qbool | BOOLEAN
     short | INT16
     ushort | UINT16
@@ -245,7 +290,7 @@ adaptor是附加到任何QObject派生类上的特殊类, 它是一个轻量的�
     ```
 
     XXX.xml内容如下，XXX名称决定了后面转换的adaptor和proxy的前缀。
- 
+
     ```xml
     <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
     <node>
@@ -274,7 +319,7 @@ adaptor是附加到任何QObject派生类上的特殊类, 它是一个轻量的�
     ```
 
 1. 代码中引入adaptor类，并创建服务：
-  
+
     ```cpp
     #include "XXX_adaptor.h"
 
@@ -317,13 +362,13 @@ class Cenum: public QObject
     Q_OBJECT
 public:
     Cenum() {}
-    
+
     enum Priority
-    { 
-        High, 
+    {
+        High,
         Low,
-        VeryHigh, 
-        VeryLow 
+        VeryHigh,
+        VeryLow
     };
     Q_ENUM(Priority)
 };
