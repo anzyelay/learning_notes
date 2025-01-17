@@ -3,6 +3,7 @@ myself=$(basename $0)
 module=${myself%.sh}
 module=${module#fii-}
 
+SESSION="--system"
 DEST=org.fii.${module}
 INTERFACE=/org/fii/${module}
 XMLFILE=/usr/share/xml/gdbus-tbox/org.fii.tbox.xml
@@ -13,7 +14,7 @@ function help() {
 Use ways:
         $myself method [args list]
         eg: ./$myself method \
-int32:47 string:'hello world' double:65.32 gboolean:true
+int32:47 string:'hello world' double:65.32 boolean:true
             array:string:"1st item","next item","last item"
             dict:string:int32:"one",1,"two",2,"three",3
             variant:int32:-8
@@ -23,8 +24,8 @@ General methods:
         - info method_name:     查看接口调用详情
         - mon | monitor:        监听所有属性变更事件
         - sig [signal_name]:    监听信号(无参数监听所有信号)
-        - get prop:             获取属性值
-        - set prop type:value:  设置属性值（如果可写）
+        - get prop_name:             获取属性值
+        - set prop_name type:value:  设置属性值（如果可写）
 
 Other special methods/signals/properities list as bellow:
 EOF
@@ -47,7 +48,7 @@ function all_fun() {
     fi
     local props=$(sed -En ${str} ${XMLFILE} | grep "<property name=.*>")
     if [ "_$props" != "_" ]; then
-        echo "  ==Properities=="
+        echo "  ==Properties=="
         echo "$props"
         echo ""
     fi
@@ -66,19 +67,19 @@ function info_fun() {
 }
 
 function monitor_prop() {
-    dbus-monitor --system "path=${INTERFACE},member=PropertiesChanged"
+    dbus-monitor $SESSION "path=${INTERFACE},member=PropertiesChanged"
 }
 
 function monitor_sig() {
     if [ $# -eq 0 ];then
-        dbus-monitor --system path=${INTERFACE}
+        dbus-monitor $SESSION path=${INTERFACE}
     else
-        dbus-monitor --system path=${INTERFACE} member=$1
+        dbus-monitor $SESSION path=${INTERFACE} member=$1
     fi
 }
 
 function call_method() {
-    ret=$(dbus-send --system --print-reply=literal --dest=${DEST} ${INTERFACE} $@)
+    ret=$(dbus-send $SESSION --print-reply=literal --dest=${DEST} ${INTERFACE} $@)
     echo "$ret"
 }
 
@@ -105,11 +106,11 @@ case "$method" in
         ;;
     "get")
         METHOD="org.freedesktop.DBus.Properties.Get"
-        call_method ${METHOD} string:${DEST} string:$@
+        call_method ${METHOD} string:${DEST} string:$1
         ;;
     "set")
         METHOD="org.freedesktop.DBus.Properties.Set"
-        call_method ${METHOD} string:${DEST} string:$@
+        call_method ${METHOD} string:${DEST} string:$1 variant:$2
         ;;
     "help" | "-h" | "-H" | "--help")
         help

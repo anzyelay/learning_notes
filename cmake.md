@@ -38,6 +38,9 @@
 寻找库、包<br>(替代`pkg-config`)| `cmake --find-package [<options>]`
 Run a Workflow Preset| `cmake --workflow [<options>]`
 View Help| `cmake --help[-<topic>]`
+查看命令列表和命令帮助 | `cmake --help-command-list` , `cmake --help-command command`
+查看变量列表和帮助 | `cmake --help-variable-list`, `cmake --help-variable variable`
+执行命令 | `cmake -E --help`打印出可支持的cmake执行命令， 可与install中的**CODE**结合使用，执行安装code
 
 ### 命令使用
 
@@ -120,7 +123,7 @@ options:
                     -o "out-$<CONFIG>.c"
                     -c "$<CONFIG>"
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/in.txt
-    COMMENT "Display the given message before the commands are executed at build time" 
+    COMMENT "Display the given message before the commands are executed at build time"
     VERBATIM)
     add_library(myLib "out-$<CONFIG>.c")
     add_library(myPlugin MODULE myPlugin.c)
@@ -143,16 +146,16 @@ options:
    # hw_proto_path = /absolute/path/to/
    get_filename_component(hw_proto_path "${hw_proto}" PATH)
    ```
-  
+
 1. 使用`pkg-config`配置第三方库和头文件
 
    假设有一个名为/usr/local/Cellar/glew/2.1.0_1/lib/pkgconfig/glew.pc的文件。则在cmakelist中可如下写法：
-  
+
    ```cmake
    set(ENV{PKG_CONFIG_PATH} "/usr/local/Cellar/glew/2.1.0_1/lib/pkgconfig")
    find_package(PkgConfig)
    # GLEW是变量名，后面XXX_INCLUDE_DIRS, XXX_LIBRARIES等都是以其为前缀
-   pkg_search_module(GLEW REQUIRED glew)    
+   pkg_search_module(GLEW REQUIRED glew)
    MESSAGE(STATUS "glew dirs:" ${GLEW_INCLUDE_DIRS})
    MESSAGE(STATUS "glew lib:" ${GLEW_LIBRARIES})
    include_directories(${GLEW_INCLUDE_DIRS})
@@ -160,11 +163,11 @@ options:
    ... ...
    target_link_libraries(main ${GLUT_LIBRARY} ${OPENGL_LIBRARY} ${GLEW_LIBRARIES})
    ```
-  
+
   pkg-config方式查找的名称引用如上为
-  
+
   ```cmake
-  GLEW_INCLUDE_DIRS 
+  GLEW_INCLUDE_DIRS
   GLEW_LIBRARY_DIRS
   GLEW_LIBRARIES
   ```
@@ -178,7 +181,7 @@ options:
   ```
 
 1. 安装指令**INSTALL**, 指令用于定义安装规则，安装的内容可以包括目标二进制、动态库、静态库以及文件、目录、脚本等
-  
+
    1. 目标文件的安装, 目标类型有三种,**ARCHIVE**特指静态库，**LIBRARY**特指动态库，**RUNTIME**特指可执行目标二进制
 
       ```cmake
@@ -234,8 +237,8 @@ options:
 代表将这个目录中的内容安装到目标路径，但不包括这个目录本身.
       - **USE_SOURCE_PERMISSIONS**表示使用源文件目录中文件的权限
       - PATTERN用于使用正则表达式进行过滤
-      - PERMISSIONS 用于指定 PATTERN 过滤后的文件权限, 
-  
+      - PERMISSIONS 用于指定 PATTERN 过滤后的文件权限,
+
       eg: 这将为所有 ".sh" 脚本文件设置读、写和执行权限
 
       ```cmake
@@ -246,12 +249,19 @@ options:
             WORLD_READ WORLD_EXECUTE)
       ```
 
+   1. 安装时执行命令
+
+      ```sh
+      install(CODE "execute_process(COMMAND ln -sf /usr/bin/fii-manager.sh /usr/bin/fii-test.sh)")
+      install(CODE "cmake -E create_symlink /usr/bin/fii-manager.sh /usr/bin/fii-test.sh")
+      ```
+
 ## Cross Compiling With CMake
 
 - 参考[toolchain file]和[cmake-toolchains](https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html)
 
 - 概念
-  
+
     概念| 说明
     -|-
     build host | 构建主机，当前用于构建工程所运行的系统
@@ -269,7 +279,7 @@ options:
     CMAKE_SYSTEM_PROCESSOR|可选，目标平台的处理器或硬件名，可用`uname -m`,参考[CMAKE_HOST_SYSTEM_PROCESSOR]
     CMAKE_C_COMPILER|c编译器可执行程序,如果是完整(绝对)路径，则其它编译工具(c++,binutils,ld等)也会从该路径中寻找，如果有前缀则CMake自动寻找对应的其它编译工具。<br>编译器也可通过环境变量**CC**设置
     CMAKE_CXX_COMPILER|c++编译器，其它同上面的C编译器，环境变量为**CXX**
-    CMAKE_SYSROOT | 可选的，如果有 sysroot 可用，则可以指定 
+    CMAKE_SYSROOT | 可选的，如果有 sysroot 可用，则可以指定
     CMAKE_STAGING_PREFIX | 可选的。它可用于指定主机上的安装路径。CMAKE_INSTALL_PREFIX 始终是运行时安装位置，即使在交叉编译时也是如此
     CMAKE_FIND_ROOT_PATH | 默认为空，设置find命令对lib,header找寻的路径前缀，可设置多个路径, 还有三个选项用来精确控制：**NO_CMAKE_FIND_ROOT_PATH**,**ONLY_CMAKE_FIND_ROOT_PATH**,**CMAKE_FIND_ROOT_PATH_BOTH**
     CMAKE_FIND_ROOT_PATH_MODE_PROGRAM|配合上面**CMAKE_FIND_ROOT_PATH**使用，设置`find_proram`找寻时是否加上**CMAKE_FIND_ROOT_PATH**做前缀的形为，有三个选项：<br><li>NERVER:除非明确指定，否则不使用</li><li>ONLY:只搜索CMAKE_FIND_ROOT_PATH做前缀下的目录</li><li>BOTH:即搜索CMAKE_FIND_ROOT_PATH下路径，也搜索其它系统默认路径，该项为**默认选项**</li>
