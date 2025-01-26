@@ -382,3 +382,100 @@ public:
  qDebug()<<  metaEnum.valueToKey(Cenum::VeryHigh);            //! enum转string
  qDebug()<<  metaEnum.keysToValue("VeryHigh");                //！string转enum
 ```
+
+## Qt Style Sheets
+
+Topics:
+
+- Overview
+- **The Style Sheet Syntax**: 语法规则
+- Qt Designer Integration
+- Customizing Qt Widgets Using Style Sheets
+- Qt Style Sheets Reference
+  - List of Stylable Widgets
+  - List of Properties
+  - List of Icons
+  - List of Property Types
+  - List of Pseudo-States
+  - List of Sub-Controls
+- Qt Style Sheets Examples
+
+### Selector
+
+选择器 | 示例 | 说明
+-|-|-
+通用选择器 | * | 匹配所有控件。
+类型选择器| QPushButton | 匹配 QPushButton 实例及其子类的实例。可支持自定义类，内建支持的参见 **List of Stylable Widgets**
+属性选择器| QPushButton[flat="false"] | 匹配所有 flat 属性为 false 的 QPushButton 实例。您可以使用此选择器来测试任何支持 QVariant::toString() 的 Qt 属性（有关详细信息，请参阅 toString() 函数文档）。此外，还支持特殊的 class 属性，用于表示类名。此选择器还可用于测试动态属性。有关使用动态属性进行自定义的更多信息，请参阅使用动态属性进行自定义。<br> 除了 =，您还可以使用 ~= 来测试 Qt 属性类型 QStringList 是否包含给定的 QString。<br> 警告：如果 Qt 属性的值在设置样式表后发生变化，可能需要强制重新计算样式表。实现这一点的一种方法是取消设置样式表并重新设置。
+类选择器 | .QPushButton | 匹配 QPushButton 实例，但不匹配其子类的实例。等价于 *[class~="QPushButton"].
+ID 选择器| QPushButton#okButton | 匹配所有对象名称为 okButton 的 QPushButton 实例。
+后代选择器| QDialog QPushButton | 匹配所有 QDialog 的后代（子代、孙代等）中的 QPushButton 实例。
+子选择器| QDialog > QPushButton | 匹配所有直接子代为 QDialog 的 QPushButton 实例。
+
+- ID选择器:  "**#**" 后面的**ID名字**必须与**object name**一致，可使用`setObjectName()`设置
+
+    > ID Selector: QPushButton#okButton: Matches all QPushButton instances whose object name is okButton.
+
+**注：不支持直接继承自QWidget的自定义类。**
+
+### QWidget
+
+参考**Qt Style Sheets Reference**中的**List of Stylable Widgets**, 直接继承自QWidget的控件不支持[selector types](qthelp://org.qt-project.qtwidgets.5142/qtwidgets/stylesheet-syntax.html#selector-types),即无法像其它控件那样指定选择它作为目标使用某样式
+
+> Supports only the background, background-clip and background-origin properties.
+If you subclass from QWidget, you need to provide a paintEvent for your custom QWidget as below:
+
+eg:
+
+- 样式设置-style.css:
+
+  ```css
+  #gerenalSettingPage {
+      background: blue;
+  }
+  ```
+
+- 在ui中使用：
+
+  ```c++
+    QFile file(":/style.css");
+    file.open(QFile::ReadOnly);
+    auto stylesheet = QString::fromUtf8(file.readAll());
+    file.close();
+    setStyleSheet(stylesheet);
+
+    SettingPage *gerenalPage = new SettingPage(tr("通用设置"), this);
+    gerenalPage->setObjectName("gerenalSettingPage");
+  ```
+
+- SettingPage实现：
+
+    ```c++
+    class SettingPage: public QWidget {
+    Q_OBJECT
+    public:
+        SettingPage(const QString &title, QWidget *parent = nullptr) : QWidget(parent) {
+            setWindowTitle(title);
+            QVBoxLayout *mainLayout = new QVBoxLayout(this);
+            mainLayout->setContentsMargins(8, 8, 8, 8); // 设置全局边距为0
+            auto label = new QLabel(title, this);
+            mainLayout->addWidget(label);
+            setLayout(mainLayout);
+        }
+        ~SettingPage() {
+
+        }
+    };
+    ```
+
+    以上方法，css无作用，因为QWidget不支持选择器使用，改为QFrame即可。
+
+    ```c++
+    class SettingPage: public QFrame {
+    Q_OBJECT
+    public:
+        SettingPage(const QString &title, QWidget *parent = nullptr) : QFrame (parent) {
+            ...
+        }
+    };
+    ```
