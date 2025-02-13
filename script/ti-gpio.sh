@@ -123,6 +123,10 @@ function do_gpio_direction()
 		echo "GPIO: Err: gpio direction is empty, please check!"
 		return
 	}
+	cur_dir=$(cat $(gpio_dir_path))
+	if [ "$cur_dir" = "$gpio_dir" ]; then
+		return
+	fi
 	echo $gpio_dir > $(gpio_dir_path)
 }
 
