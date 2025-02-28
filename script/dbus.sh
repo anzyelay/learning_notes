@@ -1,9 +1,9 @@
 #!/bin/bash
-myself=$(basename $0)
-module=${myself%.sh}
+myname=$(basename $0)
+module=${myname%.sh}
 module=${module#fii-}
 
-SESSION="--system"
+MESSAGE_BUS="--system"
 DEST=org.fii.${module}
 INTERFACE=/org/fii/${module}
 XMLFILE=/usr/share/xml/gdbus-tbox/org.fii.tbox.xml
@@ -12,12 +12,15 @@ PREFIX_METHOD="org.fii.${module}"
 function help() {
     cat <<EOF
 Use ways:
-        $myself method [args list]
-        eg: ./$myself method \
-int32:47 string:'hello world' double:65.32 boolean:true
-            array:string:"1st item","next item","last item"
-            dict:string:int32:"one",1,"two",2,"three",3
-            variant:int32:-8
+        $myname method_name [args list]
+        Eg: ./$myname method_name 47 'hello world' 65.32 true
+
+            the base type support: int, string, double, bool, you can input directly
+            the complex type should be like this:
+                variant:int32:-8
+                variant:boolean:false
+                array:string:'"1st item"','"next item"',"last_item"
+                dict:string:int32:"one",1,"two",2,"three",3
 
 General methods:
         - all_fun:              罗列所有method接口功能
@@ -30,6 +33,68 @@ General methods:
 Other special methods/signals/properities list as bellow:
 EOF
     all_fun
+}
+
+function is_integer() {
+    local re='^[-+]?[0-9]+$'
+    if [[ $1 =~ $re ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function is_decimal() {
+    local re='^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$'
+    if [[ $1 =~ $re ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function is_boolean() {
+    param="$1"
+    local ret=0
+    case "$param" in
+    "true" | "TRUE" | "True")
+        ;;
+    "false" | "FALSE" | "False")
+        ;;
+    *)
+        ret=1
+        ;;
+    esac
+    return $ret
+}
+
+function is_dbus_type() {
+    local param="$1"
+    local prefixes=("string:" "dict:" "variant:" "boolean:" "double:" "array:" "int32:")
+    local match=1
+    for prefix in "${prefixes[@]}"; do
+        if [[ "$param" == "$prefix"* ]]; then
+            match=0
+            break
+        fi
+    done
+    return $match
+}
+
+# Converts a given parameter to its corresponding D-Bus type.
+function to_dbus_type() {
+    local param="$1"
+    if is_dbus_type "$param"; then
+        echo "$param"
+    elif is_boolean "$param"; then
+        echo "boolean:$param"
+    elif is_integer "$param"; then
+        echo "int32:$param"
+    elif is_decimal "$param"; then
+        echo "double:$param"
+    else
+        echo "string:'${param}'"
+    fi
 }
 
 function all_fun() {
@@ -62,24 +127,32 @@ function info_fun() {
     if [ "$ret" != "" ]; then
         echo "${ret}" | sed "s/annotation name=\"org.freedesktop.DBus.Arg.Doc\"//" | sed '/doc:.*>/d'
     else
-        echo "No this function, please check it with: $0 all_fun"
+        echo "No this function, please check it with: $myname all_fun"
     fi
 }
 
 function monitor_prop() {
-    dbus-monitor $SESSION "path=${INTERFACE},member=PropertiesChanged"
+    dbus-monitor $MESSAGE_BUS "path=${INTERFACE},member=PropertiesChanged"
 }
 
 function monitor_sig() {
     if [ $# -eq 0 ];then
-        dbus-monitor $SESSION path=${INTERFACE}
+        dbus-monitor $MESSAGE_BUS path=${INTERFACE}
     else
-        dbus-monitor $SESSION path=${INTERFACE} member=$1
+        dbus-monitor $MESSAGE_BUS path=${INTERFACE} member="$1"
     fi
 }
 
 function call_method() {
-    ret=$(dbus-send $SESSION --print-reply=literal --dest=${DEST} ${INTERFACE} $@)
+    local method="$1"
+    shift
+    local args=()
+    for arg in "$@"; do
+        dt="$(to_dbus_type "$arg")"
+        args+=("$dt")
+    done
+    #echo "$method" "${args[@]}"
+    ret=$(dbus-send $MESSAGE_BUS --print-reply=literal --dest=${DEST} ${INTERFACE} "$method" "${args[@]}")
     echo "$ret"
 }
 
@@ -117,7 +190,7 @@ case "$method" in
         ;;
     *)
         METHOD="${PREFIX_METHOD}.${method}"
-        call_method ${METHOD} $@
+        call_method ${METHOD} "$@"
         ;;
 esac
 
