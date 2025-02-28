@@ -1,22 +1,25 @@
 #!/bin/bash
-myname=$(basename $0)
+myname=$(basename "$0")
 module=${myname%.sh}
 module=${module#fii-}
 
-MESSAGE_BUS="--system"
-DEST=org.fii.${module}
-INTERFACE=/org/fii/${module}
-XMLFILE=/usr/share/xml/gdbus-tbox/org.fii.tbox.xml
-PREFIX_METHOD="org.fii.${module}"
+#readonly MESSAGE_BUS="--system"
+readonly MESSAGE_BUS="--session"
+readonly DEST="org.fii.${module}"
+readonly INTERFACE="/org/fii/${module}"
+#readonly XMLFILE=/usr/share/xml/gdbus-tbox/org.fii.tbox.xml
+readonly XMLFILE="/home/anzye/Desktop/tboxservice/gdbus/org.fii.tbox.xml"
+readonly PREFIX_METHOD="org.fii.${module}"
 
 function help() {
     cat <<EOF
 Use ways:
         $myname method_name [args list]
-        Eg: ./$myname method_name 47 'hello world' 65.32 true
+        Eg: ./$myname method_name 47 'hello world' 65.32 true string:'123456'
 
-            the base type support: int, string, double, bool, you can input directly
-            the complex type should be like this:
+            the base type support to input directly: int32, double, boolean, some clear string
+            the complex or easily confused type should be like this:
+                string:'123456' (easy to confuse with int32 if no string prefix)
                 variant:int32:-8
                 variant:boolean:false
                 array:string:'"1st item"','"next item"',"last_item"
@@ -93,7 +96,7 @@ function to_dbus_type() {
     elif is_decimal "$param"; then
         echo "double:$param"
     else
-        echo "string:'${param}'"
+        echo "string:${param}"
     fi
 }
 
@@ -143,16 +146,136 @@ function monitor_sig() {
     fi
 }
 
+# 从XML中获取方法参数类型
+function get_method_args_type() {
+    local method_name="$1"
+    str="/<interface.*name="\"${DEST}"\">/,/<\\/interface>/p"
+    substr="/<method.*name=\"${method_name}\"/,/<\\/method>/p"
+    local args=$(sed -En "$str" "$XMLFILE" | sed -En "$substr" | grep "<arg.*direction=\"in\"" | sed -n 's/.*type="\([^"]*\)".*/\1/p')
+    echo "$args"
+}
+
+function get_prop_args_type() {
+    local method_name="$1"
+    str="/<interface.*name="\"${DEST}"\">/,/<\\/interface>/p"
+    substr="/<property.*name=\"${method_name}\".*>/p"
+    local args=$(sed -En "$str" "$XMLFILE" | sed -En "$substr" | grep "access=\".*write\"" | sed -n 's/.*type="\([^"]*\)".*/\1/p')
+    echo "$args"
+}
+
+# 根据类型转换参数
+function convert_arg_by_type() {
+    local arg="$1"
+    local type="$2"
+
+    # 如果参数已经是DBus类型，则直接返回
+    is_dbus_type "$arg" && echo "$arg" && return 0
+
+    case "$type" in
+        s)  # string
+            echo "string:$arg"
+            ;;
+        i | u)  # integer
+            if is_integer "$arg"; then
+                echo "int32:$arg"
+            else
+                echo "错误：参数 '$arg' 不是有效的整数" >&2
+                return 1
+            fi
+            ;;
+        d)  # double
+            if is_decimal "$arg"; then
+                echo "double:$arg"
+            else
+                echo "错误：参数 '$arg' 不是有效的浮点数" >&2
+                return 1
+            fi
+            ;;
+        b)  # boolean
+            if is_boolean "$arg"; then
+                echo "boolean:$arg"
+            else
+                echo "错误：参数 '$arg' 不是有效的布尔值" >&2
+                return 1
+            fi
+            ;;
+        a\(*\))  # array with any type
+            local base_type=${type#a(}
+            base_type=${base_type%)}
+            local items=()
+            IFS=',' read -r -a items <<< "$arg"
+            local dbus_items=""
+            local converted=""
+            local i=0;
+            for item in "${items[@]}"; do
+                if ! converted=$(convert_arg_by_type "$item" "$base_type"); then
+                    echo "错误：参数 '$item' 不是有效的类型 $base_type" >&2
+                    return 1
+                fi
+                if [ $i -eq 0 ]; then
+                    dbus_items="${dbus_items}${converted}"
+                else
+                    dbus_items="${dbus_items},${converted#*:}"
+                fi
+                ((i++))
+            done
+            echo "array:${dbus_items}"
+            ;;
+        v*)
+            local base_type=${type#v}
+            local converted=""
+            if ! converted=$(convert_arg_by_type "$arg" "$base_type"); then
+                echo "错误：参数 '$arg' 不是有效的类型 $base_type" >&2
+                return 1
+            fi
+            echo "variant:${converted}"
+            ;;
+        *)
+            echo "未知类型: $type" >&2
+            return 1
+            ;;
+    esac
+}
+
 function call_method() {
     local method="$1"
     shift
+
+    # 获取方法参数类型
+    local arg_types=()
+    if [ "$method" == "org.freedesktop.DBus.Properties.Get" ]; then
+        arg_types=("s" "s")
+    elif [ "$method" == "org.freedesktop.DBus.Properties.Set" ]; then
+        arg_types=("s" "s")
+        vtype=$(get_prop_args_type "${2##string:}")
+        if [ "_$vtype" != "_" ]; then
+            arg_types+=("v${vtype}")
+        else
+            echo "错误：属性 ${2##string:} 不可写" >&2
+            return 1
+        fi
+    else
+        arg_types=($(get_method_args_type "${method##*.}"))
+    fi
+
+    if [ ${#arg_types[@]} -ne $# ]; then
+        echo "错误：方法 ${method##*.} 需要 ${#arg_types[@]} 个参数，但提供了 $# 个" >&2
+        return 1
+    fi
+
     local args=()
+    local i=0
+    local converted=""
     for arg in "$@"; do
-        dt="$(to_dbus_type "$arg")"
-        args+=("$dt")
+        if ! converted=$(convert_arg_by_type "$arg" "${arg_types[$i]}"); then
+            echo "参数转换失败: $converted" >&2
+            return 1
+        fi
+        args+=("$converted")
+        ((i++))
     done
-    #echo "$method" "${args[@]}"
-    ret=$(dbus-send $MESSAGE_BUS --print-reply=literal --dest=${DEST} ${INTERFACE} "$method" "${args[@]}")
+    echo "$method" "${args[@]}"
+    ret=$(dbus-send $MESSAGE_BUS --print-reply=literal --dest="${DEST}" "${INTERFACE}" "$method" "${args[@]}")
     echo "$ret"
 }
 
@@ -179,11 +302,11 @@ case "$method" in
         ;;
     "get")
         METHOD="org.freedesktop.DBus.Properties.Get"
-        call_method ${METHOD} string:${DEST} string:$1
+        call_method ${METHOD} string:${DEST} string:"$1"
         ;;
     "set")
         METHOD="org.freedesktop.DBus.Properties.Set"
-        call_method ${METHOD} string:${DEST} string:$1 variant:$2
+        call_method ${METHOD} string:${DEST} string:"$1" "$2"
         ;;
     "help" | "-h" | "-H" | "--help")
         help
