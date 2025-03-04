@@ -6,20 +6,19 @@ module=${module#fii-}
 #readonly MESSAGE_BUS="--system"
 readonly MESSAGE_BUS="--session"
 readonly DEST="org.fii.${module}"
-readonly INTERFACE="/org/fii/${module}"
+readonly INTERFACE="org.fii.${module}"
+readonly OBJECT_PATH="/org/fii/${module}"
 #readonly XMLFILE=/usr/share/xml/gdbus-tbox/org.fii.tbox.xml
 readonly XMLFILE="/home/anzye/Desktop/tboxservice/gdbus/org.fii.tbox.xml"
-readonly PREFIX_METHOD="org.fii.${module}"
 
 function help() {
     cat <<EOF
 Use ways:
         $myname method_name [args list]
-        Eg: ./$myname method_name 47 'hello world' 65.32 true string:'123456'
+        Eg: ./$myname method_name 47 'hello world' 65.32 true "123456"
 
-            the base type support to input directly: int32, double, boolean, some clear string
-            the complex or easily confused type should be like this:
-                string:'123456' (easy to confuse with int32 if no string prefix)
+            the base type support to input directly: int32, double, boolean, string
+            the complex type should be like this:
                 variant:int32:-8
                 variant:boolean:false
                 array:string:'"1st item"','"next item"',"last_item"
@@ -101,7 +100,7 @@ function to_dbus_type() {
 }
 
 function all_fun() {
-    str="/<interface.*name="\"${DEST}"\">/,/<\\/interface>/p"
+    str="/<interface.*name="\"${INTERFACE}"\">/,/<\\/interface>/p"
     local mtds=$(sed -En ${str} ${XMLFILE} | sed -n "s/<method name=\"\(.*\)\">/- \1/p")
     if [ "_$mtds" != "_" ]; then
         echo "  ==Methods=="
@@ -124,7 +123,7 @@ function all_fun() {
 
 function info_fun() {
     fun="$1"
-    str="/<interface.*name="\"${DEST}"\">/,/<\\/interface>/p"
+    str="/<interface.*name="\"${INTERFACE}"\">/,/<\\/interface>/p"
     substr="/<method.*name="\"${fun}"\"/,/<\\/method>/p"
     ret=$(sed -En ${str} ${XMLFILE} | sed -En ${substr})
     if [ "$ret" != "" ]; then
@@ -135,30 +134,30 @@ function info_fun() {
 }
 
 function monitor_prop() {
-    dbus-monitor $MESSAGE_BUS "path=${INTERFACE},member=PropertiesChanged"
+    dbus-monitor $MESSAGE_BUS "path=${OBJECT_PATH},member=PropertiesChanged"
 }
 
 function monitor_sig() {
-    if [ $# -eq 0 ];then
-        dbus-monitor $MESSAGE_BUS path=${INTERFACE}
+    if [ $# -eq 0 ]; then
+        dbus-monitor $MESSAGE_BUS "type='signal',interface='${INTERFACE}'",path=${OBJECT_PATH}
     else
-        dbus-monitor $MESSAGE_BUS path=${INTERFACE} member="$1"
+        dbus-monitor $MESSAGE_BUS "type='signal',interface='${INTERFACE}',path=${OBJECT_PATH},member='$1'"
     fi
 }
 
 # 从XML中获取方法参数类型
 function get_method_args_type() {
     local method_name="$1"
-    str="/<interface.*name="\"${DEST}"\">/,/<\\/interface>/p"
+    str="/<interface.*name="\"${INTERFACE}"\">/,/<\\/interface>/p"
     substr="/<method.*name=\"${method_name}\"/,/<\\/method>/p"
     local args=$(sed -En "$str" "$XMLFILE" | sed -En "$substr" | grep "<arg.*direction=\"in\"" | sed -n 's/.*type="\([^"]*\)".*/\1/p')
     echo "$args"
 }
 
 function get_prop_args_type() {
-    local method_name="$1"
-    str="/<interface.*name="\"${DEST}"\">/,/<\\/interface>/p"
-    substr="/<property.*name=\"${method_name}\".*>/p"
+    local prop_name="$1"
+    str="/<interface.*name="\"${INTERFACE}"\">/,/<\\/interface>/p"
+    substr="/<property.*name=\"${prop_name}\".*>/p"
     local args=$(sed -En "$str" "$XMLFILE" | sed -En "$substr" | grep "access=\".*write\"" | sed -n 's/.*type="\([^"]*\)".*/\1/p')
     echo "$args"
 }
@@ -247,7 +246,7 @@ function call_method() {
         arg_types=("s" "s")
     elif [ "$method" == "org.freedesktop.DBus.Properties.Set" ]; then
         arg_types=("s" "s")
-        vtype=$(get_prop_args_type "${2##string:}")
+        vtype=$(get_prop_args_type "${2}")
         if [ "_$vtype" != "_" ]; then
             arg_types+=("v${vtype}")
         else
@@ -274,8 +273,8 @@ function call_method() {
         args+=("$converted")
         ((i++))
     done
-    echo "$method" "${args[@]}"
-    ret=$(dbus-send $MESSAGE_BUS --print-reply=literal --dest="${DEST}" "${INTERFACE}" "$method" "${args[@]}")
+    # echo "$method" "${args[@]}"
+    ret=$(dbus-send $MESSAGE_BUS --print-reply=literal --dest="${DEST}" "${OBJECT_PATH}" "$method" "${args[@]}")
     echo "$ret"
 }
 
@@ -302,17 +301,18 @@ case "$method" in
         ;;
     "get")
         METHOD="org.freedesktop.DBus.Properties.Get"
-        call_method ${METHOD} string:${DEST} string:"$1"
+        call_method ${METHOD} ${INTERFACE} "$1"
         ;;
     "set")
         METHOD="org.freedesktop.DBus.Properties.Set"
-        call_method ${METHOD} string:${DEST} string:"$1" "$2"
+        call_method ${METHOD} ${INTERFACE} "$1" "$2"
         ;;
     "help" | "-h" | "-H" | "--help")
         help
         ;;
     *)
-        METHOD="${PREFIX_METHOD}.${method}"
+        MEMBER="${method}"
+        METHOD="${INTERFACE}.${MEMBER}"
         call_method ${METHOD} "$@"
         ;;
 esac
