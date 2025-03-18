@@ -1,0 +1,1500 @@
+[
+    {
+        "CANID": "0x118",
+        "DLC": 16,
+        "Cycle": "100",
+        "Signals": [
+            {
+                "Name": "CCU_ACLampSts",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 34,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "FD_TBOX_DTCData_Err",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 35,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "FD_TBOX_DTCData_Sta",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 39,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "FD_TBOX_VehData_Err",
+                "Data": {
+                    "startByte": 5,
+                    "startBit": 43,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "FD_TBOX_VehData_Sta",
+                "Data": {
+                    "startByte": 5,
+                    "startBit": 47,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "VehMalfunLevel",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 51,
+                    "bitLength": 3,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "AllDoorSW",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 54,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "HoodSW",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 55,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Tailgate_SW",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 56,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "AntitheftSta",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 57,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TailgateRemote",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 59,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "BCM_DoorLock_Sta",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 61,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "CCU_CbnPreEstimdTi",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 62,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "CCU_CbnPreACWkSts",
+                "Data": {
+                    "startByte": 8,
+                    "startBit": 68,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "CCU_CbnPreSts",
+                "Data": {
+                    "startByte": 8,
+                    "startBit": 70,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Re_VehThdChkSta",
+                "Data": {
+                    "startByte": 18,
+                    "startBit": 96,
+                    "bitLength": 7,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "LowSOCWarn",
+                "Data": {
+                    "startByte": 18,
+                    "startBit": 103,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TCountSta",
+                "Data": {
+                    "startByte": 19,
+                    "startBit": 104,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "PwrSta",
+                "Data": {
+                    "startByte": 19,
+                    "startBit": 106,
+                    "bitLength": 3,
+                    "defaultValue": "0x7",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ShiftGearPosn",
+                "Data": {
+                    "startByte": 19,
+                    "startBit": 109,
+                    "bitLength": 3,
+                    "defaultValue": "0x1",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x17A",
+        "DLC": 12,
+        "Cycle": "100",
+        "Signals": [
+            {
+                "Name": "HVBContactorSta",
+                "Data": {
+                    "startByte": 3,
+                    "startBit": 26,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ExtChrgSta",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 36,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "HVBChrgErr",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 56,
+                    "bitLength": 8,
+                    "defaultValue": "0x0",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x1C5",
+        "DLC": 32,
+        "Cycle": "100",
+        "Signals": [
+            {
+                "Name": "L_RRD_Wdw_PositionSts",
+                "Data": {
+                    "startByte": 22,
+                    "startBit": 128,
+                    "bitLength": 2,
+                    "defaultValue": "0x3",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "L_RLD_Wdw_PositionSts",
+                "Data": {
+                    "startByte": 22,
+                    "startBit": 130,
+                    "bitLength": 2,
+                    "defaultValue": "0x3",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "L_Pas_Wdw_PositionSts",
+                "Data": {
+                    "startByte": 22,
+                    "startBit": 132,
+                    "bitLength": 2,
+                    "defaultValue": "0x3",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "L_Drv_Wdw_PositionSts",
+                "Data": {
+                    "startByte": 22,
+                    "startBit": 134,
+                    "bitLength": 2,
+                    "defaultValue": "0x3",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "L_RRD_Val_Wdw_Opened",
+                "Data": {
+                    "startByte": 23,
+                    "startBit": 136,
+                    "bitLength": 7,
+                    "defaultValue": "0x7F",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "L_RLD_Val_Wdw_Opened",
+                "Data": {
+                    "startByte": 24,
+                    "startBit": 144,
+                    "bitLength": 7,
+                    "defaultValue": "0x7F",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "L_Pas_Val_Wdw_Opened",
+                "Data": {
+                    "startByte": 25,
+                    "startBit": 152,
+                    "bitLength": 7,
+                    "defaultValue": "0x7F",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "L_Drv_Val_Wdw_Opened",
+                "Data": {
+                    "startByte": 32,
+                    "startBit": 160,
+                    "bitLength": 7,
+                    "defaultValue": "0x7F",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ZR_APM_WinRROpened_Sta",
+                "Data": {
+                    "startByte": 33,
+                    "startBit": 168,
+                    "bitLength": 7,
+                    "defaultValue": "0x7F",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ZR_APM_WinRFOpened_Sta",
+                "Data": {
+                    "startByte": 34,
+                    "startBit": 176,
+                    "bitLength": 7,
+                    "defaultValue": "0x7F",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ZL_APM_WinLROpened_Sta",
+                "Data": {
+                    "startByte": 35,
+                    "startBit": 184,
+                    "bitLength": 7,
+                    "defaultValue": "0x7F",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ZL_APM_WinLFOpened_Sta",
+                "Data": {
+                    "startByte": 36,
+                    "startBit": 192,
+                    "bitLength": 7,
+                    "defaultValue": "0x7F",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "PTG_Active_Sta",
+                "Data": {
+                    "startByte": 37,
+                    "startBit": 200,
+                    "bitLength": 3,
+                    "defaultValue": "0x0",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "PTG_Exist",
+                "Data": {
+                    "startByte": 37,
+                    "startBit": 203,
+                    "bitLength": 1,
+                    "defaultValue": "0x0",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "PTG_Sys_Sta",
+                "Data": {
+                    "startByte": 37,
+                    "startBit": 204,
+                    "bitLength": 2,
+                    "defaultValue": "0x3",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ZR_PTG_Active_Sta",
+                "Data": {
+                    "startByte": 38,
+                    "startBit": 208,
+                    "bitLength": 3,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ZR_PTG_Exist_Sta",
+                "Data": {
+                    "startByte": 38,
+                    "startBit": 211,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ZR_PTG_Sys_Sta",
+                "Data": {
+                    "startByte": 38,
+                    "startBit": 212,
+                    "bitLength": 2,
+                    "defaultValue": "0x3",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "CrashOutputSts",
+                "Data": {
+                    "startByte": 39,
+                    "startBit": 216,
+                    "bitLength": 8,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "VehSpeed",
+                "Data": {
+                    "startByte": 40,
+                    "startBit": 224,
+                    "bitLength": 12,
+                    "defaultValue": "",
+                    "accuracy": 0.125,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "BrkSw_Sta",
+                "Data": {
+                    "startByte": 41,
+                    "startBit": 236,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x329",
+        "DLC": 32,
+        "Cycle": "1000",
+        "Signals": [
+            {
+                "Name": "HVBattErr",
+                "Data": {
+                    "startByte": 2,
+                    "startBit": 22,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "HVBattSOCDis",
+                "Data": {
+                    "startByte": 3,
+                    "startBit": 24,
+                    "bitLength": 8,
+                    "defaultValue": "",
+                    "accuracy": 0.4,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "CellType",
+                "Data": {
+                    "startByte": 35,
+                    "startBit": 186,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x3E0",
+        "DLC": 48,
+        "Cycle": "100",
+        "Signals": [
+            {
+                "Name": "HVBCellVoltMax",
+                "Data": {
+                    "startByte": 0,
+                    "startBit": 0,
+                    "bitLength": 16,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x438",
+        "DLC": 12,
+        "Cycle": "200",
+        "Signals": [
+            {
+                "Name": "OTA_Mode",
+                "Data": {
+                    "startByte": 16,
+                    "startBit": 81,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x442",
+        "DLC": 12,
+        "Cycle": "200",
+        "Signals": [
+            {
+                "Name": "Remote_ACTemp",
+                "Data": {
+                    "startByte": 2,
+                    "startBit": 16,
+                    "bitLength": 6,
+                    "defaultValue": "0x3F",
+                    "accuracy": 0.5,
+                    "offset": 17.0
+                }
+            },
+            {
+                "Name": "Remote_MidAutoReq",
+                "Data": {
+                    "startByte": 2,
+                    "startBit": 22,
+                    "bitLength": 1,
+                    "defaultValue": "0x0",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Remote_AutoReq",
+                "Data": {
+                    "startByte": 2,
+                    "startBit": 23,
+                    "bitLength": 1,
+                    "defaultValue": "0x0",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "PowerOff_T_Set",
+                "Data": {
+                    "startByte": 3,
+                    "startBit": 24,
+                    "bitLength": 7,
+                    "defaultValue": "0x7F",
+                    "accuracy": 1.0,
+                    "offset": 1.0
+                }
+            },
+            {
+                "Name": "Re_Radio",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 36,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TBOX_TEST_STATUS",
+                "Data": {
+                    "startByte": 5,
+                    "startBit": 40,
+                    "bitLength": 4,
+                    "defaultValue": "0xF",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TBOX_NET_SIG_STR",
+                "Data": {
+                    "startByte": 5,
+                    "startBit": 44,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TBOX_Re_DTCData",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 48,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ReOutsideMirror",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 50,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "CbnPreReq",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 52,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "CbnPreACEnaReq",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 54,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "CbnPreTarT",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 56,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 0.5,
+                    "offset": 17.0
+                }
+            },
+            {
+                "Name": "Uncounting_Req",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 62,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TBOX_Remote_PW",
+                "Data": {
+                    "startByte": 8,
+                    "startBit": 64,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Re_PwrReqTbox",
+                "Data": {
+                    "startByte": 8,
+                    "startBit": 69,
+                    "bitLength": 3,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TBOX_RemoteOn",
+                "Data": {
+                    "startByte": 9,
+                    "startBit": 72,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TBOX_Re_VehData",
+                "Data": {
+                    "startByte": 9,
+                    "startBit": 74,
+                    "bitLength": 2,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Antitheft_Zero",
+                "Data": {
+                    "startByte": 9,
+                    "startBit": 76,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Re_DoorLock",
+                "Data": {
+                    "startByte": 16,
+                    "startBit": 80,
+                    "bitLength": 16,
+                    "defaultValue": "0xFFFF",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x490",
+        "DLC": 20,
+        "Cycle": "500",
+        "Signals": [
+            {
+                "Name": "IVI_Time_Year",
+                "Data": {
+                    "startByte": 2,
+                    "startBit": 16,
+                    "bitLength": 7,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 2000.0
+                }
+            },
+            {
+                "Name": "IVI_Time_Month",
+                "Data": {
+                    "startByte": 3,
+                    "startBit": 24,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "IVI_Time_Hour",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 32,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "IVI_Time_Day",
+                "Data": {
+                    "startByte": 5,
+                    "startBit": 40,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "IVI_Time_Minute",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 48,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "IVI_Time_Second",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 56,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "IVI_Time_Check",
+                "Data": {
+                    "startByte": 8,
+                    "startBit": 64,
+                    "bitLength": 8,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Sched_Chg_End_Time_HR",
+                "Data": {
+                    "startByte": 9,
+                    "startBit": 72,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Sched_Chg_End_Time_Min",
+                "Data": {
+                    "startByte": 16,
+                    "startBit": 80,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Sched_Chg_St_Time_HR",
+                "Data": {
+                    "startByte": 17,
+                    "startBit": 88,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Sched_Chg_St_Time_Min",
+                "Data": {
+                    "startByte": 18,
+                    "startBit": 96,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Sched_Chg_Day_Set",
+                "Data": {
+                    "startByte": 18,
+                    "startBit": 102,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Re_Radio_Sta",
+                "Data": {
+                    "startByte": 18,
+                    "startBit": 103,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Sched_OTA_wake",
+                "Data": {
+                    "startByte": 20,
+                    "startBit": 119,
+                    "bitLength": 1,
+                    "defaultValue": "0x0",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Upd_Countdown_Cancel",
+                "Data": {
+                    "startByte": 21,
+                    "startBit": 126,
+                    "bitLength": 1,
+                    "defaultValue": "0x0",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Upd_Countdown_Skip",
+                "Data": {
+                    "startByte": 21,
+                    "startBit": 127,
+                    "bitLength": 1,
+                    "defaultValue": "0x0",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x495",
+        "DLC": 64,
+        "Cycle": "200",
+        "Signals": [
+            {
+                "Name": "User_p_download",
+                "Data": {
+                    "startByte": 34,
+                    "startBit": 183,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Wifi_Sta_IVI_TBOX",
+                "Data": {
+                    "startByte": 35,
+                    "startBit": 188,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "User_p_upload",
+                "Data": {
+                    "startByte": 40,
+                    "startBit": 229,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Wifi_Reset",
+                "Data": {
+                    "startByte": 40,
+                    "startBit": 231,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "GPS_LAT",
+                "Data": {
+                    "startByte": 64,
+                    "startBit": 320,
+                    "bitLength": 32,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "GPS_LONG",
+                "Data": {
+                    "startByte": 68,
+                    "startBit": 352,
+                    "bitLength": 32,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Sched_Chg_butt",
+                "Data": {
+                    "startByte": 82,
+                    "startBit": 422,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "Sched_Chg_limit",
+                "Data": {
+                    "startByte": 83,
+                    "startBit": 424,
+                    "bitLength": 5,
+                    "defaultValue": "0x19",
+                    "accuracy": 2.0,
+                    "offset": 50.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x496",
+        "DLC": 8,
+        "Cycle": "1000",
+        "Signals": [
+            {
+                "Name": "TimeSyncFromBS_Month",
+                "Data": {
+                    "startByte": 2,
+                    "startBit": 20,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TimeSyncFromBS_Hour",
+                "Data": {
+                    "startByte": 3,
+                    "startBit": 27,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TimeSyncFromBS_Day",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 35,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TimeSyncFromBS_Second",
+                "Data": {
+                    "startByte": 5,
+                    "startBit": 42,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TimeSyncFromBS_Minute",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 50,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TimeSyncFromBS_Year",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 57,
+                    "bitLength": 7,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 2000.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x4E1",
+        "DLC": 24,
+        "Cycle": "1000",
+        "Signals": [
+            {
+                "Name": "ReserveChargeOn_Minute",
+                "Data": {
+                    "startByte": 3,
+                    "startBit": 24,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ReserveChargeOn_Hour",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 32,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ReserveChargeOn_Day",
+                "Data": {
+                    "startByte": 5,
+                    "startBit": 40,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ReserveChargeOn_Month",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 48,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ReserveChargeOn_Year",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 56,
+                    "bitLength": 7,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 2000.0
+                }
+            },
+            {
+                "Name": "ReserveChargeOFF_Minute",
+                "Data": {
+                    "startByte": 8,
+                    "startBit": 64,
+                    "bitLength": 6,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ReserveChargeOFF_Hour",
+                "Data": {
+                    "startByte": 9,
+                    "startBit": 72,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ReserveChargeOFF_Day",
+                "Data": {
+                    "startByte": 16,
+                    "startBit": 80,
+                    "bitLength": 5,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ReserveChargeOFF_Month",
+                "Data": {
+                    "startByte": 17,
+                    "startBit": 88,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "ReserveChargeOFF_Year",
+                "Data": {
+                    "startByte": 18,
+                    "startBit": 96,
+                    "bitLength": 7,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 2000.0
+                }
+            },
+            {
+                "Name": "Charge_Percent_Set",
+                "Data": {
+                    "startByte": 19,
+                    "startBit": 104,
+                    "bitLength": 8,
+                    "defaultValue": "0x64",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TBOX_SW_VER",
+                "Data": {
+                    "startByte": 20,
+                    "startBit": 112,
+                    "bitLength": 32,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "TBOX_HW_VER",
+                "Data": {
+                    "startByte": 24,
+                    "startBit": 144,
+                    "bitLength": 32,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x500",
+        "DLC": 8,
+        "Cycle": "",
+        "Signals": [
+            {
+                "Name": "NM_FUSION_ERROR_State",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 36,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_FUSION_Rpt_Msg_Req",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 48,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_FUSION_CSB",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 51,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_FUSION_Active_WU",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 52,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_FUSION_PNI",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 54,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_FUSION_Node_ID",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 56,
+                    "bitLength": 8,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x550",
+        "DLC": 8,
+        "Cycle": "",
+        "Signals": [
+            {
+                "Name": "NM_TBOX_ERROR_State",
+                "Data": {
+                    "startByte": 4,
+                    "startBit": 36,
+                    "bitLength": 4,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_TBOX_Rpt_Msg_Req",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 48,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_TBOX_CSB",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 51,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_TBOX_Active_WU",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 52,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_TBOX_PNI",
+                "Data": {
+                    "startByte": 6,
+                    "startBit": 54,
+                    "bitLength": 1,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            },
+            {
+                "Name": "NM_TBOX_Node_ID",
+                "Data": {
+                    "startByte": 7,
+                    "startBit": 56,
+                    "bitLength": 8,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x650",
+        "DLC": 64,
+        "Cycle": "",
+        "Signals": [
+            {
+                "Name": "DiagRespFromTBOX",
+                "Data": {
+                    "startByte": 86,
+                    "startBit": 448,
+                    "bitLength": 64,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x6D0",
+        "DLC": 64,
+        "Cycle": "",
+        "Signals": [
+            {
+                "Name": "DiagPhysReqToTBOX",
+                "Data": {
+                    "startByte": 86,
+                    "startBit": 448,
+                    "bitLength": 64,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    },
+    {
+        "CANID": "0x7D0",
+        "DLC": 8,
+        "Cycle": "",
+        "Signals": [
+            {
+                "Name": "DiagFuncReqFT",
+                "Data": {
+                    "startByte": 0,
+                    "startBit": 0,
+                    "bitLength": 64,
+                    "defaultValue": "",
+                    "accuracy": 1.0,
+                    "offset": 0.0
+                }
+            }
+        ]
+    }
+]
