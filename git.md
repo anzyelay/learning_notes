@@ -9,6 +9,13 @@ git config --global core.editor "vim" //修改commit的编辑器
 git config --global alias.st status
 # 设置github.com的镜像替换仓库加速访问
 git config --global url."https://git.homegu.com".insteadOf https://github.com
+
+# 但遇到 error: RPC failed; curl 18 transfer closed with outstanding read data remaining 及后续报错时,增加以下3行配置
+# 增大 HTTP 缓冲区（推荐值 500MB）
+git config --global http.postBuffer 524288000
+# 若仍失败，降低传输速度限制（允许更慢但稳定的连接）
+git config --global http.lowSpeedLimit 0
+git config --global http.lowSpeedTime 999999
 ```
 
 ## 仓库的建立
@@ -90,7 +97,7 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
     # 可以对这些行重新排序，将从上至下执行。 (commit的排列也是按历史从上到下排列)
     # 如果您在这里删除一行，对应的提交将会丢失。
     # 然而，如果您删除全部内容，变基操作将会终止。
-    # 注意空提交已被注释掉  
+    # 注意空提交已被注释掉
     ```
 
 - 仅修改提交信息，比如修改author或时间
@@ -100,7 +107,7 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
     git rebase -i father_commit_id
 
     # 2. 修改信息
-    git commit --amend --reset-author` 
+    git commit --amend --reset-author`
     # or
     git commit --date="$(date -R)"
     # or
@@ -146,9 +153,9 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
 
     ```sh
     #delete locale
-    git tag | xargs git tag -d 
+    git tag | xargs git tag -d
     #delete remote
-    git tag | xargs git push origin :refs/tags/  
+    git tag | xargs git push origin :refs/tags/
     ```
 
 ---
@@ -156,11 +163,11 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
 ## 日志
 
 > SYNOPSIS
-> `git log [<options>] [<revision range>] [[--] <path>...]`  
-> path前的"--"是用来与前面的options和revision避免混淆分隔用的，没分歧时可省略  
+> `git log [<options>] [<revision range>] [[--] <path>...]`
+> path前的"--"是用来与前面的options和revision避免混淆分隔用的，没分歧时可省略
 > revision raqnge: 中间用“..“分隔, eg:"old..new" ,默认”orig..HEAD“
 
-1. 查看单独一个文件/文件侠的修改历史  
+1. 查看单独一个文件/文件侠的修改历史
 
     ```sh
     git log path
@@ -186,7 +193,7 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
 1. How to ignore a tracked file in git without deleting it?
 
     ```sh
-    git rm --cached  path/to/file 
+    git rm --cached  path/to/file
     git rm --cached -r path/to/folder
     ```
 
@@ -195,7 +202,7 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
     ```sh
     # pull 默认情况下是 fetch + merge
     # 加了--rebase后， 优先换基而不是合并。incorporate changes by rebasing rather than merging
-    git pull --rebase 
+    git pull --rebase
     ```
 
     - the repository current status
@@ -203,16 +210,16 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
     ```mermaid
     graph LR
 
-    a --> b{b} --remote fresh commit -->　c --> d --> e 
-    b--local commit--> h-->j 
+    a --> b{b} --remote fresh commit -->　c --> d --> e
+    b--local commit--> h-->j
     ```
 
     - git pull
 
     ```mermaid
     graph LR
-    a --> b{b} --remote fresh commit -->　c --> d --> e 
-    b--local commit--> h-->j 
+    a --> b{b} --remote fresh commit -->　c --> d --> e
+    b--local commit--> h-->j
     e-.-> M((merge))
     j-..-> M --> m
     ```
@@ -221,7 +228,7 @@ git config --global url."https://git.homegu.com".insteadOf https://github.com
 
     ```mermaid
     graph LR
-    a --> b --remote commit -->　c --> d --> e 
+    a --> b --remote commit -->　c --> d --> e
     e --rebase---> h --> j
     b -. X .-> h
     ```
