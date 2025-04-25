@@ -99,3 +99,51 @@ static DEVICE_ATTR_RO(phy_state);
 
 1. 编译并加载模块：
 1. 查看debugfs目录： cat /sys/kernel/debug/my_device/test
+
+## 查看调用堆栈
+
+使用`WARN(1, "====\n")`打印可以输出调用堆栈
+
+## 使能Kernal Panic查看上次panic信息
+
+```sh
+commit 2137ec501b6842eff88fe0f8a979447c06fd1c30
+Author: Shujun Wang <walter.sj.wang@fii-foxconn.com>
+Date:   Fri Jan 24 15:56:17 2025 +0800
+
+    Kernel Panic: Enable RAMOOPS to capture the last crash or panic log to RAM
+
+    After kernel panic, we may be able to get the crash log in next reboot
+
+    How to get the log:
+    $ mkdir /tmp/pstore
+    $ mount -t pstore pstore /tmp/pstore
+    $ cd /tmp/pstore
+    $ cat console-ramoops-0
+    $ cat dmesg-ramoops-0
+
+    We can get the logs from the files: console-ramoops-0 or dmesg-ramoops-0
+
+diff --git a/sources/meta-foxconn/recipes-kernel/linux/files/linux-6.6-foxconn/arch/arm64/configs/defconfig b/sources/meta-foxconn/recipes-kernel/linux/files/linux-6.6-foxconn/arch/arm64/configs/defconfig
+index 2f271df40..f4b50dc83 100755
+--- a/sources/meta-foxconn/recipes-kernel/linux/files/linux-6.6-foxconn/arch/arm64/configs/defconfig
++++ b/sources/meta-foxconn/recipes-kernel/linux/files/linux-6.6-foxconn/arch/arm64/configs/defconfig
+@@ -1329,6 +1329,17 @@ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+ CONFIG_TMPFS_XATTR=y
+
++CONFIG_PSTORE_CONSOLE=y
++CONFIG_PSTORE_PMSG=y
++CONFIG_PSTORE_RAM=y
++CONFIG_PSTORE_ZONE=y
++CONFIG_PSTORE_BLK=y
++CONFIG_PSTORE_BLK_BLKDEV="lastpanic"
++CONFIG_PSTORE_BLK_KMSG_SIZE=512
++CONFIG_PSTORE_BLK_MAX_REASON=2
++CONFIG_PSTORE_BLK_PMSG_SIZE=128
++CONFIG_PSTORE_BLK_CONSOLE_SIZE=128
++
+ # CONFIG_WLAN_VENDOR_ADMTEK is not set
+ # CONFIG_WLAN_VENDOR_ATH is not set
+ # CONFIG_WLAN_VENDOR_ATMEL is not set
+```
