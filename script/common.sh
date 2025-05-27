@@ -41,6 +41,26 @@ ex_cp()
     sync
 }
 
+ex_run_apps() {
+    LOGAPPS=$@
+    # LOGAPPS=(
+    #     ddsservice
+    #     otaserver
+    #     fx-mifi-main
+    # )
+
+    PIDS=""
+
+    for logapp in "${LOGAPPS[@]}"; do
+        $logapp --logcat "$@" &
+        PIDS="$! $PIDS"
+    done
+
+    trap 'for pid in ${PIDS}; do kill -15 "$pid"; done' SIGINT SIGTERM
+
+    wait
+}
+
 main(){
 
 	has_fun=$(grep "^ex_$fun()$" $0)

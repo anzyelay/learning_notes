@@ -7,7 +7,7 @@
 1. 标准目标文件系统的路径变量和构建过程的变量定义的文件所在(Standard target filesystem paths)
 
    - sources/oe-core/meta/conf/bitbake.conf
-  
+
 1. 常见错误和警告参考文档
 
    - https://docs.yoctoproject.org/ref-manual/qa-checks.html
@@ -24,7 +24,7 @@ bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说�
   比如foo.bb内容如下
 
   ```bitbake
-  # foo的编译依赖bar，所以先编译bar 
+  # foo的编译依赖bar，所以先编译bar
   DEPENDS = "bar"
   # 带native表示需要依赖构建主机上的程序
   DEPENDS = "bar-native"
@@ -32,7 +32,7 @@ bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说�
   PV = "version-dir"
   ```
 
-- RDEPENDS: 后面接一个recipe name，或者一个recipe name list, 
+- RDEPENDS: 后面接一个recipe name，或者一个recipe name list,
   - Run time dependency: foo运行时依赖, 表示该依赖包被正常安装后foo才能正常运行
 
   - PROVIDES：主要是为了起别名
@@ -42,7 +42,7 @@ bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说�
   - bbwarn：用来打印
   - bbfatal：用来打印
   - eval:用来执行语句
-  
+
   ```bb
     bbnote ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}' --target test -- ${EXTRA_OECMAKE_BUILD}
     eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}' --target test -- ${EXTRA_OECMAKE_BUILD}
@@ -171,7 +171,7 @@ bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说�
   # 前提：
   # 1. 假设bb文件所以:   yocto/poky-jethro-14.0.0/meta-example/recipes-example/bbexample/bbexample-lt_1.0.bb
   # 2. 假设包所在：      yocto/poky-jethro-14.0.0/meta-example/recipes-example/bbexample/bbexample-lt-1.0/bbexample-v1.0.tar.gz
-  
+
   # 指定本地包
   SRC_URI = "file://bbexample-${PV}.tar.gz"
   # 指定bitbake搜索路径, 使用_prepend会报new bitbake不兼营错误
@@ -184,7 +184,7 @@ bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说�
    1. Make sure our source directory (for the build) matches the directory structure in the tarball
    2. We provide a search path to ensure bitbake can find the archive
    3. There is no SRC_REV here or check-sum for the local archive.
-  
+
 
 
 ### 修改kernel使用本地文件
@@ -277,46 +277,62 @@ FILES:${PN} += " \
 
 ### systemd
 
-添加systemd服务和自动启动, 参考wpa-supplicant
+1. 添加systemd服务和自动启动, 参考wpa-supplicant
 
-```sh
+  ```sh
 
-S = "${WORKDIR}/${BPN}"
+  S = "${WORKDIR}/${BPN}"
 
-SRC_URI = " file://pvr.service "
+  SRC_URI = " file://pvr.service "
 
-inherit systemd
+  inherit systemd
 
-do_install () {
+  do_install () {
 
-	install -d ${D}/${sysconfdir}/dbus-1/system.d
-	install -m 644 ${S}/wpa_supplicant/dbus/dbus-wpa_supplicant.conf ${D}/${sysconfdir}/dbus-1/system.d
-	install -d ${D}/${datadir}/dbus-1/system-services
-	install -m 644 ${S}/wpa_supplicant/dbus/*.service ${D}/${datadir}/dbus-1/system-services
+    install -d ${D}/${sysconfdir}/dbus-1/system.d
+    install -m 644 ${S}/wpa_supplicant/dbus/dbus-wpa_supplicant.conf ${D}/${sysconfdir}/dbus-1/system.d
+    install -d ${D}/${datadir}/dbus-1/system-services
+    install -m 644 ${S}/wpa_supplicant/dbus/*.service ${D}/${datadir}/dbus-1/system-services
 
-	if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
-		install -d ${D}/${systemd_system_unitdir}
-		install -m 644 ${S}/wpa_supplicant/systemd/*.service ${D}/${systemd_system_unitdir}
-	fi
+    if ${@bb.utils.contains('DISTRO_FEATURES','systemd','true','false',d)}; then
+      install -d ${D}/${systemd_system_unitdir}
+      install -m 644 ${S}/wpa_supplicant/systemd/*.service ${D}/${systemd_system_unitdir}
+    fi
 
-	install -d ${D}/etc/default/volatiles
-	install -m 0644 ${WORKDIR}/99_wpa_supplicant ${D}/etc/default/volatiles
+    install -d ${D}/etc/default/volatiles
+    install -m 0644 ${WORKDIR}/99_wpa_supplicant ${D}/etc/default/volatiles
 
-	install -d ${D}${includedir}
-	install -m 0644 ${S}/src/common/wpa_ctrl.h ${D}${includedir}
+    install -d ${D}${includedir}
+    install -m 0644 ${S}/src/common/wpa_ctrl.h ${D}${includedir}
 
-	if [ -z "${DISABLE_STATIC}" ]; then
-		install -d ${D}${libdir}
-		install -m 0644 wpa_supplicant/libwpa_client.a ${D}${libdir}
-	fi
-}
+    if [ -z "${DISABLE_STATIC}" ]; then
+      install -d ${D}${libdir}
+      install -m 0644 wpa_supplicant/libwpa_client.a ${D}${libdir}
+    fi
+  }
 
-FILES:${PN} += "${datadir}/dbus-1/system-services/* ${systemd_system_unitdir}/*"
+  FILES:${PN} += "${datadir}/dbus-1/system-services/* ${systemd_system_unitdir}/*"
 
-SYSTEMD_SERVICE:${PN} = "pvr.service"
-SYSTEMD_AUTO_ENABLE:${PN} = "enable"
+  SYSTEMD_SERVICE:${PN} = "pvr.service"
+  SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
-```
+  ```
+
+1. 禁用某项启动项
+
+   ```sh
+   # 1. way
+   SYSTEMD_AUTO_ENABLE:${PN} = "disable" # 如果有多个服务项，只想禁用某一个，此法无法针对某一个服务项禁用
+
+   # 2. 使用如下方式禁某一个服务
+
+   do_install:append() {
+    rm -rf ${D}${sysconfdir}/systemd/system/sysinit.target.wants/systemd-timesyncd.service
+   }
+
+   # 3. 这个可用，上面一个无效
+   PACKAGECONFIG:remove = "timesyncd"
+   ```
 
 ### 手动下载源码包
 
