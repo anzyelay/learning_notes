@@ -183,7 +183,7 @@ static void inject_to_logcat_pipes(unsigned int request_level, const char * extr
 	inject_to_pipe(&logcat_pipe, extra_prefix, log, log_bytes);
 	for (i = 0; i < LOGCAT_CLIENTS_NR; i++) {
 		if (!logcat_clients_pipe[i])
-			continue;
+			break;
 		inject_to_pipe(logcat_clients_pipe[i], extra_prefix, log, log_bytes);
 	}
 	logcat_service_mutex_unlock();
@@ -233,6 +233,43 @@ void log_logcat_clear(void)
 	logcat_service_mutex_unlock();
 }
 
+static int server_logcat_to_logall(void)
+{
+	pipe_t * pipe;
+	char buf[1024];
+	int ret, bytes;
+
+	pthread_detach(pthread_self()); // Need NO pthread_join()
+
+	pipe = logcat_clients_get_new_pipe();
+	if (!pipe)
+		return -1;
+	// log_debug_v2("%s: new client connected, socket: %d\n", tag, client_sock);
+	int local_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	struct sockaddr_in logall_addr;
+	logall_addr.sin_family = AF_INET;
+	logall_addr.sin_port = htons(LOGCAT_LOGALL_SERVICE_PORT);
+	logall_addr.sin_addr.s_addr = INADDR_ANY;
+
+	while(!log_get_exit_flag()) {
+		bytes = pipe_read(pipe, buf, sizeof(buf), 0, 0);
+		if (bytes < 0)
+			break;
+		if (bytes > 0) {
+			ret = sendto(local_socket, buf, bytes, NULL, &logall_addr, sizeof(logall_addr));
+			if (ret < 0) {
+				msleep(100);
+				log_debug_vv("%s: send to logall service failed, %d bytes, error = %d (%s)\n", tag, bytes, errno, strerro
+(errno));
+			}
+		} else {
+			msleep(100);
+		}
+	}
+	close(local_socket);
+	logcat_clients_free_pipe(pipe);
+	return 0;
+}
 /*
  * Logcat clients process
  * Each client has a thread
@@ -302,6 +339,14 @@ static int do_logcat_service()
 	if (listen_sock < 0) {
 		log_err("%s: service start failed\n", tag);
 		return listen_sock;
+	}
+
+	if (!has_log_logall_service) {
+		pthread_t log2logall_thread;
+		int ret = pthread_create(&log2logall_thread, NULL, server_logcat_to_logall, NULL);
+		if (ret != 0) {
+			log_err("%s: create log_to_all thread failed: %d\n", tag, ret);
+		}
 	}
 	service_waiting_for_clients(listen_sock, serve_logcat_client, NULL, tag);
 	service_sock_close(listen_sock, tag);

@@ -97,4 +97,14 @@ void set_log_dir(char * dir_path);
 */
 int log_init(int argc, char *argv[], int (*p_parse_fun)(int, char**));
 
+/**
+ * @brief  logall_run: run the log all service, which will collect all logs, and block here
+ * This function is used when the log service is running as a daemon or service.
+ *
+ * @param argc
+ * @param argv
+ * @return int
+ */
+int logall_run(int argc, char *argv[]);
+
 #endif /* _LOG_OUT_H */

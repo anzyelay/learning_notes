@@ -282,6 +282,26 @@ static void do_logcat_client(void)
 		sleep(1);
 		return;
 	}
+	if (logcat_clear_logs) {
+		fd_set read_fds;
+		struct timeval timeout;
+		int ret = -1;
+
+		FD_ZERO(&read_fds);
+		FD_SET(sock, &read_fds);
+		timeout.tv_sec = 1;
+		timeout.tv_usec = 0;
+
+		while ((ret = select(sock + 1, &read_fds, NULL, NULL, &timeout)) > 0) {
+			if (FD_ISSET(sock, &read_fds)) {
+				bytes = read(sock, buf, sizeof(buf));
+				if (bytes <= 0) {
+					break;
+				}
+			}
+		}
+		log_info("%s: %s logcat buffer cleared\n", tag, me);
+	}
 	int read_max_times = 50;
 	while (read_max_times) {
 		bytes = read(sock, buf, sizeof(buf));
@@ -323,14 +343,90 @@ static void do_logcat_client(void)
 	sock_close(sock);
 }
 
+// 用socket接收日志服务，并读取日志数据
+static int do_logcat_logall(void)
+{
+	char buf[3072], * pbuf;
+	int sock, bytes;
+
+	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock < 0) {
+		log_info("%s: logcat-logall service cant create...\n", tag);
+		sleep(1);
+		return -1;
+	}
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(LOGCAT_LOGALL_SERVICE_PORT);
+	addr.sin_addr.s_addr = INADDR_ANY;
+	bind(sock, (struct sockaddr*)&addr, sizeof(addr));
+
+	int read_max_times = 50;
+	while (read_max_times) {
+		bytes = recv(sock, buf, sizeof(buf), 0);
+		if (bytes < 0) {
+			log_err("%s: read socket error: %d (%s), try to reconnect...\n", tag, errno, strerror(errno));
+			break;
+		}
+		else if (bytes == 0) {
+			read_max_times--;
+			msleep(100);
+			if (read_max_times <= 0) {
+				log_err("%s: read socket timeout times: %d, try to reconnect...\n", tag, 50-read_max_times);
+				break;
+			}
+		}
+		else {
+			read_max_times = 50;
+		}
+
+		pbuf = buf;
+		while (bytes > 0) {
+			// Convert the '\0' to "<nul>" string, or else the log will be hung by '\0'
+			char nul_str[] = "<nul>";
+			int t = strlen(pbuf);;
+			if (t > bytes)
+				t = bytes;
+			if (t > 0)
+				logcat_parse_log(pbuf, t);
+			if (bytes > t) {
+				logcat_parse_log(nul_str, strlen(nul_str));
+				t++;
+			}
+
+			bytes -= t;
+			pbuf += t;
+		}
+	}
+
+	close(sock);
+	return 0;
+}
+
+void logall_main(void)
+{
+	log_verbose_level &= (~_LOG_LEVEL_PREFIX);
+	log_verbose_level &= (~_LOG_LEVEL_TIMESTAMP);
+
+	log_to_kmsg_allowed = 0;
+	has_log_file_service = 1;
+	has_log_logcat_service = 1;
+
+
+	while (1) {
+		do_logcat_logall();
+		msleep(100);
+	}
+}
+
 void logcat_main(void)
 {
 	logcat_set_verbose();
 
-	if (logcat_clear_logs) {
-		log_logcat_clear();
-		return;
-	}
+	// if (logcat_clear_logs) {
+	// 	log_logcat_clear();
+	// 	return;
+	// }
 
 	if (logcat_cat_log_file) {
 		do_logcat_file(logcat_cat_log_file);
@@ -358,41 +454,4 @@ void set_log_dir(char * dir_path)
 	}
 	log_dir = dir_path;
 	log_debug("%s: set log dir: %s\n", tag, log_dir);
-}
-
-/**
- * return: 0 as a service or run in block as a client until exit
-*/
-int log_run()
-{
-	setup_signals();
-
-	if (logcat_mode()){
-		log_info("====log client====\n");
-		logcat_main();
-		exit(EXIT_SUCCESS);
-	}
-
-	log_info("log server!\n");
-	start_log_service();
-	usleep(10000);
-	return 0;
-}
-
-int log_init(int argc, char *argv[], int (*p_parse_fun)(int, char**))
-{
-	int ret = 0;
-	ret = parse_args(argc, argv);
-	if (ret < 0){
-		log_err("parse args in log parse failed\n");
-		return -1;
-	}
-	if (ret==0 && p_parse_fun) {
-		ret = p_parse_fun(argc, argv);
-		if (ret < 0){
-			log_debug_vv("stop from user parse func\n");
-			return ret;
-		}
-	}
-	return log_run();
 }

@@ -16,6 +16,7 @@ static long timestamp_start = 0;
 int has_log_file_service = 1;
 int has_log_logcat_service = 1;
 int log_to_kmsg_allowed = 1;
+int has_log_logall_service = 0;
 
 enum __LOG_COLORS {
 	__LOG_ATTR_RESET,
@@ -368,4 +369,77 @@ void start_log_service(void)
 		start_log_logcat_service();
 	if (has_log_file_service)
 		start_log_file_service();
+}
+
+/**
+ * return: 0 as a service or run in block as a client until exit
+*/
+int log_run()
+{
+	setup_signals();
+
+	if (logcat_mode()){
+		log_info("====log client====\n");
+		logcat_main();
+		exit(EXIT_SUCCESS);
+	}
+
+	log_info("log server!\n");
+	start_log_service();
+	usleep(10000);
+	return 0;
+}
+
+int log_init(int argc, char *argv[], int (*p_parse_fun)(int, char**))
+{
+	int ret = 0;
+	ret = parse_args(argc, argv);
+	if (ret < 0){
+		log_err("parse args in log parse failed\n");
+		return -1;
+	}
+	if (ret==0 && p_parse_fun) {
+		ret = p_parse_fun(argc, argv);
+		if (ret < 0){
+			log_debug_vv("stop from user parse func\n");
+			return ret;
+		}
+	}
+	return log_run();
+}
+
+int logall_run(int argc, char *argv[])
+{
+       int ret = 0;
+
+       setup_signals();
+
+       ret = parse_args(argc, argv);
+       if (ret < 0) {
+               log_err("parse args in log parse failed\n");
+               return -1;
+       }
+
+       if (ret == 0) {
+               usage(NULL, NULL);
+               return -1;
+       }
+
+       if (logcat_mode()) {
+               if (me != NULL) {
+                       log_info("====%s log client====\n", me);
+               }
+               logcat_main();
+               exit(EXIT_SUCCESS);
+       }
+
+       if (me != NULL) {
+               log_info("%s log server!\n", me);
+       }
+
+       has_log_logall_service = 1;
+
+       start_log_service();
+
+       return logall_main();
 }

@@ -30,3 +30,9 @@ int main(int argc, char ** argv)
 
     return 0;
 }
+
+// This function is used to run the logall example
+int main1(int argc, char **argv)
+{
+    return logall_run(argc, argv);
+}

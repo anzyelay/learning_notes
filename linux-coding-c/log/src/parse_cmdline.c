@@ -344,12 +344,12 @@ int parse_args(int argc, char **argv)
 
 	// Get the new config file path
 	ret = parse_args_once(argc, argv);
-	if (ret < 0)
+	if (ret <= 0)
 		return ret;
 
 	// If this is the 'logcat', we return here
 	if (logcat_mode())
-		return 0;
+		return 1;
 
 	// If --save-config set, save the configs to file, and then exit!
 	if (do_save_config) {

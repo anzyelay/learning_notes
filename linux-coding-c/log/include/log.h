@@ -15,9 +15,12 @@ extern "C" {
 #define LOG_SERVICE_NAME_FMT          "/dev/%s_log_interface"
 #endif
 
+#define LOGCAT_LOGALL_SERVICE_PORT  8259       // logall服务端口
+
 extern unsigned int log_verbose_level;
 extern int has_log_file_service;
 extern int has_log_logcat_service;
+extern int has_log_logall_service;
 extern int log_to_kmsg_allowed;
 extern const char * me;
 extern char * log_dir;

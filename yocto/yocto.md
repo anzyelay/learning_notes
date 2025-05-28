@@ -320,19 +320,19 @@ FILES:${PN} += " \
 
 1. 禁用某项启动项
 
-   ```sh
-   # 1. way
-   SYSTEMD_AUTO_ENABLE:${PN} = "disable" # 如果有多个服务项，只想禁用某一个，此法无法针对某一个服务项禁用
+  ```sh
+  # 1. way
+  SYSTEMD_AUTO_ENABLE:${PN} = "disable" # 如果有多个服务项，只想禁用某一个，此法无法针对某一个服务项禁用
 
-   # 2. 使用如下方式禁某一个服务
+  # 2. 使用如下方式禁某一个服务
 
-   do_install:append() {
+  do_install:append() {
     rm -rf ${D}${sysconfdir}/systemd/system/sysinit.target.wants/systemd-timesyncd.service
-   }
+  }
 
-   # 3. 这个可用，上面一个无效
-   PACKAGECONFIG:remove = "timesyncd"
-   ```
+  # 3. 这个可用，上面一个无效
+  PACKAGECONFIG:remove = "timesyncd"
+  ```
 
 ### 手动下载源码包
 
