@@ -147,3 +147,34 @@ index 2f271df40..f4b50dc83 100755
  # CONFIG_WLAN_VENDOR_ATH is not set
  # CONFIG_WLAN_VENDOR_ATMEL is not set
 ```
+
+## 查看kernel bootup 的各模块耗时
+
+> initcall_debug	[KNL] Trace initcalls as they are executed.  Useful
+> for working out where the kernel is dying during
+> startup.
+>
+>           ------ <<Documentation/admin-guide/kernel-parameters.txt>>
+
+可以用来检查开机启动时哪个服务比较慢
+
+- linux
+
+    CONFIG_CMDLINE="initcall_debug loglevel=8"
+
+- colect tty log to log.txt, sort by consumer time
+
+    ```sh
+    cat log.txt | grep "initcall" | sed "s/\(.*\)after\(.*\)/\2 \1/g" | sort -n
+    ```
+
+- 该参数定义在init的main.c文件中。
+
+    ```c
+    bool initcall_debug;
+    core_param(initcall_debug, initcall_debug, bool, 0644);
+    ```
+
+## PM时间分析工具
+
+> pm-graph: suspend/resume/boot timing analysis tools
