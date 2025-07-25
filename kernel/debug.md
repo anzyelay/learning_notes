@@ -42,6 +42,8 @@ static DEVICE_ATTR_RO(phy_state);
 
 ## 方法二 ：使用debugfs
 
+> 参考：sources/meta-foxconn/recipes-kernel/linux/files/linux-6.6-foxconn/Documentation/filesystems/debugfs.rst
+
 1. 需要引用的头文件： debugfs.h - a tiny little debug file system
 1. 创建目录： `debugfs_create_dir(const char *name, struct dentry *parent)`
 1. 创建文件： `debugfs_create_file(const char *name, umode_t mode, struct dentry *parent, void *data, const struct file_operations *fops)`
@@ -54,15 +56,60 @@ static DEVICE_ATTR_RO(phy_state);
     ```c
     #include <linux/debugfs.h>
 
+    struct mydevice {
+        char name[100];
+        int dd;
+    };
+
+    static struct mydevice mydev;
+    static struct dentry *debugfs_dir = NULL;
+
     static ssize_t my_device_test_get(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
     {
         // 实现读取数据的逻辑
+        struct mydevice *pdev = filp->private_data;
+	    /* need room for the name, a newline and a terminating null */
+        char buf[100];
+        int i;
+
+        i = scnprintf(buf, sizeof(buf), "%.98s\n", pdev->name);
+
+        return simple_read_from_buffer(userbuf, count, ppos, buf, i);
         return count;
     }
 
     static int my_device_test_set(struct file *file, const char __user *user_buf, size_t count, loff_t *ppos)
     {
         // 实现写入数据的逻辑
+        unsigned int type;
+        int ret;
+
+        // int case
+        ret = kstrtouint_from_user(user_buf, count, 0, &type);
+        if (ret < 0)
+            return ret;
+
+        /**
+        // string case:
+        char buf[10];
+        if (count < 1 || count > sizeof(buf))
+            return -EINVAL;
+
+        ret = copy_from_user(buf, user_buf, count);
+        if (ret)
+            return -EFAULT;
+
+        if (buf[count - 1] == '\n')
+            buf[count - 1] = '\0';
+
+        if (!strncmp(buf, "enabled", count)) {
+        } else if (!strncmp(buf, "disabled", count)) {
+        } else {
+            return -EINVAL;
+        }
+        **/
+
+        // todo something
         return count;
     }
 
@@ -71,15 +118,15 @@ static DEVICE_ATTR_RO(phy_state);
 
     static int __init my_device_init(void)
     {
-        // 创建debugfs目录
-        struct dentry *debugfs_dir = debugfs_create_dir("my_device", NULL);
+        // 创建debugfs目录 my_device 可用 KBUILD_MODNAME或dev_name(dev)代替
+        debugfs_dir = debugfs_create_dir("my_device", NULL);
         if (!debugfs_dir) {
             pr_err("Failed to create debugfs directory\n");
             return -ENOMEM;
         }
 
         // 创建debugfs文件
-        debugfs_create_file("test", 0644, debugfs_dir, NULL, &my_device_test_fops);
+        debugfs_create_file("test", 0644, debugfs_dir, &mydev, &my_device_test_fops);
 
         return 0;
     }
@@ -87,10 +134,10 @@ static DEVICE_ATTR_RO(phy_state);
     static void __exit my_device_exit(void)
     {
         // 删除debugfs文件
-        debugfs_remove(debugfs_create_file("test", 0644, NULL, NULL, &my_device_test_fops));
+        // debugfs_remove(debugfs_create_file("test", 0644, NULL, NULL, &my_device_test_fops));
 
         // 删除debugfs目录
-        debugfs_remove_recursive(debugfs_create_dir("my_device", NULL));
+        debugfs_remove_recursive(debugfs_dir);
     }
 
     module_init(my_device_init);
