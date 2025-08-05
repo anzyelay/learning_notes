@@ -274,7 +274,7 @@ function call_method() {
         ((i++))
     done
     # echo "$method" "${args[@]}"
-    ret=$(dbus-send $MESSAGE_BUS --print-reply=literal --dest="${DEST}" "${OBJECT_PATH}" "$method" "${args[@]}")
+    ret=$(dbus-send $MESSAGE_BUS --print-reply=literal --reply-timeout=180000 --dest="${DEST}" "${OBJECT_PATH}" "$method" "${args[@]}")
     echo "$ret"
 }
 
