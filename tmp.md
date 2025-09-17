@@ -49,7 +49,7 @@ context.play (0, Canberra.PROP_EVENT_ID, "desktop-login"
     ret=`gsettings get org.gnome.desktop.sound event-sounds`
     echo $ret
     if [ $ret = "true"  ] ;then
-      paplay /usr/share/sounds/freedesktop/stereo/bell.oga 
+      paplay /usr/share/sounds/freedesktop/stereo/bell.oga
     fi
     ```
 
@@ -95,7 +95,7 @@ context.play (0, Canberra.PROP_EVENT_ID, "desktop-login"
     - 修改主工程的meson.build中的gettext_name
 
       ```meson
-      gettext_name = 'settingboard-plug-' + meson.project_name() 
+      gettext_name = 'settingboard-plug-' + meson.project_name()
       ```
 
     - rename  xml中的translation type
@@ -141,7 +141,7 @@ Actor动画
     //恢复设置值立即生效模式
     //这句只是恢复easing_state,不是恢复opacity值到0的哦！！！！，因此下次还要初始化它为0
     restore_easing_state ();
-    
+
 
 ```
 
@@ -165,7 +165,7 @@ Actor动画
 ## 终端页面无法回滚，不能使用上和pageup键回看,原因是pager默认配置为more,改为less即可
 
 ```sh
-ann@dell:settingboard-plug-applications-1.0.0$ sudo update-alternatives --config pager 
+ann@dell:settingboard-plug-applications-1.0.0$ sudo update-alternatives --config pager
 有 2 个候选项可用于替换 pager (提供 /usr/bin/pager)。
 
   选择       路径          优先级  状态
@@ -303,7 +303,7 @@ get_crtcs();
 
 get_outputs();
   XRRGetOutputInfo(dpy, res, res->outputs[o]);
-  output = find_output(&output_name); 
+  output = find_output(&output_name);
   output?:output = add_output();
 
 
@@ -700,7 +700,7 @@ F1-.-C1-.->|yes| AACSD --> |2| F3
 C1-.->|no| ARCSD --> |3| F3
 
 
-F3-->F2-.-C2-.no 2.-> SCSD1 
+F3-->F2-.-C2-.no 2.-> SCSD1
 C2-.no 1,3-.-> SNCSD
 C2-.yes 1,3-.-> AADEF--> SCSD2
 
@@ -712,7 +712,7 @@ C2-.yes 1,3-.-> AADEF--> SCSD2
 
 ```mermaid
 flowchart TB
-panel_object_loader_idle_handler 
+panel_object_loader_idle_handler
 --> panel_applet_frame_load
 --> panel_applets_manager_get_applet_info
 --> gp_module_manager_init??
@@ -813,7 +813,7 @@ slogan | summary
 
 ## seeds --> metapackages
 
-## What is [Germinate](https://wiki.debian.org/Germinate#:~:text=What%20is%20Germinate%3F%20Germinate%20is%20a%20package%20available,for%20each%20of%20these%20lists.%20Files%20You%20Need)?  
+## What is [Germinate](https://wiki.debian.org/Germinate#:~:text=What%20is%20Germinate%3F%20Germinate%20is%20a%20package%20available,for%20each%20of%20these%20lists.%20Files%20You%20Need)?
 
 Germinate is a package available in Debian and Ubuntu which starts with lists of packages (called seeds) and grows them into a full list of packages including dependencies and (in additional lists) suggests, recommends, and sources for each of these lists.
 可以结合elementary seeds工程看
@@ -906,10 +906,10 @@ ITX-3588J，Linux sdk：
    grub> cat (lvm/data-root)/etc/fstab
    PARTUUID=238232-234.....         /boot/efi vfat umask=0077 0 0
    UUID=33b3063f-5dfa-4cec-bb4c-b0ae86b47d86 / ext4 noatime,errors=remount-ro 0 0
-   
+
    grub> linux (lvm/data-root)/boot/vmlinuz ro root=UUID=33b3063f-5dfa-4cec-bb4c-b0ae86b47d86 quiet
    #其它版本linux命令改为kernel
-   grub> kernel 
+   grub> kernel
    ```
 
    - (lvm/data-root)/boot/vmlinuz：指定了内核文件的位置，这里的 (lvm/data-root)/boot/ 是指 boot 分区。
@@ -937,13 +937,13 @@ ITX-3588J，Linux sdk：
 
 2. 设置apt代理，touch /etc/apt/apt.conf, 内容如下：
 
-    ``` txt  
+    ``` txt
     Acquire::http::Proxy "http://username:passwd@proxy_ip:port";
     ```
 
 3. docker 代理设置
 
-   [参考链接](https://docs.docker.com/config/daemon/systemd/)  
+   [参考链接](https://docs.docker.com/config/daemon/systemd/)
 
     ```sh
     sudo mkdir -p /etc/systemd/system/docker.service.d
@@ -1198,14 +1198,14 @@ jailhouse | 构建支持hypervisor平台所需模块
 env variants | desc
 -|-
 PLATFORM |AM62x installer支持`am62xx-evm`和`am62xx-lp-evm`, 前者是默认平台
-ARCH | 
+ARCH |
 UBOOT_MACHINE |
 TI_SDK_PATH |
 DESTDIR |
 LINUX_DEVKIT_PATH |
 CROSS_COMPILE |
 ENV_SETUP |
-LINUXKERNEL_INSTALL_DIR | 
+LINUXKERNEL_INSTALL_DIR |
 
 1. 用`bmap-tools`烧录SD卡
 
@@ -1326,9 +1326,9 @@ DESTDIR=`pwd`/installed ninja install
 1. 执行build时会先安装arm和aarch64 toolchain, 网络不行，建议自行安装解压到tools目录下。
 
    ```sh
-   # download 
+   # download
    host_arch=x86_64 && wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-${host_arch}-aarch64-none-linux-gnu.tar.xz
-   host_arch=x86_64 && wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-${host_arch}-aarch64-none-linux-gnu.tar.xz 
+   host_arch=x86_64 && wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-${host_arch}-aarch64-none-linux-gnu.tar.xz
    # decompress
    cd tools && tar -Jxf toolchain
    # rm
@@ -1364,7 +1364,7 @@ recipes-* | 目录中存放*.bb或bbappend文件
 
 - bb中写注释一定要顶行的**#**字符才起作用
 
-yocto 
+yocto
 
 bbclass类型文件 c++类型，使用`inherit bbclassname`引入，bbclassname即为bbclass文件不带后缀的名字
 bb文件类似一个bbclass实例，里面可以继承重载bbclass方法`do_configure, do_compile, do_install`等，可以用`xxx.inc`引用xxx文件变量，
@@ -1396,7 +1396,7 @@ ERROR: Logfile of failure stored in: /working_dir/build/arago-tmp-default-glibc/
 ERROR: Task (/working_dir/sources/meta-foxconn/recipes-grpc/grpc/grpc-1.27.0.bb:do_package) failed with exit code '1'
 ```
 
-  错误说明下方的文件没有被打包，可以在`FILES`变量中加入这些文件，比如 
+  错误说明下方的文件没有被打包，可以在`FILES`变量中加入这些文件，比如
 
   `FILES:{PN} += "${datadir}"`
 
@@ -1416,7 +1416,7 @@ ERROR: Task (/working_dir/sources/meta-foxconn/recipes-grpc/grpc/grpc-1.27.0.bb:
 # kernel debug
 
 1. 反向编译设备树文件： `dtc -I dtb -O dts k3-am625-<boardname>.dtb -o <boardname>-reversed.dts`
-   
+
 2. dmesg中内核打印信息
 
   ```sh
@@ -1544,7 +1544,7 @@ ERROR: Task (/working_dir/sources/meta-foxconn/recipes-grpc/grpc/grpc-1.27.0.bb:
   MODULE_DESCRIPTION("AM65 CPSW Nuss MDIO driver");
   MODULE_LICENSE("GPL v2");
 
-  
+
   }
 ```
 
@@ -1555,8 +1555,45 @@ ERROR: Task (/working_dir/sources/meta-foxconn/recipes-grpc/grpc/grpc-1.27.0.bb:
 ```sh
 mkdir /tmp/pluginname
 cd /tmp/pluginname
-ar -x plugin.ipk 
+ar -x plugin.ipk
 mkdir ./CONTROL
 tar vxzf control.tar.gz -C ./CONTROL
 tar vxzf data.tar.gz  -C ./
+```
+
+## mutex
+
+不应在信号处理函数中使用其它线程会使用到的锁
+不要在信号处理函数中调用日志函数，除非你确保它是异步信号安全的（如只用 write() 而不是 fprintf()）
+如果你使用的是多线程程序，建议使用 pthread_sigmask() 替代 sigprocmask()，以线程粒度控制信号屏蔽
+
+```c
+void write_log_safely(const char *msg) {
+    sigset_t block_set, old_set;
+
+    // 设置要屏蔽的信号集
+    sigemptyset(&block_set);
+    sigaddset(&block_set, SIGCHLD);  // 屏蔽 SIGCHLD，避免中断
+
+    // 屏蔽信号，保存原始信号屏蔽集
+    if (sigprocmask(SIG_BLOCK, &block_set, &old_set) != 0) {
+        perror("sigprocmask block failed");
+        return;
+    }
+
+    // 日志写入（关键区）
+    FILE *fp = fopen("/tmp/myapp.log", "a");
+    if (fp) {
+        time_t now = time(NULL);
+        fprintf(fp, "[%s] %s\n", ctime(&now), msg);
+        fclose(fp);
+    } else {
+        perror("fopen log file failed");
+    }
+
+    // 恢复原始信号屏蔽集
+    if (sigprocmask(SIG_SETMASK, &old_set, NULL) != 0) {
+        perror("sigprocmask restore failed");
+    }
+}
 ```

@@ -183,7 +183,7 @@ static void inject_to_logcat_pipes(unsigned int request_level, const char * extr
 	inject_to_pipe(&logcat_pipe, extra_prefix, log, log_bytes);
 	for (i = 0; i < LOGCAT_CLIENTS_NR; i++) {
 		if (!logcat_clients_pipe[i])
-			break;
+			continue; // logcat clients pipe may be free, so it break down the continueos
 		inject_to_pipe(logcat_clients_pipe[i], extra_prefix, log, log_bytes);
 	}
 	logcat_service_mutex_unlock();

@@ -225,3 +225,84 @@ index 2f271df40..f4b50dc83 100755
 ## PM时间分析工具
 
 > pm-graph: suspend/resume/boot timing analysis tools
+
+## 设备树中的reg属性与其在代码中的应用（register 地址）
+
+### 相关函数
+
+函数 | 作用 | 适应场景
+-|-|-
+platform_get_resource() | 获取设备树中定义的 reg
+devm_ioremap_resource() | 映射物理地址为虚拟地址 | 适合简单设备，无需缓存或复杂寄存器管理
+devm_platform_ioremap_resource() | 简化版，自动获取并映射 | 上面两个函数的合体
+readl() / writel() | 读写寄存器 | 使用 `ioremap()` 或 `devm_ioremap_resource()` 映射的地址
+devm_regmap_init_mmio() | 使用 regmap 框架统一访问寄存器 | 返回`struct regmap`结构体用于regmap_read/write, 适合复杂设备，支持寄存器缓存、默认值、调试接口
+regmap_read() / regmap_write() | 读写寄存器 | 使用 `devm_regmap_init_mmio()` 初始化的 regmap 接口
+
+
+- 使用 readl() / writel()
+
+```c
+void __iomem *base;
+base = devm_platform_ioremap_resource(pdev, 1);//如果设备树中定义了多个reg块，可以通过不同的索引访问, 1表示映射reg区域的第二个，对应上面的0x0fa18000
+// 接下来就可以通过 base 访问寄存器了
+val = readl(base + REG_OFFSET);
+writel(val, base + REG_OFFSET);
+```
+
+- 使用 regmap_read() / regmap_write()
+
+```c
+struct regmap *regmap;
+regmap = devm_regmap_init_mmio(&pdev->dev, base, &regmap_config);
+regmap_read(regmap, REG_OFFSET, &val);
+regmap_write(regmap, REG_OFFSET, val);
+```
+
+1. 在代码中寻找寄存器对应值
+
+    ```dts
+    sdhci0: mmc@fa10000 {
+        compatible = "ti,am62-sdhci";
+        reg = <0x00 0x0fa10000 0x00 0x1000>, <0x00 0x0fa18000 0x00 0x400>;
+        status = "okay";
+    };
+    ```
+
+   1. 通过**compatible**先找到对应设备树结点"sdhci0"
+   2. 由上述映射关系找到对应reg基址, 0x0fa18000
+   3. 加上访问的偏移值, 0x0fa18000+REG_OFFSET
+
+### 用户空间快速验证
+
+1. `devmem` tool
+
+   ```bash
+    devmem 0x10000000 w         # 读取寄存器
+    devmem 0x10000000 w 0x1234  # 写入寄存器
+   ```
+
+1. Regmap Debugfs 寄存器调试接口
+
+    如果你的驱动使用了 regmap 框架（如通过 devm_regmap_init_mmio()），那么你可以自动获得寄存器调试接口：
+
+    使用方式：
+    - 驱动中初始化 regmap：
+
+        `regmap = devm_regmap_init_mmio(&pdev->dev, base, &regmap_config);`
+
+    - 启用 CONFIG_REGMAP_DEBUGFS：
+
+        `CONFIG_REGMAP_DEBUGFS=y`
+
+    - 挂载 Debugfs：
+
+        `mount -t debugfs none /sys/kernel/debug`
+
+    - 查看寄存器：
+
+        `cat /sys/kernel/debug/regmap/<device>/registers`
+
+    你可以看到寄存器的值、访问次数、是否命中缓存等信息。
+
+注： `devm_regmap_init_i2c()` 或 `devm_regmap_init_spi()`，也支持 Debugfs

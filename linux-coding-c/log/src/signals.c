@@ -20,7 +20,7 @@
 
 static void quit_by_user(int signo)
 {
-	log_emerg("%s: Quit by Signal: %d\n", tag, signo);
+	printf("%s: Quit by Signal: %d\n", tag, signo);
 	safely_quit("Signal", 0);
 }
 
