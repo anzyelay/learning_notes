@@ -130,3 +130,7 @@ ex_create_image()
 - 配置输出：`devmem2 gpio_address 0x00010007`
 
 - 拉高: `gpioset -c chip line=1`
+
+## uboot cmdline传参
+
+在/boot/uEnv.txt中加入`setenv optargs "initcall_debug ignore_loglevel"`
