@@ -150,7 +150,7 @@ bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说�
         ```
 
         常见task:
-            下载（fetch）、解包（unpack）、打补丁（patch）、配置（configure）、编译（compile）、安装（install）、打包（package）、staging、做安装包（package_write_ipk）、构建文件系统等,可以在对应的构建目录下的temp中看到一堆的run.do_xxx, xxx就是task。
+            下载（fetch）、解包（unpack）、打补丁（patch）、配置（configure）、编译（compile）、安装（install）、打包（package）、staging、做安装包（package_write_ipk）、构建文件系统， 发布SDK包（populate_sdk）等,可以在对应的构建目录下的temp中看到一堆的run.do_xxx, xxx就是task。
         不指定任务则是默认build
 
         eg:
@@ -336,7 +336,28 @@ FILES:${PN} += " \
 
 ### 手动下载源码包
 
-先手动下载源码包，然后放到`dl`目录下， 再执行`bitbake -c fetch package`，这样就可以避免下载源码包了
+1. 先手动下载源码包，然后放到`dl`目录下。
+2. 再执行`bitbake -c fetch package`, 生成应对包的packagename.done文件。(也可手动创建空白done文件)
+3. 这样就可以避免下载源码包了
+
+注: 如果有*.tmp文件，需要手动删除它，不然即使有下载文件，也会报fecth错误。
+
+#### 使用 BB_NO_NETWORK 强制离线构建
+
+如果你已经有完整的源码包，可以在 local.conf 中添加：
+
+```sh
+BB_NO_NETWORK = "1"
+```
+
+#### 使用PREMIRRORS 或 LOCAL_MIRROR镜像加速下载
+
+```sh
+PREMIRRORS:prepend = " \
+  git://.*/.* https://mirrors.tuna.tsinghua.edu.cn/git/yocto/ \n \
+  https://.*/.* https://mirrors.tuna.tsinghua.edu.cn/yocto/sources/ \n \
+"
+```
 
 ### 修改hostname
 
@@ -345,4 +366,19 @@ FILES:${PN} += " \
 ```sh
 #Set the hostname, the value will be written to /etc/hostname in target device
 hostname:pn-base-files = "fvt-5g-tbox"
+```
+
+### overlay-etc
+
+在build/local.conf中添加
+
+```conf
+EXTRA_IMAGE_FEATURES += "read-only-rootfs"
+EXTRA_IMAGE_FEATURES += "overlayfs-etc"
+
+#  Set configs for overlayfs /etc, under the read only rootfs
+OVERLAYFS_ETC_MOUNT_POINT = "/run"
+OVERLAYFS_ETC_DEVICE = "tmpfs"
+OVERLAYFS_ETC_FSTYPE = "tmpfs"
+OVERLAYFS_ETC_EXPOSE_LOWER = "1"
 ```
