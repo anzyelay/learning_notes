@@ -62,7 +62,7 @@ hostapd_cli -i interface deauthen <MAC addr>
 运行脚本
 
 ```sh
-# -B：后台运行 
+# -B：后台运行
 # -a：hostapd发生事件时运行的脚本, eg: /usr/bin/QCMAP_StaInterface
 # -p: control sockets的寻找路径
 hostapd_cli -i wlan0 -p /var/run/hostapd -B -a /usr/bin/QCMAP_StaInterface
@@ -147,3 +147,158 @@ expire  mac ip hostname(无为空或*) clid(无为*)
 > iwpriv - configure optionals (private) parameters of a wireless network interface
 
 与wifi driver找交道的工具，通过IOCTL的实现来设置、获取驱动参数。
+
+## 使用实战
+
+### store dnsmasq info to dnsmasq_host.txt
+
+dnsmasq --> dnsmasq_script.sh --> creating file to store dnsmasq info to "/tmp/dnsmasq_host.txt"
+
+dnsmasq_script.sh
+
+```sh
+#!/bin/sh
+#Copyright (c) 2015-2016 Qualcomm Technologies, Inc.  All Rights Reserved.
+#Qualcomm Technologies Proprietary and Confidential.
+#
+#script run by dnsmasq on providing IP
+#help
+# dnsmasq option --dhcp-script=<path of script> with provide
+# command line argument in below format
+#
+#  event mac                ip             hostname
+#  add   b2:5b:c5:66:77:8b  192.168.225.45 lab3284
+#  $1    $2                 $3             $4
+#
+#creating file to store dnsmasq info
+FILE="/tmp/dnsmasq_host.txt"
+
+if [ ! -f  $FILE ] ; then
+  #File  does not exists creating
+  touch $FILE
+  chmod a+rw $FILE
+fi
+
+case "$1" in
+  add)
+      #"add" event  means a lease has been created
+      #Removing entry for that is already for  ip=$3
+      sed -i "/$3/d" $FILE
+      echo "$2 $3 $4" >> $FILE   # storing entry with mac ip & hostname
+      ;;
+  old)
+      #"old" is a notification of an existing lease when dnsmasq starts
+      # or a change to MAC address or hostname of an existing lease
+      #checking for if we have entry stored in file or not
+
+      if grep -q "$2 $3" "$FILE"     # checking entry match  with ip & mac only
+      then
+        # match if found
+        # for match entry dnsmasq sometimes will not provide hostname
+        echo "match found" > /dev/null 2>&1
+      else
+        # match if not found & hostname not empty
+        if [ "$4" != "" ]
+        then
+        #first Removing entry for that is already for  ip=$3
+        sed -i "/$3/d" $FILE
+        #match not found so adding to file
+        echo "$2 $3 $4" >> $FILE # storing entry with mac ip & hostname
+      fi
+
+      fi
+      ;;
+  del)
+      #del event means entry has been destroyed by dnsmasq
+      #Removing entry for ip=$3
+      sed -i "/$3/d" $FILE
+      ;;
+  *)
+    #invalid event
+
+    ;;
+esac
+```
+
+### how to get hostname
+
+1. 从dnsmasq.leases中获取
+
+dnsmasq --> creat --> /data/dnsmasq.leases
+
+QCMAP_ConnectionManager::GetConnectedDevicesInfo
+--> `cut -f1,2,4 -d ' '  /data/dnsmasq.leases >  /data/hostname.txt`
+
+1. 从手动备份的dnsmasq_host.txt中文件中获取
+
+do loop for connectedDevicesList --> call --> fetchHostNameAndLeasetime() --> 从hostname.txt中获取-->如果为*--> QCMAP_ConnectionManager::fetchHostName --> 从/tmp/dnsmasq_host.txt中寻找
+
+### 监听STA/AT_STA连接或断开信息
+
+```sh
+hostapd_cli -i wlan0 -p /var/run/hostapd -B -a /usr/bin/QCMAP_StaInterface
+wpa_cli -i wlan0 -p /var/run/hostapd -B -a /usr/bin/QCMAP_StaInterface
+```
+
+QCMAP_StaInterface自己写, 大致内容如下：
+
+```c
+#define NUM_ARGS_EXPECTED_FOR_STA_MODE_EVENT 3
+#define NUM_ARGS_EXPECTED_FOR_AP_EVENT  4
+
+#define STA_ASSOCIATED "CONNECTED"
+#define STA_DISASSOCIATED "DISCONNECTED"
+#define AP_STA_ASSOCIATED "AP-STA-CONNECTED"
+#define AP_STA_DISSOCIATED "AP-STA-DISCONNECTED"
+
+int main(int argc, char **argv)
+{
+  if (argc == NUM_ARGS_EXPECTED_FOR_STA_MODE_EVENT)
+  {
+    LOG_MSG_INFO1("QCMAP STA Interface called by WPA_SUPPLICANT event",
+                  0, 0, 0);
+  }
+  else if(argc == NUM_ARGS_EXPECTED_FOR_AP_EVENT)
+  {
+    LOG_MSG_INFO1("QCMAP STA Interface called by WLAN Client event",
+                  0, 0, 0);
+  }
+  else
+  {
+    LOG_MSG_ERROR("QCMAP STA Interface called with incorrect number"
+                  "of arguements",0,0,0);
+    exit(1);
+  }
+  LOG_MSG_INFO1("Got %s event on STA interface %s", argv[2], argv[1], 0);
+
+  if ( strncmp(argv[2], STA_ASSOCIATED, strlen(STA_ASSOCIATED)) == 0 )
+  {
+    qcmap_sta_buffer.event = STA_CONNECTED;
+  }
+  else if ( strncmp(argv[2], STA_DISASSOCIATED, strlen(STA_DISASSOCIATED)) == 0 )
+  {
+    qcmap_sta_buffer.event = STA_DISCONNECTED;
+  }
+  else if ( strncmp(argv[2], AP_STA_ASSOCIATED, strlen(AP_STA_ASSOCIATED)) == 0 )
+  {
+    qcmap_sta_buffer.event = AP_STA_CONNECTED;
+
+    qcmap_sta_buffer.iface_num = atoi((char*)(argv[1])+4);
+    strlcpy ( qcmap_sta_buffer.mac_addr, argv[3], QCMAP_MSGR_MAC_ADDR_NUM_CHARS_V01);
+  }
+  else if ( strncmp(argv[2], AP_STA_DISSOCIATED,
+            strlen(AP_STA_DISSOCIATED)) == 0 )
+  {
+    qcmap_sta_buffer.event = AP_STA_DISCONNECTED;
+
+    qcmap_sta_buffer.iface_num = atoi((char*)(argv[1])+4);
+    strlcpy ( &qcmap_sta_buffer.mac_addr, argv[3], QCMAP_MSGR_MAC_ADDR_NUM_CHARS_V01);
+  }
+  else
+  {
+    LOG_MSG_INFO1("QCMAP STA Interface: unsupported event %s", argv[2], 0, 0);
+    exit(1);
+  }
+  //Send the event to someone who interested in
+}
+```
