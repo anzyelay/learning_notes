@@ -107,7 +107,7 @@
    1. TI板子服务端使用的是udhcpd做dhcp和dns服务，但配置文件未设置分配dns功能如下：
 
    ```sh
-   [docker] f1339899@lhbvm176:working_dir$ cat fii-rootfs/etc/udhcpd_ap0.conf   
+   [docker] f1339899@lhbvm176:working_dir$ cat fii-rootfs/etc/udhcpd_ap0.conf
     start 192.168.1.2
     end 192.168.1.254
     interface ap0
@@ -227,33 +227,3 @@
    ```
 
    只加ip不加“/24”， 则route -n 中不显示网关，加/24则显示网关
-
-## 12/23
-
-1. 指导gnss模块开发
-2. 修改tboxmanager模块代码
-3. 指导休眠唤醒开发, 如何使用wnc模组唤醒SOC
-
-## 12/24
-
-1. 编写wifi dbus demo,制造fake data给DDS
-
-## 12/25
-
-1. 优化wifi dbus demo, 增加wifi模块的接口和实现scan真实数据
-
-## 12/26
-
-1. 优化wifi dbus demo
-2. 协助DDS dbus开发
-3. 协助解决git 问题
-
-## 12/27
-
-1. 代码审查
-1. 申请FORTIFY服务
-
-## shcedule
-
-TODO: 休眠唤醒策略
-

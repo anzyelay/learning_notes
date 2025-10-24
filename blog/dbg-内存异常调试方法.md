@@ -3,7 +3,44 @@
 ## [参考debug.md](../vala/debug.md)
 
 - 编译程序时启用调试信息， `-g`
-- 开启core抓取功能
+- 开启core抓取功能, 开启脚本见下面, 主要`ulimt -c`和输出保存地址写到文件`/proc/sys/kernel/core_pattern`中
+
+    ```sh
+    #!/bin/bash
+
+    core_down()
+    {
+        sed -i '/ulimit -c 2048/culimit -c 0' /root/.bashrc
+        echo "Set off coredump"
+        echo "logout and login again to make it work"
+    }
+
+    core_up()
+    {
+        grep 'ulimit -c' /root/.bashrc >> /dev/null
+        if [ $? -eq 0 ];then
+            sed -i '/ulimit -c 0/culimit -c 2048' /root/.bashrc
+        else
+            echo "ulimit -c 2048" >> /root/.bashrc
+        fi
+        echo "/home/logs/core-%e-%p-%t" > /proc/sys/kernel/core_pattern
+        echo "Set on coredump, the coredump log will place in /home/logs"
+        echo "logout and login again to make it work"
+    }
+
+    case "$1" in
+        "up")
+                core_up
+                ;;
+        "down")
+                core_down
+                ;;
+        *)
+                echo $0 up/down
+                ;;
+    esac
+    ```
+
 - `gdb your-app coredump-file`
 - 启动后输入`bt`
 
@@ -28,7 +65,7 @@
                 multi_basedir="$srcdir/$with_multisrctop.."
             fi
             # 增加下面一行，就是不要上面的那个
-            multi_basedir="$srcdir/.." 
+            multi_basedir="$srcdir/.."
         else
             multi_basedir="$srcdir/.."
         fi
@@ -76,7 +113,7 @@ LD_PRELOAD=libasan.so.3.0.0 && ./new
     - 返回局部堆区地址后使用
     - 作用域外使用栈内存 :stack-use-after-scope
     - 初始化顺序错误
-    - 内存泄漏: detected memory leaks  
+    - 内存泄漏: detected memory leaks
 1. fsanitize=thread：可以检测多线程程序中的数据竞争和其他线程相关的错误，**注意：不能和-fsanitize=address -fsanitize=leak一起使用**
 
 1. fsanitize=undefined: 可以检测代码中的未定义行为，如除以零、空指针解引用等

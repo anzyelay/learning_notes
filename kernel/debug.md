@@ -151,7 +151,7 @@ static DEVICE_ATTR_RO(phy_state);
 
 使用`WARN(1, "====\n")`打印可以输出调用堆栈
 
-## 使能Kernal Panic查看上次panic信息
+## 使能Kernal Panic查看上次panic/crash信息
 
 ```sh
 commit 2137ec501b6842eff88fe0f8a979447c06fd1c30
@@ -193,6 +193,41 @@ index 2f271df40..f4b50dc83 100755
  # CONFIG_WLAN_VENDOR_ADMTEK is not set
  # CONFIG_WLAN_VENDOR_ATH is not set
  # CONFIG_WLAN_VENDOR_ATMEL is not set
+```
+
+### 整合脚本
+
+```sh
+#!/bin/bash
+# Dump the last dmesg from RAMOOPS, can be used to debug crash which happened in last run.
+
+ramoops_dir=/tmp/fii_ramoops_dir
+
+if [ ! -d $ramoops_dir ]; then
+	mkdir -p $ramoops_dir
+	mount -t pstore pstore $ramoops_dir
+fi
+
+cd $ramoops_dir
+
+echo "======= console-ramoops ========"
+if [ -r console-ramoops-0 ]; then
+	ls console-ramoops* 2>/dev/null
+	echo "--------------------"
+	cat console-ramoops*
+else
+	echo "Has no file: console-ramoops-0"
+fi
+echo
+
+echo "======= dmesg-ramoops ========"
+if [ -r dmesg-ramoops-0 ]; then
+	ls dmesg-ramoops* 2>/dev/null
+	echo "--------------------"
+	cat dmesg-ramoops*
+else
+	echo "Has no file: dmesg-ramoops-0"
+fi
 ```
 
 ## 查看kernel bootup 的各模块耗时

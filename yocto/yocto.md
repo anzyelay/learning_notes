@@ -16,10 +16,18 @@
 
 bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说明：
 
-- S: 源码包在构建目录下的解压出来的目录（S[doc] = "The location in the Build Directory where unpacked package source code resides."）
-- PN: package name, PN指的是OpenEmbedded构建系统使用的文件上下文中的配方名(recipe name)，作为创建包的输入。它指的是OpenEmbedded构建系统创建或生成的文件上下文中的包名
-- DEPENDS: 后面接一个recipe name，或者一个recipe name list
-  - Build time dependency, foo构建时的依赖, 只有依赖包先编译成功后才能编译foo
+### 变量解释
+
+变量名 | 含义
+-|-
+WORKDIR | 当前配方的工作目录，由 BitBake 自动生成, `${TMPDIR}/work/${MULTIMACH_TARGET_SYS}/${PN}/${EXTENDPE}${PV}-${PR}`
+S | 源码包在构建目录下的解压出来的目录（S[doc] = "The location in the Build Directory where unpacked package source code resides."）
+B | 构建目录，默认等于 `S`，但可以单独设置
+PN | package name, PN指的是OpenEmbedded构建系统使用的文件上下文中的配方名(recipe name)，作为创建包的输入。它指的是OpenEmbedded构建系统创建或生成的文件上下文中的包名
+PV | 配方版本，例如 2.10
+DEPENDS | 后面接一个recipe name，或者一个recipe name list, Build time dependency, foo构建时的依赖, 只有依赖包先编译成功后才能编译foo
+RDEPENDS | 后面接一个recipe name，或者一个recipe name list, Run time dependency: foo运行时依赖, 表示该依赖包被正常安装后foo才能正常运行
+PROVIDES | 主要是为了起别名
 
   比如foo.bb内容如下
 
@@ -32,21 +40,17 @@ bb/bbclass中的变量说明,未说到的可以参数前一章节第1点的说�
   PV = "version-dir"
   ```
 
-- RDEPENDS: 后面接一个recipe name，或者一个recipe name list,
-  - Run time dependency: foo运行时依赖, 表示该依赖包被正常安装后foo才能正常运行
+### 在BB中加调试信息
 
-  - PROVIDES：主要是为了起别名
+- bbnote：用来打印
+- bbwarn：用来打印
+- bbfatal：用来打印
+- eval:用来执行语句
 
-- 在BB中加调试信息：
-  - bbnote：用来打印
-  - bbwarn：用来打印
-  - bbfatal：用来打印
-  - eval:用来执行语句
-
-  ```bb
-    bbnote ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}' --target test -- ${EXTRA_OECMAKE_BUILD}
-    eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}' --target test -- ${EXTRA_OECMAKE_BUILD}
-  ```
+```bb
+  bbnote ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}' --target test -- ${EXTRA_OECMAKE_BUILD}
+  eval ${DESTDIR:+DESTDIR=${DESTDIR} }${CMAKE_VERBOSE} cmake --build '${B}' --target test -- ${EXTRA_OECMAKE_BUILD}
+```
 
 ### 编译的情况
 
@@ -367,6 +371,48 @@ PREMIRRORS:prepend = " \
 #Set the hostname, the value will be written to /etc/hostname in target device
 hostname:pn-base-files = "fvt-5g-tbox"
 ```
+
+### 添加用户密码或免密码登录
+
+1. debug-tweaks作用
+
+在local.conf中设置如下：
+
+```sh
+EXTRA_IMAGE_FEATURES += "debug-tweaks"
+```
+
+功能|说明
+-|-
+empty-root-password | 设置 root 用户密码为空，允许无密码登录
+allow-empty-password | 允许 Dropbear/OpenSSH 接受空密码登录
+post-install-logging | 启用 postinstall 脚本的日志记录，日志保存在 /var/log/postinstall.log
+安装调试工具| 包括一些调试工具包，如 tools-debug、dbg-pkgs 等（视配置而定）
+
+1. extrausers作用
+
+构建镜像时添加或修改系统用户和用户组
+
+在local.conf中设置如下：
+
+```sh
+INHERIT += "extrausers"
+EXTRA_USERS_PARAMS = "\
+    usermod -P devpass root; \
+    useradd -P dev123 developer; \
+    groupadd devgroup; \
+    usermod -a -G devgroup developer; \
+"
+```
+
+命令|说明
+-|-
+useradd -P <密码> <用户名>|添加用户并设置密码
+usermod -P <密码> <用户名>|修改用户密码
+groupadd <组名>|添加用户组
+usermod -a -G <组名> <用户名>|将用户添加到指定组
+userdel <用户名>|删除用户
+groupdel <组名>|删除用户组
 
 ### overlay-etc
 
