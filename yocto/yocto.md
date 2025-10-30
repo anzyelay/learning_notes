@@ -40,6 +40,17 @@ PROVIDES | 主要是为了起别名
   PV = "version-dir"
   ```
 
+#### **Yocto 的变量优先级规则如下（从低到高）：**
+
+```txt
+配方 (.bb)
+类 (.bbclass)
+层 (layer.conf)
+机器配置 (machine.conf)
+发行版配置 (distro.conf)
+用户配置 (local.conf)
+```
+
 ### 在BB中加调试信息
 
 - bbnote：用来打印
@@ -413,6 +424,22 @@ groupadd <组名>|添加用户组
 usermod -a -G <组名> <用户名>|将用户添加到指定组
 userdel <用户名>|删除用户
 groupdel <组名>|删除用户组
+
+usermod中-p/-P的区别，有些版本不支持明文密码
+
+选项 | 含义 |密码格式|适用场景
+-|-|-|-
+-p| 设置加密后的密码| 必须是 /etc/shadow 格式的加密字符串（如 SHA-512）| 安全性高，推荐用于生产环境
+-P| 设置明文密码| 明文字符串，系统会自动加密 |适合快速测试或开发环境
+
+
+```sh
+# 系统会自动将 root123 加密后写入 /etc/shadow。
+EXTRA_USERS_PARAMS = "usermod -P root123 root;"
+# 你需要提前生成加密密码（例如用 openssl passwd -6），并手动转义 $
+EXTRA_USERS_PARAMS = "usermod -p '\$6\$abc\$xyz...' root;"
+```
+
 
 ### overlay-etc
 
