@@ -10,33 +10,56 @@
 
 ## 元素定义作用
 
-```dts
+1. 基本结构
 
-aliases {
-    serial0 = &uart0;
-};
+    ```dts
+    / {
+        model = "TI AM62x Board";
+        compatible = "ti,am625";
+        aliases {
+            serial0 = &uart0;
+        };
+        chosen {
+            bootargs = "console=ttyS0,115200";
+        };
 
+        soc {
+            uart0: serial@2800000 {
+                compatible = "ti,omap-uart";
+                reg = <0x2800000 0x1000>;
+                status = "okay";
+            };
+        };
+    };
+    ```
 
-soc {
-    uart0: serial@2800000 {
-        compatible = "ti,omap-uart";
-        reg = <0x2800000 0x1000>;
+    名称               |   类型     |   作用
+    -----------------  |  --------  |  -------
+    / { ... }          |  根节点    |   "/"标识设备树的起点
+    serial@2800000     |   节点名   |   表示设备地址
+    uart0:             |   标签     |   给设备节点起别名，便于引用
+    &uart0             |   句柄     |   引用该设备节点
+    serial0 = &uart0   |   alias    |   给设备一个统一的逻辑名称，供内核获取设备的编号或别名，从而实现统一的初始化逻辑, 保持设备编号稳定 eg:<br> `int id = of_alias_get_id(np, "serial");`<br> - *这会返回 serial0 是哪个设备，从而决定它是 /dev/ttyS0*
+    {...} | 节点内容 | 包含属性
+
+     - 在 Linux 设备树中，aliases 节点的键名（如 serial0, mmc0, ethernet0 等）并不是随意定义的，而是有一套约定俗成的标准前缀，这些前缀是内核和驱动程序通过函数如 of_alias_get_id() 来识别和使用的。
+
+1. 节点格式定义
+
+    ```dts
+    label: name@address {
+        compatible = "...";
+        reg = <address size>;
         status = "okay";
     };
-};
+    ```
 
-```
+    部分|含义
+    -|-
+    label: | 标签，用于引用该节点（如 &label）
+    name@address| 节点名，name 是功能描述，address 是设备地址
+    { ... }| 节点属性集合
 
-  名称               |   类型     |   作用
-  -----------------  |  --------  |  -------
-  / { ... }          |  根节点    |   "/"标识设备树的起点
-  serial@2800000     |   节点名   |   表示设备地址
-  uart0:             |   标签     |   给设备节点起别名，便于引用
-  &uart0             |   句柄     |   引用该设备节点
-  serial0 = &uart0   |   alias    |   给设备一个统一的逻辑名称，供内核获取设备的编号或别名，从而实现统一的初始化逻辑, 保持设备编号稳定 eg:<br> `int id = of_alias_get_id(np, "serial");`<br> - *这会返回 serial0 是哪个设备，从而决定它是 /dev/ttyS0*
-  {...} | 节点内容 | 包含属性
-
-- 在 Linux 设备树中，aliases 节点的键名（如 serial0, mmc0, ethernet0 等）并不是随意定义的，而是有一套约定俗成的标准前缀，这些前缀是内核和驱动程序通过函数如 of_alias_get_id() 来识别和使用的。
 
 ### 属性字段
 
@@ -47,9 +70,45 @@ reg | 寄存器地址和长度
 status | "okay" 表示启用，"disabled" 表示禁用
 interrupts | 中断号
 clocks | 时钟源引用
-pinctrl-names / pinctrl-0 | 引脚配置
+pinctrl-names |引脚配置名称（如 "default"、"sleep"）
+pinctrl-0,pinctrl-1,... | 引脚配置组
 dma-names / dmas | DMA 配置
 phandle显| 式句柄（通常自动生成）
+
+#### pinctrl-names 的作用
+
+1. 它定义了设备在不同状态下使用的引脚配置名称，常见状态包括：
+
+    ```txt
+    "default"：设备正常工作时使用的引脚配置
+    "sleep"：设备进入低功耗模式时使用的配置
+    "idle"：设备空闲时的配置
+    "active"：某些设备使用这个表示激活状态
+    "init"：初始化阶段使用的配置
+    ```
+
+1. 驱动如何使用这些名称？
+
+    ```c
+    pinctrl_lookup_state(pinctrl, "default");
+    ```
+
+    驱动会调用设备树API来获取对应状态的引脚配置，并在设备状态切换时应用。
+
+1. 示例
+
+    ```dts
+    &uart0 {
+        pinctrl-names = "default", "sleep";
+        pinctrl-0 = <&uart0_default_pins>;
+        pinctrl-1 = <&uart0_sleep_pins>;
+        status = "okay";
+    };
+    ```
+
+    - pinctrl-names 是一个字符串数组
+    - pinctrl-0, pinctrl-1对应每个名称的引脚配置
+    - 顺序必须严格对应
 
 ### 特殊节点
 
