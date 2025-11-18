@@ -247,6 +247,8 @@ target_link_libraries(mem_debug pthread dl)
 
 `LD_PRELOAD=./libmem_debug.so ./your_program`
 
+缺点：不支持TLS
+
 #### CMake编译引入
 
 ```CMakeLists
@@ -277,4 +279,38 @@ cmake -DENABLE_MEMORY_DEBUG=ON ..
 
 # 关闭内存调试（零开销发布版）
 cmake -DENABLE_MEMORY_DEBUG=OFF ..
+```
+
+#### "-include" 自动注入
+
+- 源码一行不改
+- 不用手写 #include "debug_alloc.h"
+- 保留 TLS、__FILE__、__LINE__、线程隔离等全部功能！
+
+```CMakeLists
+cmake_minimum_required(VERSION 3.10)
+project(MemDebugDemo C)
+
+option(ENABLE_MEMORY_DEBUG "Enable memory debugging" OFF)
+
+add_executable(${PROJECT_NAME} main.c)
+
+if(ENABLE_MEMORY_DEBUG)
+    # 自动包含头文件，无需源码写 #include
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        -include "${CMAKE_CURRENT_SOURCE_DIR}/debug_alloc.h"
+    )
+    target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_MEMORY_ENABLED)
+    target_link_libraries(${PROJECT_NAME} pthread)
+
+    # 尝试启用 backtrace
+    find_library(EXECINFO execinfo)
+    if(EXECINFO)
+        target_link_libraries(${PROJECT_NAME} ${EXECINFO})
+    endif()
+
+    target_compile_options(${PROJECT_NAME} PRIVATE -g -O0 -Wall -Wextra)
+else()
+    target_compile_options(${PROJECT_NAME} PRIVATE -O2 -DNDEBUG)
+endif()
 ```
