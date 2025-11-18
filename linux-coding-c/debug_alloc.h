@@ -3,6 +3,8 @@
 #ifndef DEBUG_ALLOC_TLS_H
 #define DEBUG_ALLOC_TLS_H
 
+#ifdef DEBUG_MEMORY_ENABLED
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -213,5 +215,7 @@ __attribute__((constructor)) static void init_debug_allocator() {
     atexit(report_leaks);
     register_current_thread();
 }
+
+#endif //DEBUG_MEMORY_ENABLED
 
 #endif

@@ -233,3 +233,48 @@ int main() {
     return 0;  // 程序结束时自动调用泄漏报告
 }
 ```
+
+### 集成使用方法
+
+#### 创建共享库版本
+
+```CMakeLists
+add_library(mem_debug SHARED debug_allocator.c)
+target_link_libraries(mem_debug pthread dl)
+```
+
+使用时：
+
+`LD_PRELOAD=./libmem_debug.so ./your_program`
+
+#### CMake编译引入
+
+```CMakeLists
+if(ENABLE_MEMORY_DEBUG)
+    # 启用调试：定义宏 + 调试编译选项
+    target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG_MEMORY_ENABLED)
+
+    # 尝试链接 execinfo（用于 backtrace），如果存在就加上
+    find_library(EXECINFO_LIBRARY execinfo)
+    if(EXECINFO_LIBRARY)
+        target_link_libraries(${PROJECT_NAME} ${EXECINFO_LIBRARY})
+    endif()
+
+    # 调试构建标志
+    target_compile_options(${PROJECT_NAME} PRIVATE -g -O0 -Wall -Wextra)
+else()
+    # 发布构建标志
+    target_compile_options(${PROJECT_NAME} PRIVATE -O2 -DNDEBUG)
+endif()
+
+# 确保能包含 debug_alloc.h（放在项目根目录即可）
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+```
+
+```sh
+# 启用内存调试（自动包含 backtrace、填充模式等）
+cmake -DENABLE_MEMORY_DEBUG=ON ..
+
+# 关闭内存调试（零开销发布版）
+cmake -DENABLE_MEMORY_DEBUG=OFF ..
+```
