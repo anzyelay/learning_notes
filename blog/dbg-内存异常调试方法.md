@@ -189,15 +189,47 @@ valgrind --leak-check=full ./your_app
 ```c
 #include "debug_alloc.h"
 
+// 使用示例：只需要直接使用 malloc/free 即可
+void* worker_thread(void* arg) {
+    int id = *(int*)arg;
+
+    // 直接使用 malloc，自动被宏替换为调试版本
+    char* data = (char*)malloc(100);
+    sprintf(data, "Thread %d data", id);
+    printf("Thread %d: %s\n", id, data);
+
+    int* numbers = (int*)calloc(5, sizeof(int));
+    for (int i = 0; i < 5; i++) {
+        numbers[i] = id * 10 + i;
+    }
+
+    // 故意制造泄漏：不释放 numbers
+    free(data);  // 正确释放
+
+    return NULL;
+}
+
 int main() {
-    char *buf = malloc(64);
-    strcpy(buf, "Hello Debug Alloc!");
-    buf = realloc(buf, 128);
-    free(buf);
+    printf("=== TLS Memory Debugger - No Manual Init Required ===\n");
 
-    char *arr = calloc(10, sizeof(char));
-    // 忘记 free(arr)，测试泄漏报告
+    // 直接使用 malloc/free，无需任何初始化调用
+    char* main_data = (char*)malloc(200);
+    strcpy(main_data, "Main thread data");
+    printf("Main: %s\n", main_data);
 
-    return 0; // 程序退出时自动调用 report_leaks()
+    // 创建线程
+    pthread_t t1, t2;
+    int id1 = 1, id2 = 2;
+    pthread_create(&t1, NULL, worker_thread, &id1);
+    pthread_create(&t2, NULL, worker_thread, &id2);
+
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+
+    // 故意泄漏 main_data
+    // free(main_data);
+
+    printf("Main thread ending...\n");
+    return 0;  // 程序结束时自动调用泄漏报告
 }
 ```

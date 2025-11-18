@@ -1,7 +1,7 @@
-#ifndef DEBUG_ALLOC_H
-#define DEBUG_ALLOC_H
-
 // 参考文档 dbg-内存异常调试方法
+// 包含 TLS 优化的内存调试器
+#ifndef DEBUG_ALLOC_TLS_H
+#define DEBUG_ALLOC_TLS_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +12,7 @@
 #define FILL_ALLOC_PATTERN 0xAA
 #define FILL_FREE_PATTERN  0xDD
 #define MAX_BACKTRACE_DEPTH 10
+#define MAX_THREAD_NAME 32
 
 typedef struct AllocInfo {
     void *ptr;
@@ -23,23 +24,34 @@ typedef struct AllocInfo {
     struct AllocInfo *next;
 } AllocInfo;
 
-static AllocInfo *alloc_list = NULL;
-static pthread_mutex_t alloc_lock = PTHREAD_MUTEX_INITIALIZER;
+// 每个线程独立的分配记录链表
+__thread AllocInfo *thread_alloc_list = NULL;
+__thread pthread_mutex_t thread_alloc_lock = PTHREAD_MUTEX_INITIALIZER;
 
-/* 打印调用栈 */
+// 全局线程注册表（用于最终合并）
+typedef struct ThreadRecord {
+    pthread_t tid;
+    AllocInfo *alloc_list;  // 从TLS复制的记录
+    char name[MAX_THREAD_NAME];
+    struct ThreadRecord *next;
+} ThreadRecord;
+
+static ThreadRecord *global_thread_list = NULL;
+static pthread_mutex_t global_list_lock = PTHREAD_MUTEX_INITIALIZER;
+
 static void print_backtrace() {
     void *buffer[MAX_BACKTRACE_DEPTH];
     int nptrs = backtrace(buffer, MAX_BACKTRACE_DEPTH);
     char **symbols = backtrace_symbols(buffer, nptrs);
     for (int i = 0; i < nptrs; i++) {
-         printf("    [%d] %s\n", i, symbols[i]);
+        printf("    [%d] %s\n", i, symbols[i]);
     }
     free(symbols);
 }
 
 /* 添加分配记录 */
 static void add_alloc(void *ptr, size_t size, const char *file, int line) {
-    pthread_mutex_lock(&alloc_lock);
+    pthread_mutex_lock(&thread_alloc_lock);
     AllocInfo *info = (AllocInfo *)malloc(sizeof(AllocInfo));
     info->ptr = ptr;
     info->size = size;
@@ -50,15 +62,15 @@ static void add_alloc(void *ptr, size_t size, const char *file, int line) {
     info->stack_depth = backtrace(buffer, MAX_BACKTRACE_DEPTH);
     info->stack = backtrace_symbols(buffer, info->stack_depth);
 
-    info->next = alloc_list;
-    alloc_list = info;
-    pthread_mutex_unlock(&alloc_lock);
+    info->next = thread_alloc_list;
+    thread_alloc_list = info;
+    pthread_mutex_unlock(&thread_alloc_lock);
 }
 
 /* 删除分配记录 */
 static void remove_alloc(void *ptr) {
-    pthread_mutex_lock(&alloc_lock);
-    AllocInfo **curr = &alloc_list;
+    pthread_mutex_lock(&thread_alloc_lock);
+    AllocInfo **curr = &thread_alloc_list;
     while (*curr) {
         if ((*curr)->ptr == ptr) {
             AllocInfo *to_free = *curr;
@@ -69,44 +81,81 @@ static void remove_alloc(void *ptr) {
         }
         curr = &(*curr)->next;
     }
-    pthread_mutex_unlock(&alloc_lock);
+    pthread_mutex_unlock(&thread_alloc_lock);
 }
 
 /* 查找分配大小 */
 static size_t find_alloc_size(void *ptr) {
-    pthread_mutex_lock(&alloc_lock);
-    AllocInfo *curr = alloc_list;
+    pthread_mutex_lock(&thread_alloc_lock);
+    AllocInfo *curr = thread_alloc_list;
     while (curr) {
         if (curr->ptr == ptr) {
             size_t size = curr->size;
-            pthread_mutex_unlock(&alloc_lock);
+            pthread_mutex_unlock(&thread_alloc_lock);
             return size;
         }
         curr = curr->next;
     }
-    pthread_mutex_unlock(&alloc_lock);
+    pthread_mutex_unlock(&thread_alloc_lock);
     return 0;
 }
 
-/* 泄漏报告 */
-static void report_leaks() {
-    pthread_mutex_lock(&alloc_lock);
-    printf("\n[LEAK REPORT]\n");
-    if (!alloc_list) {
-        printf("No memory leaks detected.\n");
+static void register_current_thread() {
+    pthread_mutex_lock(&global_list_lock);
+    ThreadRecord *record = (ThreadRecord *)malloc(sizeof(ThreadRecord));
+    record->tid = pthread_self();
+    record->alloc_list = thread_alloc_list;
+
+    pthread_getname_np(pthread_self(), record->name, MAX_THREAD_NAME);
+    if (record->name[0] == '\0') {
+        snprintf(record->name, MAX_THREAD_NAME, "thread_%lu", (unsigned long)pthread_self());
     }
-    AllocInfo *curr = alloc_list;
-    while (curr) {
-        printf("Leak: ptr=%p size=%zu at %s:%d\n", curr->ptr, curr->size, curr->file, curr->line);
-        for (int i = 0; i < curr->stack_depth; i++) {
-            printf("    %s\n", curr->stack[i]);
-        }
-        curr = curr->next;
-    }
-    pthread_mutex_unlock(&alloc_lock);
+
+    record->next = global_thread_list;
+    global_thread_list = record;
+    pthread_mutex_unlock(&global_list_lock);
 }
 
-/* 核心实现 */
+/*泄漏报告*/
+static void report_leaks() {
+    register_current_thread();
+
+    printf("\n[LEAK REPORT - TLS Optimized]\n");
+
+    pthread_mutex_lock(&global_list_lock);
+    ThreadRecord *thread_rec = global_thread_list;
+    int total_leaks = 0;
+
+    while (thread_rec) {
+        printf("\n--- Leaks in %s (TID: %lu) ---\n",
+               thread_rec->name, (unsigned long)thread_rec->tid);
+
+        AllocInfo *curr = thread_rec->alloc_list;
+        int thread_leaks = 0;
+
+        while (curr) {
+            printf("Leak: ptr=%p size=%zu at %s:%d\n",
+                   curr->ptr, curr->size, curr->file, curr->line);
+            for (int i = 0; i < curr->stack_depth; i++) {
+                printf("    %s\n", curr->stack[i]);
+            }
+            curr = curr->next;
+            thread_leaks++;
+        }
+
+        printf("Thread %s has %d leaks.\n", thread_rec->name, thread_leaks);
+        total_leaks += thread_leaks;
+        thread_rec = thread_rec->next;
+    }
+
+    if (total_leaks == 0) {
+        printf("No memory leaks detected across all threads.\n");
+    } else {
+        printf("\nTotal leaks: %d\n", total_leaks);
+    }
+    pthread_mutex_unlock(&global_list_lock);
+}
+
 static void *debug_malloc_impl(size_t size, const char *file, int line) {
     void *ptr = malloc(size);
     if (!ptr) return NULL;
@@ -156,9 +205,13 @@ static void *debug_realloc_impl(void *ptr, size_t size, const char *file, int li
 #define calloc(nmemb, size) debug_calloc_impl(nmemb, size, __FILE__, __LINE__)
 #define realloc(ptr, size)  debug_realloc_impl(ptr, size, __FILE__, __LINE__)
 
-/* 自动泄漏报告 */
-__attribute__((constructor)) static void init_leak_report() {
+/* 自动初始化，清理和泄漏报告
+__attribute__((constructor)) 是 GCC 扩展，表示这个函数在程序启动时自动执行, 所以无需手动调用，程序一运行就自动初始化
+*/
+__attribute__((constructor)) static void init_debug_allocator() {
+    printf("[DEBUG_ALLOC] TLS-optimized memory debugger initialized.\n");
     atexit(report_leaks);
+    register_current_thread();
 }
 
 #endif
