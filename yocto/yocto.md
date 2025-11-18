@@ -455,3 +455,9 @@ OVERLAYFS_ETC_DEVICE = "tmpfs"
 OVERLAYFS_ETC_FSTYPE = "tmpfs"
 OVERLAYFS_ETC_EXPOSE_LOWER = "1"
 ```
+
+### other
+
+```bbfile
+TOOLCHAIN_TARGET_TASK:append = " gcc-sanitizers"
+```

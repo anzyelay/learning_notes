@@ -1,5 +1,18 @@
 # 内存异常调试方法
 
+## 常见的几个内存问题分析工具
+
+- Valgrind (Linux)：检测内存泄漏、越界访问。
+- ASan (AddressSanitizer)：编译时开启，快速定位越界、UAF（Use After Free）。
+- GDB：结合 watchpoint 监控内存变量变化。
+- [日志 + 内存填充](../linux-coding-c/debug_alloc.h)
+
+快速定位建议：
+
+- 如果问题是 崩溃或随机异常 → 首选 ASan。
+- 如果问题是 内存泄漏 → 首选 Valgrind 或 heap profiler。
+- 如果是 嵌入式资源紧张 → 用 日志 + 内存填充。
+
 ## [参考debug.md](../vala/debug.md)
 
 - 编译程序时启用调试信息， `-g`
@@ -117,3 +130,74 @@ LD_PRELOAD=libasan.so.3.0.0 && ./new
 1. fsanitize=thread：可以检测多线程程序中的数据竞争和其他线程相关的错误，**注意：不能和-fsanitize=address -fsanitize=leak一起使用**
 
 1. fsanitize=undefined: 可以检测代码中的未定义行为，如除以零、空指针解引用等
+
+### Yocto 配方添加
+
+```bbfile
+DEPENDS += "gcc-sanitizers"
+```
+
+### CMAKE
+
+```CMakeFile
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address -static-libasan")
+endif()
+
+```
+
+构建
+
+```sh
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+make
+```
+
+## valgrind
+
+```sh
+valgrind --leak-check=full ./your_app
+```
+
+## [日志 + 内存填充](../linux-coding-c/debug_alloc.h)
+
+1. 全局替换 malloc/free/calloc/realloc
+1. 自动泄漏报告（atexit）
+1. 调用栈打印 + 文件名行号
+1. 内存填充（分配填充 0xAA，释放填充 0xDD）
+1. 分配表记录（检测泄漏）
+
+### 功能说明
+
+- 宏替换系统 malloc/free/calloc/realloc
+  - 自动记录文件名和行号
+  - 在标准 free() 不需要 size，但我们的封装需要 size 来填充内存, 解决方案是在分配表中记录 size，debug_free_impl() 根据 ptr 查找 size
+- 调用栈打印：
+  - backtrace() 显示分配/释放时的调用路径。
+- 内存填充(帮助检测未初始化和 UAF)：
+  - 分配后填充 0xAA → 检测未初始化使用。
+  - 释放后填充 0xDD → 检测 UAF（Use-After-Free）。
+- 日志输出：显示地址、大小、调用栈。
+- 分配表记录（检测泄漏）:
+  - 每次分配都会记录调用栈，释放时删除
+  - 程序结束时调用 report_leaks() 检测泄漏
+
+### 使用示例
+
+```c
+#include "debug_alloc.h"
+
+int main() {
+    char *buf = malloc(64);
+    strcpy(buf, "Hello Debug Alloc!");
+    buf = realloc(buf, 128);
+    free(buf);
+
+    char *arr = calloc(10, sizeof(char));
+    // 忘记 free(arr)，测试泄漏报告
+
+    return 0; // 程序退出时自动调用 report_leaks()
+}
+```
