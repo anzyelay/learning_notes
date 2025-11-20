@@ -14,6 +14,7 @@
 #define FILL_ALLOC_PATTERN 0xAA
 #define FILL_FREE_PATTERN  0xDD
 #define MAX_BACKTRACE_DEPTH 10
+#define MAX_STACK_DEPTH 10
 #define MAX_THREAD_NAME 32
 
 typedef struct AllocInfo {
@@ -21,7 +22,7 @@ typedef struct AllocInfo {
     size_t size;
     const char *file;
     int line;
-    char **stack;
+    void *stack_addrs[MAX_STACK_DEPTH];
     int stack_depth;
     struct AllocInfo *next;
 } AllocInfo;
@@ -54,18 +55,30 @@ static void print_backtrace() {
 /* 添加分配记录 */
 static void add_alloc(void *ptr, size_t size, const char *file, int line) {
     pthread_mutex_lock(&thread_alloc_lock);
+
     AllocInfo *info = (AllocInfo *)malloc(sizeof(AllocInfo));
+    if (!info) {
+        pthread_mutex_unlock(&thread_alloc_lock);
+        return;
+    }
+
     info->ptr = ptr;
     info->size = size;
     info->file = file;
     info->line = line;
 
-    void *buffer[MAX_BACKTRACE_DEPTH];
-    info->stack_depth = backtrace(buffer, MAX_BACKTRACE_DEPTH);
-    info->stack = backtrace_symbols(buffer, info->stack_depth);
+    // 获取调用栈地址， 不解析为符号以节省开销, 在报告时再解析, 因为解析符号开销较大
+    info->stack_depth = backtrace(info->stack_addrs, MAX_STACK_DEPTH);
+    // 跳过前两帧（add_alloc 和调用的分配函数）
+    if (info->stack_depth > 2) {
+        memmove(info->stack_addrs, info->stack_addrs + 2,
+                (info->stack_depth - 2) * sizeof(void *));
+        info->stack_depth -= 2;
+    }
 
     info->next = thread_alloc_list;
     thread_alloc_list = info;
+
     pthread_mutex_unlock(&thread_alloc_lock);
 }
 
@@ -77,7 +90,6 @@ static void remove_alloc(void *ptr) {
         if ((*curr)->ptr == ptr) {
             AllocInfo *to_free = *curr;
             *curr = (*curr)->next;
-            free(to_free->stack);
             free(to_free);
             break;
         }
@@ -138,8 +150,16 @@ static void report_leaks() {
         while (curr) {
             printf("Leak: ptr=%p size=%zu at %s:%d\n",
                    curr->ptr, curr->size, curr->file, curr->line);
-            for (int i = 0; i < curr->stack_depth; i++) {
-                printf("    %s\n", curr->stack[i]);
+            printf("Backtrace:\n");
+            // 此时才只能泄漏块解析符号
+            char **symbols = backtrace_symbols(curr->stack_addrs, curr->stack_depth);
+            if (symbols) {
+                for (int i = 0; i < curr->stack_depth; i++) {
+                    printf("    [%d] %s\n", i, symbols[i]);
+                }
+                free(symbols);
+            } else {
+                printf("    [Error retrieving symbols]\n");
             }
             curr = curr->next;
             thread_leaks++;
