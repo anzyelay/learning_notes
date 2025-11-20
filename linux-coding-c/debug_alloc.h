@@ -27,11 +27,16 @@
 typedef struct AllocInfo {
     void *ptr; // 用户实际使用的指针（跳过红区）
     size_t size; // 用户请求的大小
-    const char *file;
-    int line;
-    void *stack_addrs[MAX_STACK_DEPTH];
+    const char *alloc_file;
+    int alloc_line;
+
     int freed; // 是否已释放
+    const char *free_file;
+    int free_line;
+
+    void *stack_addrs[MAX_STACK_DEPTH];
     int stack_depth;
+
     struct AllocInfo *next;
 } AllocInfo;
 
@@ -49,14 +54,35 @@ typedef struct ThreadRecord {
 static ThreadRecord *global_thread_list = NULL;
 static pthread_mutex_t global_list_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static void print_backtrace() {
-    void *buffer[MAX_BACKTRACE_DEPTH];
-    int nptrs = backtrace(buffer, MAX_BACKTRACE_DEPTH);
-    char **symbols = backtrace_symbols(buffer, nptrs);
-    for (int i = 0; i < nptrs; i++) {
+static void print_backtrace_symbols(void **addrs, int depth) {
+    char **symbols = backtrace_symbols(addrs, depth);
+    for (int i = 0; i < depth; i++) {
         printf("    [%d] %s\n", i, symbols[i]);
     }
     free(symbols);
+}
+
+static void print_backtrace_info(void **addrs, int depth) {
+    for (int i = 0; i < depth; i++) {
+        Dl_info dlinfo;
+        if (dladdr(addrs[i], &dlinfo) && dlinfo.dli_sname) {
+            printf("    [%d] %s + %lu\n", i,
+                dlinfo.dli_sname,
+                (unsigned long)((char *)addrs[i] - (char *)dlinfo.dli_saddr));
+        } else {
+            printf("    [%d] %p\n", i, addrs[i]);
+        }
+    }
+}
+
+static void print_backtrace_addresses(void **addrs, int depth) {
+    print_backtrace_info(addrs, depth);
+}
+
+static void print_backtrace_current() {
+    void *addrs[MAX_BACKTRACE_DEPTH];
+    int depth = backtrace(addrs, MAX_BACKTRACE_DEPTH);
+    print_backtrace_addresses(addrs, depth);
 }
 
 /* 添加分配记录 */
@@ -69,9 +95,11 @@ static void add_alloc(void *ptr, size_t size, const char *file, int line) {
 
     info->ptr = ptr;
     info->size = size;
-    info->file = file;
-    info->line = line;
+    info->alloc_file = file;
+    info->alloc_line = line;
     info->freed = 0;
+    info->free_file = NULL;
+    info->free_line = 0;
 
     // 获取调用栈地址， 不解析为符号以节省开销, 在报告时再解析, 因为解析符号开销较大
     info->stack_depth = backtrace(info->stack_addrs, MAX_STACK_DEPTH);
@@ -135,19 +163,10 @@ static void report_leaks() {
         while (curr) {
             if (!curr->freed) { // 仅报告未释放的块
                 printf("Leak: ptr=%p size=%zu at %s:%d\n",
-                    curr->ptr, curr->size, curr->file, curr->line);
+                    curr->ptr, curr->size, curr->alloc_file, curr->alloc_line);
                 printf("Backtrace:\n");
                 // 此时才解析泄漏块符号
-                for (int i = 0; i < curr->stack_depth; i++) {
-                    Dl_info dlinfo;
-                    if (dladdr(curr->stack_addrs[i], &dlinfo) && dlinfo.dli_sname) {
-                        printf("    [%d] %s + %lu\n", i,
-                            dlinfo.dli_sname,
-                            (unsigned long)((char *)curr->stack_addrs[i] - (char *)dlinfo.dli_saddr));
-                    } else {
-                        printf("    [%d] %p\n", i, curr->stack_addrs[i]);
-                    }
-                }
+                print_backtrace_addresses(curr->stack_addrs, curr->stack_depth);
                 thread_leaks++;
             }
 
@@ -198,23 +217,29 @@ static void debug_free_impl(void *ptr, const char *file, int line) {
     AllocInfo *info = find_alloc_info(ptr);
     if (!info) {
         printf("[FREE] ptr=%p NOT FOUND in alloc records at %s:%d\n", ptr, file, line);
-        #if MODE_DEBUG_ABORT_ON_INVALID_FREE
+#if MODE_DEBUG_ABORT_ON_INVALID_FREE
             // way 1: 非法释放，直接中止程序, 适用于调试阶段,生产环境慎用
             abort();
-        #else
+#else
             // way 2: 忽略非法释放, 适用于生产环境, 不中止程序, 继续执行, 但不进行后续检查
             return;
-        #endif
+#endif
     }
+
     if (info->freed) {
-        // 重复释放检测
-        printf("[WARNING] Double free detected for ptr=%p allocated at %s:%d\n",
-               ptr, info->file, info->line);
-        #if MODE_DEBUG_ABORT_ON_INVALID_FREE
-            abort();
-        #else
-            return;
-        #endif
+        // 重复释放检测, 打印警告信息
+        printf("\n[ERROR] [DOUBLE-FREE DETECTED]\n");
+        printf("    Pointer %p allocated at %s:%d\n", ptr, info->alloc_file, info->alloc_line);
+        printf("    First freed at %s:%d\n", info->free_file, info->free_line);
+        printf("    Current free attempt at %s:%d\n", file, line);
+        printf("    Backtrace of first free:\n");
+        print_backtrace_addresses(info->stack_addrs, info->stack_depth);
+#if MODE_DEBUG_ABORT_ON_INVALID_FREE
+        abort(); // 中止程序以便调试
+#else
+        return; // 忽略重复释放，继续执行
+#endif
+
     }
 
     // 计算实际分配的原始指针和红区位置
@@ -251,6 +276,16 @@ static void debug_free_impl(void *ptr, const char *file, int line) {
     printf("[FREE] ptr=%p size=%zu at %s:%d\n", ptr, size, file, line);
 
     info->freed = 1;
+    info->free_file = file;
+    info->free_line = line;
+    // 覆盖 stack_addrs 为第一次 free 的调用栈, 以便检测重复释放时打印调用栈
+    info->stack_depth = backtrace(info->stack_addrs, MAX_STACK_DEPTH);
+    // 跳过前两帧（debug_free_impl 和调用的 free 函数）
+    if (info->stack_depth > 2) {
+        memmove(info->stack_addrs, info->stack_addrs + 2,
+                (info->stack_depth - 2) * sizeof(void *));
+        info->stack_depth -= 2;
+    }
 
     free(raw_ptr);
 }
