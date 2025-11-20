@@ -10,6 +10,7 @@
 #include <string.h>
 #include <execinfo.h>
 #include <pthread.h>
+#include <dlfcn.h>
 
 #define FILL_ALLOC_PATTERN 0xAA
 #define FILL_FREE_PATTERN  0xDD
@@ -151,16 +152,18 @@ static void report_leaks() {
             printf("Leak: ptr=%p size=%zu at %s:%d\n",
                    curr->ptr, curr->size, curr->file, curr->line);
             printf("Backtrace:\n");
-            // 此时才只能泄漏块解析符号
-            char **symbols = backtrace_symbols(curr->stack_addrs, curr->stack_depth);
-            if (symbols) {
-                for (int i = 0; i < curr->stack_depth; i++) {
-                    printf("    [%d] %s\n", i, symbols[i]);
+            // 此时才解析泄漏块符号
+            for (int i = 0; i < curr->stack_depth; i++) {
+                Dl_info dlinfo;
+                if (dladdr(curr->stack_addrs[i], &dlinfo) && dlinfo.dli_sname) {
+                    printf("    [%d] %s + %lu\n", i,
+                           dlinfo.dli_sname,
+                           (unsigned long)((char *)curr->stack_addrs[i] - (char *)dlinfo.dli_saddr));
+                } else {
+                    printf("    [%d] %p\n", i, curr->stack_addrs[i]);
                 }
-                free(symbols);
-            } else {
-                printf("    [Error retrieving symbols]\n");
             }
+
             curr = curr->next;
             thread_leaks++;
         }
