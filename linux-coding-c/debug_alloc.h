@@ -30,6 +30,7 @@ typedef struct AllocInfo {
     const char *file;
     int line;
     void *stack_addrs[MAX_STACK_DEPTH];
+    int freed; // 是否已释放
     int stack_depth;
     struct AllocInfo *next;
 } AllocInfo;
@@ -70,6 +71,7 @@ static void add_alloc(void *ptr, size_t size, const char *file, int line) {
     info->size = size;
     info->file = file;
     info->line = line;
+    info->freed = 0;
 
     // 获取调用栈地址， 不解析为符号以节省开销, 在报告时再解析, 因为解析符号开销较大
     info->stack_depth = backtrace(info->stack_addrs, MAX_STACK_DEPTH);
@@ -85,31 +87,16 @@ static void add_alloc(void *ptr, size_t size, const char *file, int line) {
 
 }
 
-/* 删除分配记录 */
-static void remove_alloc(void *ptr) {
-    AllocInfo **curr = &thread_alloc_list;
-    while (*curr) {
-        if ((*curr)->ptr == ptr) {
-            AllocInfo *to_free = *curr;
-            *curr = (*curr)->next;
-            free(to_free);
-            break;
-        }
-        curr = &(*curr)->next;
-    }
-}
-
-/* 查找分配大小 */
-static size_t find_alloc_size(void *ptr) {
+/* 查找alloc信息 */
+static AllocInfo *find_alloc_info(void *ptr) {
     AllocInfo *curr = thread_alloc_list;
     while (curr) {
         if (curr->ptr == ptr) {
-            size_t size = curr->size;
-            return size;
+            return curr;
         }
         curr = curr->next;
     }
-    return 0;
+    return NULL;
 }
 
 static void register_current_thread() {
@@ -146,29 +133,37 @@ static void report_leaks() {
         int thread_leaks = 0;
 
         while (curr) {
-            printf("Leak: ptr=%p size=%zu at %s:%d\n",
-                   curr->ptr, curr->size, curr->file, curr->line);
-            printf("Backtrace:\n");
-            // 此时才解析泄漏块符号
-            for (int i = 0; i < curr->stack_depth; i++) {
-                Dl_info dlinfo;
-                if (dladdr(curr->stack_addrs[i], &dlinfo) && dlinfo.dli_sname) {
-                    printf("    [%d] %s + %lu\n", i,
-                           dlinfo.dli_sname,
-                           (unsigned long)((char *)curr->stack_addrs[i] - (char *)dlinfo.dli_saddr));
-                } else {
-                    printf("    [%d] %p\n", i, curr->stack_addrs[i]);
+            if (!curr->freed) { // 仅报告未释放的块
+                printf("Leak: ptr=%p size=%zu at %s:%d\n",
+                    curr->ptr, curr->size, curr->file, curr->line);
+                printf("Backtrace:\n");
+                // 此时才解析泄漏块符号
+                for (int i = 0; i < curr->stack_depth; i++) {
+                    Dl_info dlinfo;
+                    if (dladdr(curr->stack_addrs[i], &dlinfo) && dlinfo.dli_sname) {
+                        printf("    [%d] %s + %lu\n", i,
+                            dlinfo.dli_sname,
+                            (unsigned long)((char *)curr->stack_addrs[i] - (char *)dlinfo.dli_saddr));
+                    } else {
+                        printf("    [%d] %p\n", i, curr->stack_addrs[i]);
+                    }
                 }
+                thread_leaks++;
             }
 
-            curr = curr->next;
-            thread_leaks++;
+            AllocInfo *next = curr->next;
+            free(curr); // 释放记录结构体
+            curr = next;
         }
 
         printf("Thread %s has %d leaks.\n", thread_rec->name, thread_leaks);
         total_leaks += thread_leaks;
-        thread_rec = thread_rec->next;
+
+        ThreadRecord *next_thread = thread_rec->next;
+        free(thread_rec); // 释放线程记录结构体
+        thread_rec = next_thread;
     }
+    global_thread_list = NULL;
 
     if (total_leaks == 0) {
         printf("No memory leaks detected across all threads.\n");
@@ -200,9 +195,8 @@ static void *debug_malloc_impl(size_t size, const char *file, int line) {
 static void debug_free_impl(void *ptr, const char *file, int line) {
     if (!ptr) return;
 
-    // 查找分配记录 以获取大小
-    size_t size = find_alloc_size(ptr);
-    if (size <= 0) {
+    AllocInfo *info = find_alloc_info(ptr);
+    if (!info) {
         printf("[FREE] ptr=%p NOT FOUND in alloc records at %s:%d\n", ptr, file, line);
         #if MODE_DEBUG_ABORT_ON_INVALID_FREE
             // way 1: 非法释放，直接中止程序, 适用于调试阶段,生产环境慎用
@@ -212,8 +206,19 @@ static void debug_free_impl(void *ptr, const char *file, int line) {
             return;
         #endif
     }
+    if (info->freed) {
+        // 重复释放检测
+        printf("[WARNING] Double free detected for ptr=%p allocated at %s:%d\n",
+               ptr, info->file, info->line);
+        #if MODE_DEBUG_ABORT_ON_INVALID_FREE
+            abort();
+        #else
+            return;
+        #endif
+    }
 
     // 计算实际分配的原始指针和红区位置
+    size_t size = info->size;
     char *raw_ptr = (char *)ptr - REDZONE_SIZE;
     char *end_redzone = (char *)raw_ptr + REDZONE_SIZE + size;
 
@@ -244,8 +249,8 @@ static void debug_free_impl(void *ptr, const char *file, int line) {
     memset(ptr, FILL_FREE_PATTERN, size);
 
     printf("[FREE] ptr=%p size=%zu at %s:%d\n", ptr, size, file, line);
-    // print_backtrace();
-    remove_alloc(ptr);
+
+    info->freed = 1;
 
     free(raw_ptr);
 }
@@ -269,12 +274,12 @@ static void *debug_realloc_impl(void *ptr, size_t size, const char *file, int li
     }
 
     // 查找旧分配大小
-    size_t old_size = find_alloc_size(ptr);
-    if (old_size == 0) {
-        printf("[REALLOC] ptr=%p NOT FOUND in alloc records at %s:%d\n", ptr, file, line);
+    AllocInfo *old_info = find_alloc_info(ptr);
+    if (!old_info) {
+        printf("[REALLOC] ptr=%p NOT FOUND ...\n", ptr, file, line);
         return debug_malloc_impl(size, file, line); // 直接分配新块, 视为未跟踪的 realloc
     }
-
+    size_t old_size = old_info->size;
     // 分配新块
     void *new_ptr = debug_malloc_impl(size, file, line);
     if (!new_ptr) {
