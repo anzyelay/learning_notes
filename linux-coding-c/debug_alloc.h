@@ -5,9 +5,7 @@
 
 #ifdef DEBUG_MEMORY_ENABLED
 
-// #define MODE_DEBUG_ABORT_ON_INVALID_FREE    1  // 调试模式：非法释放时中止程序
-// #define MODE_PROD_IGNORE_INVALID_FREE     1  // 生产模式：非法释放时忽略，不中止程序
-// 注意：两种模式只能启用一种, 否则默认使用第三种方式（填充特殊模式）
+#define MODE_DEBUG_ABORT_ON_INVALID_FREE    1  // 调试模式：非法释放时中止程序
 
 
 #include <stdio.h>
@@ -202,28 +200,22 @@ static void *debug_malloc_impl(size_t size, const char *file, int line) {
 static void debug_free_impl(void *ptr, const char *file, int line) {
     if (!ptr) return;
 
-    // 计算实际分配的原始指针和红区位置
-    char *raw_ptr = (char *)ptr - REDZONE_SIZE;
-    char *end_redzone = (char *)raw_ptr + REDZONE_SIZE + size;
-
     // 查找分配记录 以获取大小
     size_t size = find_alloc_size(ptr);
     if (size <= 0) {
         printf("[FREE] ptr=%p NOT FOUND in alloc records at %s:%d\n", ptr, file, line);
-        // way 1: 非法释放，直接中止程序, 适用于调试阶段,生产环境慎用
         #if MODE_DEBUG_ABORT_ON_INVALID_FREE
+            // way 1: 非法释放，直接中止程序, 适用于调试阶段,生产环境慎用
             abort();
-        // way 2: 继续释放，但不做任何填充和记录删除, 适用于生产环境
-        #elif MODE_PROD_IGNORE_INVALID_FREE
-            free(raw_ptr);
-            return;
-        // way 3: 继续释放，但填充为特殊模式，便于事后分析
         #else
-            memset(ptr, FILL_FREE_PATTERN, size);
-            free(raw_ptr);
+            // way 2: 忽略非法释放, 适用于生产环境, 不中止程序, 继续执行, 但不进行后续检查
             return;
         #endif
     }
+
+    // 计算实际分配的原始指针和红区位置
+    char *raw_ptr = (char *)ptr - REDZONE_SIZE;
+    char *end_redzone = (char *)raw_ptr + REDZONE_SIZE + size;
 
     // 检查红区是否被破坏
     int underflow = 0, overflow = 0;
@@ -260,7 +252,11 @@ static void debug_free_impl(void *ptr, const char *file, int line) {
 
 static void *debug_calloc_impl(size_t nmemb, size_t size, const char *file, int line) {
     size_t total_size = nmemb * size;
-    return debug_malloc_impl(total_size, file, line);
+    void *ptr = debug_malloc_impl(total_size, file, line);
+    if (ptr) {
+        memset(ptr, 0, total_size); // 覆盖为0, 因为 calloc 要求返回的内存初始化为0
+    }
+    return ptr;
 }
 
 static void *debug_realloc_impl(void *ptr, size_t size, const char *file, int line) {
@@ -276,7 +272,7 @@ static void *debug_realloc_impl(void *ptr, size_t size, const char *file, int li
     size_t old_size = find_alloc_size(ptr);
     if (old_size == 0) {
         printf("[REALLOC] ptr=%p NOT FOUND in alloc records at %s:%d\n", ptr, file, line);
-        return NULL;
+        return debug_malloc_impl(size, file, line); // 直接分配新块, 视为未跟踪的 realloc
     }
 
     // 分配新块
