@@ -163,7 +163,7 @@ static void *debug_malloc_impl(size_t size, const char *file, int line) {
     if (!ptr) return NULL;
     memset(ptr, FILL_ALLOC_PATTERN, size);
     printf("[ALLOC] ptr=%p size=%zu at %s:%d\n", ptr, size, file, line);
-    print_backtrace();
+    // print_backtrace();
     add_alloc(ptr, size, file, line);
     return ptr;
 }
@@ -175,7 +175,7 @@ static void debug_free_impl(void *ptr, const char *file, int line) {
         memset(ptr, FILL_FREE_PATTERN, size);
     }
     printf("[FREE] ptr=%p size=%zu at %s:%d\n", ptr, size, file, line);
-    print_backtrace();
+    // print_backtrace();
     remove_alloc(ptr);
     free(ptr);
 }
@@ -185,7 +185,7 @@ static void *debug_calloc_impl(size_t nmemb, size_t size, const char *file, int 
     if (!ptr) return NULL;
     memset(ptr, FILL_ALLOC_PATTERN, nmemb * size);
     printf("[CALLOC] ptr=%p size=%zu at %s:%d\n", ptr, nmemb * size, file, line);
-    print_backtrace();
+    // print_backtrace();
     add_alloc(ptr, nmemb * size, file, line);
     return ptr;
 }
@@ -195,7 +195,7 @@ static void *debug_realloc_impl(void *ptr, size_t size, const char *file, int li
     if (!new_ptr) return NULL;
     memset(new_ptr, FILL_ALLOC_PATTERN, size);
     printf("[REALLOC] old_ptr=%p new_ptr=%p size=%zu at %s:%d\n", ptr, new_ptr, size, file, line);
-    print_backtrace();
+    // print_backtrace();
     remove_alloc(ptr);
     add_alloc(new_ptr, size, file, line);
     return new_ptr;

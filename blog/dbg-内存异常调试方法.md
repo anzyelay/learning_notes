@@ -247,7 +247,7 @@ target_link_libraries(mem_debug pthread dl)
 
 `LD_PRELOAD=./libmem_debug.so ./your_program`
 
-缺点：不支持TLS
+缺点：不支持TLS(thread local storage)
 
 #### CMake编译引入
 
