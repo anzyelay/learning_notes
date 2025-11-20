@@ -5,6 +5,11 @@
 
 #ifdef DEBUG_MEMORY_ENABLED
 
+// #define MODE_DEBUG_ABORT_ON_INVALID_FREE    1  // 调试模式：非法释放时中止程序
+// #define MODE_PROD_IGNORE_INVALID_FREE     1  // 生产模式：非法释放时忽略，不中止程序
+// 注意：两种模式只能启用一种, 否则默认使用第三种方式（填充特殊模式）
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +35,6 @@ typedef struct AllocInfo {
 
 // 每个线程独立的分配记录链表
 __thread AllocInfo *thread_alloc_list = NULL;
-__thread pthread_mutex_t thread_alloc_lock = PTHREAD_MUTEX_INITIALIZER;
 
 // 全局线程注册表（用于最终合并）
 typedef struct ThreadRecord {
@@ -55,11 +59,9 @@ static void print_backtrace() {
 
 /* 添加分配记录 */
 static void add_alloc(void *ptr, size_t size, const char *file, int line) {
-    pthread_mutex_lock(&thread_alloc_lock);
 
     AllocInfo *info = (AllocInfo *)malloc(sizeof(AllocInfo));
     if (!info) {
-        pthread_mutex_unlock(&thread_alloc_lock);
         return;
     }
 
@@ -80,12 +82,10 @@ static void add_alloc(void *ptr, size_t size, const char *file, int line) {
     info->next = thread_alloc_list;
     thread_alloc_list = info;
 
-    pthread_mutex_unlock(&thread_alloc_lock);
 }
 
 /* 删除分配记录 */
 static void remove_alloc(void *ptr) {
-    pthread_mutex_lock(&thread_alloc_lock);
     AllocInfo **curr = &thread_alloc_list;
     while (*curr) {
         if ((*curr)->ptr == ptr) {
@@ -96,22 +96,18 @@ static void remove_alloc(void *ptr) {
         }
         curr = &(*curr)->next;
     }
-    pthread_mutex_unlock(&thread_alloc_lock);
 }
 
 /* 查找分配大小 */
 static size_t find_alloc_size(void *ptr) {
-    pthread_mutex_lock(&thread_alloc_lock);
     AllocInfo *curr = thread_alloc_list;
     while (curr) {
         if (curr->ptr == ptr) {
             size_t size = curr->size;
-            pthread_mutex_unlock(&thread_alloc_lock);
             return size;
         }
         curr = curr->next;
     }
-    pthread_mutex_unlock(&thread_alloc_lock);
     return 0;
 }
 
@@ -194,9 +190,24 @@ static void *debug_malloc_impl(size_t size, const char *file, int line) {
 static void debug_free_impl(void *ptr, const char *file, int line) {
     if (!ptr) return;
     size_t size = find_alloc_size(ptr);
-    if (size > 0) {
-        memset(ptr, FILL_FREE_PATTERN, size);
+    if (size <= 0) {
+        printf("[FREE] ptr=%p NOT FOUND in alloc records at %s:%d\n", ptr, file, line);
+        // way 1: 非法释放，直接中止程序, 适用于调试阶段,生产环境慎用
+        #if MODE_DEBUG_ABORT_ON_INVALID_FREE
+            abort();
+        // way 2: 继续释放，但不做任何填充和记录删除, 适用于生产环境
+        #elif MODE_PROD_IGNORE_INVALID_FREE
+            free(ptr);
+            return;
+        // way 3: 继续释放，但填充为特殊模式，便于事后分析
+        #else
+            memset(ptr, FILL_FREE_PATTERN, 16); // 填充前16字节
+            free(ptr);
+            return;
+        #endif
     }
+
+    memset(ptr, FILL_FREE_PATTERN, size);
     printf("[FREE] ptr=%p size=%zu at %s:%d\n", ptr, size, file, line);
     // print_backtrace();
     remove_alloc(ptr);
