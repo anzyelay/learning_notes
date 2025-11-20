@@ -19,13 +19,16 @@
 
 #define FILL_ALLOC_PATTERN 0xAA
 #define FILL_FREE_PATTERN  0xDD
+#define FILL_REDZONE_PATTERN 0xEE
+// memory struct: redzone + usrer data + redzone
+#define REDZONE_SIZE 16 // 每个分配块前后的红区大小, 用于检测越界写入
 #define MAX_BACKTRACE_DEPTH 10
 #define MAX_STACK_DEPTH 10
 #define MAX_THREAD_NAME 32
 
 typedef struct AllocInfo {
-    void *ptr;
-    size_t size;
+    void *ptr; // 用户实际使用的指针（跳过红区）
+    size_t size; // 用户请求的大小
     const char *file;
     int line;
     void *stack_addrs[MAX_STACK_DEPTH];
@@ -178,17 +181,32 @@ static void report_leaks() {
 }
 
 static void *debug_malloc_impl(size_t size, const char *file, int line) {
-    void *ptr = malloc(size);
+    size_t total_size = size + 2 * REDZONE_SIZE;
+    void *ptr = malloc(total_size);
     if (!ptr) return NULL;
-    memset(ptr, FILL_ALLOC_PATTERN, size);
-    printf("[ALLOC] ptr=%p size=%zu at %s:%d\n", ptr, size, file, line);
-    // print_backtrace();
-    add_alloc(ptr, size, file, line);
-    return ptr;
+
+    // 设置红区
+    memset(ptr, FILL_REDZONE_PATTERN, REDZONE_SIZE);
+    memset((char *)ptr + REDZONE_SIZE + size, FILL_REDZONE_PATTERN, REDZONE_SIZE);
+
+    // 填充用户数据区
+    void *usr_ptr = (char *)ptr + REDZONE_SIZE;
+    memset(usr_ptr, FILL_ALLOC_PATTERN, size);
+
+    printf("[ALLOC] ptr=%p size=%zu at %s:%d\n", usr_ptr, size, file, line);
+
+    add_alloc(usr_ptr, size, file, line);
+    return usr_ptr;
 }
 
 static void debug_free_impl(void *ptr, const char *file, int line) {
     if (!ptr) return;
+
+    // 计算实际分配的原始指针和红区位置
+    char *raw_ptr = (char *)ptr - REDZONE_SIZE;
+    char *end_redzone = (char *)raw_ptr + REDZONE_SIZE + size;
+
+    // 查找分配记录 以获取大小
     size_t size = find_alloc_size(ptr);
     if (size <= 0) {
         printf("[FREE] ptr=%p NOT FOUND in alloc records at %s:%d\n", ptr, file, line);
@@ -197,41 +215,83 @@ static void debug_free_impl(void *ptr, const char *file, int line) {
             abort();
         // way 2: 继续释放，但不做任何填充和记录删除, 适用于生产环境
         #elif MODE_PROD_IGNORE_INVALID_FREE
-            free(ptr);
+            free(raw_ptr);
             return;
         // way 3: 继续释放，但填充为特殊模式，便于事后分析
         #else
-            memset(ptr, FILL_FREE_PATTERN, 16); // 填充前16字节
-            free(ptr);
+            memset(ptr, FILL_FREE_PATTERN, size);
+            free(raw_ptr);
             return;
         #endif
     }
 
+    // 检查红区是否被破坏
+    int underflow = 0, overflow = 0;
+    for (size_t i = 0; i < REDZONE_SIZE; i++) {
+        if (((unsigned char *)raw_ptr)[i] != FILL_REDZONE_PATTERN) {
+            underflow = 1;
+            break;
+        }
+    }
+    for (size_t i = 0; i < REDZONE_SIZE; i++) {
+        if (((unsigned char *)end_redzone)[i] != FILL_REDZONE_PATTERN) {
+            overflow = 1;
+            break;
+        }
+    }
+    if (underflow) {
+        printf("[ERROR] Buffer underflow detected for ptr=%p allocated at %s:%d\n",
+               ptr, file, line);
+    }
+    if (overflow) {
+        printf("[ERROR] Buffer overflow detected for ptr=%p allocated at %s:%d\n",
+               ptr, file, line);
+    }
+
+    // 填充释放模式(UAF检测)
     memset(ptr, FILL_FREE_PATTERN, size);
+
     printf("[FREE] ptr=%p size=%zu at %s:%d\n", ptr, size, file, line);
     // print_backtrace();
     remove_alloc(ptr);
-    free(ptr);
+
+    free(raw_ptr);
 }
 
 static void *debug_calloc_impl(size_t nmemb, size_t size, const char *file, int line) {
-    void *ptr = calloc(nmemb, size);
-    if (!ptr) return NULL;
-    memset(ptr, FILL_ALLOC_PATTERN, nmemb * size);
-    printf("[CALLOC] ptr=%p size=%zu at %s:%d\n", ptr, nmemb * size, file, line);
-    // print_backtrace();
-    add_alloc(ptr, nmemb * size, file, line);
-    return ptr;
+    size_t total_size = nmemb * size;
+    return debug_malloc_impl(total_size, file, line);
 }
 
 static void *debug_realloc_impl(void *ptr, size_t size, const char *file, int line) {
-    void *new_ptr = realloc(ptr, size);
-    if (!new_ptr) return NULL;
-    memset(new_ptr, FILL_ALLOC_PATTERN, size);
-    printf("[REALLOC] old_ptr=%p new_ptr=%p size=%zu at %s:%d\n", ptr, new_ptr, size, file, line);
-    // print_backtrace();
-    remove_alloc(ptr);
-    add_alloc(new_ptr, size, file, line);
+    if (!ptr) {
+        return debug_malloc_impl(size, file, line);
+    }
+    if (size == 0) {
+        debug_free_impl(ptr, file, line);
+        return NULL;
+    }
+
+    // 查找旧分配大小
+    size_t old_size = find_alloc_size(ptr);
+    if (old_size == 0) {
+        printf("[REALLOC] ptr=%p NOT FOUND in alloc records at %s:%d\n", ptr, file, line);
+        return NULL;
+    }
+
+    // 分配新块
+    void *new_ptr = debug_malloc_impl(size, file, line);
+    if (!new_ptr) {
+        return NULL;
+    }
+
+    // 复制旧数据
+    size_t copy_size = (size < old_size) ? size : old_size;
+    memcpy(new_ptr, ptr, copy_size);
+
+    // 释放旧块
+    debug_free_impl(ptr, file, line);
+
     return new_ptr;
 }
 
