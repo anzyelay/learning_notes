@@ -83,7 +83,7 @@ NAT 操作只会修改回复方向（第二个）四元组，因为这是接受�
 
 ```sh
 # 创建bridge
-ip link add [name] br_name type bridge 
+ip link add [name] br_name type bridge
 ip link set br_name up
 # 删除网桥可以用
 ip link delete br_name type bridge
@@ -188,6 +188,49 @@ a2:1d:93:58:0b:f7 dev rndis0 master bridge0 permanent （rndis0的MAC地址）
 > Arp manipulates or displays the kernel's IPv4 network neighbour cache. It can add entries to the table, delete one or display the current content
 
 1. `arp -a`: 查询ip的mac地址
+
+> 在 IPv6 中，ARP 被 邻居发现协议（NDP，Neighbor Discovery Protocol） 取代。NDP 的功能不仅包括地址解析，还扩展了更多能力，例如：
+> - 地址解析：将 IPv6 地址映射到链路层地址（类似 ARP 的作用）。
+> - 邻居可达性检测：检测邻居是否仍然可达。
+> - 自动地址配置：支持无状态地址自动配置（SLAAC）。
+> - 路由器发现：主机可以发现可用的路由器。
+> - 重复地址检测（DAD）：确保地址唯一性。
+
+### IPv4 ARP vs IPv6 NDP 对比
+
+| 特性                | IPv4 (ARP)                          | IPv6 (NDP)                                      |
+|---------------------|-------------------------------------|-------------------------------------------------|
+| 协议类型           | ARP (Address Resolution Protocol)  | NDP (Neighbor Discovery Protocol)              |
+| 所属协议族         | 独立协议，直接封装在链路层         | 基于 ICMPv6                                    |
+| 功能               | 地址解析（IP → MAC）               | 地址解析、邻居可达性检测、路由器发现、自动配置 |
+| 消息类型           | ARP Request / ARP Reply            | NS、NA、RS、RA、Redirect                       |
+| 广播方式           | 使用广播（Broadcast）              | 使用组播（Multicast）                          |
+| 安全性             | 无内置安全机制                     | 可结合 IPsec，支持 SEND（Secure NDP）          |
+| 地址配置           | 不支持自动配置                     | 支持 SLAAC（无状态自动配置）                   |
+| 重复地址检测       | 不支持                             | 支持（DAD）                                    |
+
+```mermaid
+flowchart TB
+    style IPv4_ARP fill:#f9f9f9,stroke:#333,stroke-width:1px
+    style IPv6_NDP fill:#f0f9ff,stroke:#333,stroke-width:1px
+
+    subgraph IPv6_NDP["IPv6 - NDP 流程"]
+        direction TB
+        A2[主机需要解析 IPv6 地址] -->|组播| B2[发送 Neighbor Solicitation]
+        B2 -->|接收| C2[目标主机接收请求]
+        C2 -->|单播| D2[目标主机发送 Neighbor Advertisement]
+        D2 -->|更新| E2[源主机更新邻居缓存]
+    end
+
+    subgraph IPv4_ARP["IPv4 - ARP 流程"]
+        direction TB
+        A1[主机需要解析 IPv4 地址] -->|广播| B1[发送 ARP Request]
+        B1 -->|接收| C1[目标主机接收请求]
+        C1 -->|单播| D1[目标主机发送 ARP Reply]
+        D1 -->|更新| E1[源主机更新 ARP 缓存]
+    end
+
+```
 
 ## iptable
 
