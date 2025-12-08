@@ -15,7 +15,7 @@
 
 1. 宏录制: `q[reg]`
 
-    - 常规模式下按q[x]进入录制模式，[x]代表[0-9a-z]内的所有取值，指示录制的寄存器标识，下面会显示recording @x，再次按q，结束录制。 
+    - 常规模式下按q[x]进入录制模式，[x]代表[0-9a-z]内的所有取值，指示录制的寄存器标识，下面会显示recording @x，再次按q，结束录制。
     - 使用n@[x]进行使用,n指重复使用资料[x]是指使用哪个记录
 
 ## other
@@ -47,8 +47,8 @@
     eval "$(ssh-agent -s)" && ssh-add
     ssh user@ip
     #way 2
-    ssh-agent ssh user@ip 
-    # way 1 and way 2 is temporary,新开一个终端就无效了,永久性的方法如下 
+    ssh-agent ssh user@ip
+    # way 1 and way 2 is temporary,新开一个终端就无效了,永久性的方法如下
     ssh-add  [OpenSSH private key]
     ssh-add -l //查看是否加入
     ssh user@ip //新开终端也有效
@@ -154,8 +154,8 @@
    # 原文内容为： com.patapua.os-updates (1.0.0-4ubuntu1) unstable; urgency=medium
    # oldversion为 1.0.0-4ubuntu1
    OLDVERSION=$(sed -n '1s/.*(\(.*\)).*/\1/p' debian/changelog)
- 
-   # -r+双引号: 可以使用变量MY_DATA, 
+
+   # -r+双引号: 可以使用变量MY_DATA,
    sed -i -r "s/^(CURRENT_TIME =).*/\1 $MY_DATE/" test.txt
    ```
 
@@ -224,3 +224,28 @@
     sync;sync
 
    ```
+
+1. 数组的使用
+
+    ```sh
+    declare -A LAN_IFS=(
+        ["eth0"]="192.168.225.0/24"
+        ["ap0"]="192.168.46.0/24"
+    )
+
+    # 1. 访问单个元素
+    echo "${LAN_IFS["eth0"]}"   # 输出 192.168.225.0/24
+    echo "${LAN_IFS["ap0"]}"    # 输出 192.168.46.0/24
+
+    # 2. 遍历所有键值对
+    for iface in "${!LAN_IFS[@]}"; do
+        net="${LAN_IFS[$iface]}"
+        echo "接口: $iface, 网段: $net"
+    done
+
+    # 3. 遍历所有元素
+    for net in "${LAN_IFS[@]}"; do
+        # 允许该内网子网访问外网
+        echo "网段: $net"
+    done
+    ```
