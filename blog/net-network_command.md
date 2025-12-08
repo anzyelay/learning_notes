@@ -246,6 +246,8 @@ tables有：
 - raw
 - security
 
+使用可以参考[smart-gateway.sh](../script/smart-gateway.sh)
+
 ## ip
 
 1. ip monitor all -  watch for netlink messages
