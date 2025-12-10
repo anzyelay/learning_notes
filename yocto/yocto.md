@@ -456,6 +456,86 @@ OVERLAYFS_ETC_FSTYPE = "tmpfs"
 OVERLAYFS_ETC_EXPOSE_LOWER = "1"
 ```
 
+### 子包（Subpackages）的概念
+
+#### 问题来源
+
+**起因:**
+
+在添加`tc`工具时，因为该工具是包含在`iproute2`里，所以直接在local.conf文件中如下添加
+
+```local.conf
+IMAGE_INSTALL:append = " iproute2"
+```
+
+测试结果是可以搜索到`tc`有被编译出来，但未被安装到最终的image里面。
+
+执行`grep "iproute2" build/.../tisdk-base-image-*.manifest`
+
+可以发现`iproute2`和`iproute2-ip`,说明编译安装没问题，那就是打包阶段出现的问题。
+
+> 根本原因：iproute2 被拆分成多个子包（subpackages），而主包是空的
+
+**验证方法：**
+
+检查 iproute2 的子包列表：
+
+```sh
+ls build/arago-tmp-default-glibc/work/aarch64-oe-linux/iproute2/6.7.0/packages-split/
+#可能输出如下
+iproute2/
+iproute2-dbg/
+iproute2-dev/
+iproute2-ip/
+iproute2-tc/      ← 包含 /usr/sbin/tc
+iproute2-ss/
+...
+```
+
+再检查`manifest`是否包含`iproute2-tc`:
+
+`grep "iproute2-tc" build/.../tisdk-base-image-*.manifest`
+
+大概率是没有的
+
+**解决方案：**
+
+修改添加内容为更精确的子包
+
+```local.conf
+IMAGE_INSTALL:append = " iproute2-tc"
+```
+
+#### 介绍
+
+> Yocto（基于 OpenEmbedded Core）允许一个 recipe 生成 多个独立的软件包（RPM/DEB/IPK），而不是“一个 recipe = 一个包”。这种机制称为 subpackages 或 package splitting。
+> 设计目的是**最小化嵌入式系统镜像体积 + 精细化控制依赖**
+
+#### 子包是如何工作的？
+
+1. 默认行为：recipe 自动拆分子包(以iproute2为例)
+
+    ```bbclass
+    # meta/recipes-connectivity/iproute2/iproute2_%.bb
+    PACKAGES =+ "${PN}-tc ${PN}-ip ${PN}-ss ${PN}-devlink ..."
+
+    FILES:${PN}-tc = "${sbindir}/tc"
+    FILES:${PN}-ip = "${sbindir}/ip"
+    FILES:${PN}-ss = "${sbindir}/ss"
+    ...
+    ```
+
+    - `${PN} = iproute2`
+    - `FILES:${PN}-tc` 定义了 `iproute2-tc` 包包含哪些文件
+    - 构建时，Yocto 会为每个子包生成独立的 .rpm / .ipk
+
+1. 主包（${PN}）通常为空或只含文档---*所以只装 iproute2 会得到一个“空包”——这正是你遇到的问题！*
+
+#### 如何查看一个 recipe 有哪些子包？
+
+- 方法 1：查看构建输出目录`iproute2/*/packages-split/`
+- 方法 2：查看 recipe 源码`bitbake -e iproute2 | grep "^PACKAGES="`
+
 ### other
 
 ```bbfile
