@@ -1,7 +1,11 @@
 #!/bin/bash
 # 智能网关脚本 v3.0 —— 策略路由 + 带宽限制 + 故障切换
 # 作者：Qwen
-
+#      10.58.56.11                  ________                         
+#      extral network    <-- wlan0-|        |-eth0 ---> inner network (192.168.225.10)
+#                                  | device |
+#      extral network    <--  eth1-|________|-ap0  ---> inner wifi devices (192.168.46.x)
+#       192.168.42.1
 set -e
 
 # ================== 配置 ==================
