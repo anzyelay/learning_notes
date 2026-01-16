@@ -3,6 +3,7 @@
 1. 对已知的**TASKS**和**VARIABLES**的说明文件在
 
    - sources/oe-core/meta/conf/documentation.conf
+   - sources/bitbake/doc/bitbake-user-manual/bitbake-user-manual-ref-variables.rst
 
 1. 标准目标文件系统的路径变量和构建过程的变量定义的文件所在(Standard target filesystem paths)
 
@@ -11,6 +12,16 @@
 1. 常见错误和警告参考文档
 
    - https://docs.yoctoproject.org/ref-manual/qa-checks.html
+
+1. bitbake介绍参考
+
+   - sources/bitbake/doc/bitbake-user-manual/bitbake-user-manual-intro.rst
+
+1. metadata语法
+
+   - sources/bitbake/doc/bitbake-user-manual/bitbake-user-manual-metadata.rst
+
+1.
 
 ## yocto
 
@@ -535,6 +546,18 @@ IMAGE_INSTALL:append = " iproute2-tc"
 
 - 方法 1：查看构建输出目录`iproute2/*/packages-split/`
 - 方法 2：查看 recipe 源码`bitbake -e iproute2 | grep "^PACKAGES="`
+
+### Executing a Multiple Configuration Build
+
+1. 准备多个目标的配置文件,比如: `target1.conf, target2.conf`,配置中必须指定machine和临时构建目录
+
+1. 通过设置**BBMULTICONFIG**变量来启动多配置构建
+
+  `BBMULTICONFIG = "target1 target2"`
+
+1. 使用以下指令开始构建
+
+  ` $ bitbake [mc:multiconfigname:]target [[[mc:multiconfigname:]target] ... ]`
 
 ### other
 
