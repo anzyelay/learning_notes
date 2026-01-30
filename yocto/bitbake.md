@@ -341,3 +341,47 @@ A .= "5"
 | **include_all**      | 全量引入       | 聚合所有层的同名文件，如维护者清单      | `.bb` / `.bbclass` / `.conf` | 包含所有匹配文件；适合跨层聚合<br>示例：`include_all maintainers.inc` → 所有层的 maintainers.inc 都被包含 |
 | **EXPORT_FUNCTIONS** | 函数共享       | 导出类函数供 recipe 调用/覆盖，如 `EXPORT_FUNCTIONS do_compile` | `.bbclass`             | 函数需按 `classname_func` 命名；支持覆盖<br>示例：类中定义 `autotools_do_compile` 并 `EXPORT_FUNCTIONS do_compile`，recipe 中可调用或覆盖 `do_compile` |
 | **addfragments**     | 片段管理器     | 管理配置片段，如内核特性 `OE_FRAGMENTS` | `.conf` (如 bitbake.conf) | 四参数：路径前缀、启用列表、元数据、内置映射<br>示例：<br>`OE_FRAGMENTS = "core/net/ipv6"`<br>`addfragments conf/fragments OE_FRAGMENTS OE_FRAGMENTS_METADATA_VARS OE_FRAGMENTS_BUILTIN` |
+
+**文件的定位规则:**
+
+| 项目 | Include 文件 (`include` / `require`) | Class 文件 (`inherit` / `INHERIT`) |
+|------|--------------------------------------|------------------------------------|
+| **查找路径** | 当前目录 + `BBPATH` | `BBPATH` 下的 `classes-recipe` / `classes-global` / `classes` |
+| **查找顺序** | ① 当前目录 → ② 按 `BBPATH` 路径顺序查找，找到第一个即停止 | - `inherit`：先查 `classes-recipe` → 再查 `classes` <br> - `INHERIT`：先查 `classes-global` → 再查 `classes` |
+| **匹配规则** | 默认只包含第一个匹配文件 | 默认只继承第一个匹配类文件 |
+| **特殊指令** | `include_all` 可包含所有同名文件 | 无类似指令 |
+| **典型用途** | 引入 `.inc` 文件（变量、配置片段） | 引入 `.bbclass` 文件（通用功能、任务封装） |
+
+```mermaid
+flowchart TB
+
+    subgraph Include/require文件
+        direction TB
+        A1[开始] --> B1[查当前目录]
+        B1 --> C1[若找到 → 使用]
+        B1 --> D1[遍历 BBPATH 从前到后]
+        D1 --> E1[在每个目录查目标文件]
+        E1 --> F1[找到第一个匹配 → 使用]
+    end
+
+    subgraph inherit查找
+        direction TB
+        A2[开始] --> B2[遍历 BBPATH 从前到后]
+        B2 --> C2[在每个目录查 classes-recipe/]
+        C2 --> D2[若找到 → 使用]
+        C2 --> E2[否则查 classes/]
+        E2 --> F2[若找到 → 使用]
+        E2 --> G2[若找不到]-->B2
+    end
+
+    subgraph INHERIT查找
+        direction TB
+        A3[开始] --> B3[遍历 BBPATH 从前到后]
+        B3 --> C3[在每个目录查 classes-global/]
+        C3 --> D3[若找到 → 使用]
+        C3 --> E3[否则查 classes/]
+        E3 --> F3[若找到 → 使用]
+        E3 --> G3[若找不到]-->B3
+    end
+
+```
