@@ -1,4 +1,3 @@
-// main.c
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
@@ -20,6 +19,16 @@
 #include "state_common.h"
 #include "state_off.h"
 #include "state_on.h"
+
+// --- 状态注册表的实现 ---
+// 这是将所有状态“注册”到中央位置的关键部分
+GetStateFunction g_state_registry[] = {
+    [LIGHT_STATE_ID_OFF] = get_off_state,
+    [LIGHT_STATE_ID_ON] = get_on_state,
+    // 当添加新状态时，在这里追加，例如：
+    // [LIGHT_STATE_ID_SLEEPING] = get_sleeping_state,
+    // [LIGHT_STATE_ID_ERROR] = get_error_state,
+};
 
 int kbhit() {
 #ifdef _WIN32
@@ -78,19 +87,32 @@ int main() {
 }
 
 void light_context_init(LightContext* ctx) {
-    ctx->current_state = get_off_state();
+    // 通过注册表初始化
+    ctx->current_state = g_state_registry[LIGHT_STATE_ID_OFF]();
 }
 
 void light_context_handle_event(LightContext* ctx, LightEvent_t event) {
     if (ctx->current_state && ctx->current_state->vptr) {
-        // 直接调用处理函数
-        ctx->current_state = ctx->current_state->vptr->handle_event(ctx, event);
+        // 1. 状态实现返回下一个状态的ID
+        LightStateId_t next_state_id = ctx->current_state->vptr->handle_event(ctx, event);
+        // 2. 复用统一的状态切换接口
+        light_context_switch_to_state(ctx, next_state_id);
     }
 }
 
 void light_context_update_timer(LightContext* ctx) {
     if (ctx->current_state && ctx->current_state->vptr && ctx->current_state->vptr->update_timer) {
-        ctx->current_state = ctx->current_state->vptr->update_timer(ctx);
+        // 1. 状态实现返回下一个状态的ID
+        LightStateId_t next_state_id = ctx->current_state->vptr->update_timer(ctx);
+        // 2. 复用统一的状态切换接口
+        light_context_switch_to_state(ctx, next_state_id);
+    }
+}
+
+// 新增：通过ID切换状态的通用接口
+void light_context_switch_to_state(LightContext* ctx, LightStateId_t state_id) {
+    if (state_id < sizeof(g_state_registry) / sizeof(GetStateFunction)) {
+        ctx->current_state = g_state_registry[state_id]();
     }
 }
 
@@ -99,4 +121,11 @@ const char* get_current_state_name(const LightContext* ctx) {
         return ctx->current_state->name;
     }
     return "UNKNOWN";
+}
+
+LightStateId_t get_current_state_id(const LightContext* ctx) {
+    if (ctx->current_state) {
+        return ctx->current_state->id;
+    }
+    return -1; // 或者定义一个无效状态ID
 }

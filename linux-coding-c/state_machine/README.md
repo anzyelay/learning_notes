@@ -1,89 +1,70 @@
-# 智能灯泡状态机 (Smart Light State Machine)
+# 精简版状态机示例
 
-本项目实现了一个基于 C 语言的、高度模块化的有限状态机（FSM）系统，用于模拟一个具有双重自动关闭逻辑的智能灯泡。该项目旨在展示如何在 C 语言中运用面向对象的设计思想，特别是通过 `vtable`（虚函数表）模式来实现状态模式。
+这是一个使用C语言实现的、基于虚函数表（vtable）和中央状态注册表的精简版状态机示例。该项目旨在演示一种可扩展、高内聚、低耦合的状态机设计模式。
 
-## 功能描述
+## 特性
 
-- 两种状态：灯泡可以在 OFF (关闭) 和 ON (开启) 两种状态间切换。
-- 双重自动关闭：
-  - 长时无操作：灯开启后，如果在 30 分钟内没有任何操作，它将自动关闭。
-  - 短时延迟关闭：在 ON 状态下按一次开关，灯不会立即关闭，而是进入一个 5 秒的延迟关闭倒计时。在此期间，如果再次按下开关，倒计时会被取消，灯继续亮着；如果倒计时结束，灯将关闭。
+- **高内聚**：每个状态逻辑被封装在其独立的 `.c` 文件中，职责单一。
+- **低耦合**：状态之间通过中央注册表进行通信，无需互相引用头文件，降低了依赖性。
+- **易于扩展**：添加新状态只需在 `state_common.h` 中定义ID，在注册表中添加入口，并创建相应的 `.c/.h` 文件，即可无缝集成。
+- **清晰的状态流转**：通过 `enum` 定义所有状态ID，使所有可能的状态一目了然，状态切换关系清晰可控。
 
-- 交互界面：用户可以通过键盘输入 1 来模拟按下开关，输入 0 来退出程序。
+## 示例场景
 
-## 设计与实现
+本项目模拟了一个具有双重定时器的智能开关：
 
-### 1. 核心模式：vtable (虚函数表)
+- **规则1 (长定时器)**：灯开启后，如果在30分钟内没有任何操作，将自动关闭。
+- **规则2 (短定时器)**：按下关闭键后，灯不会立即熄灭，而是会等待5秒后才关闭。在此期间，如果再次按下开关，则会取消本次关闭操作。
 
-这是整个设计的灵魂。C 语言本身不支持类和继承，但我们可以通过结构体和函数指针来模拟面向对象的核心特性——**多态**。
+## 设计模式
 
-- `StateObject` 结构体：代表一个抽象的状态。它包含一个指向 `StateVTable` 的指针 `vptr` 和一个状态名称 name。这个结构体是所有具体状态（如 OffState, OnState）的“基类”。
-- `StateVTable` 结构体：即“虚函数表”。它包含了该状态需要实现的所有行为（方法）的函数指针，例如 `handle_event` 和 `update_timer`。不同的状态可以提供自己独特的函数实现。
-- `LightContext` 结构体：即“上下文”。它持有一个指向 `StateObject` 的指针，代表当前状态。状态切换就是修改这个指针，使其指向不同的 `StateObject` 实例。
+- **状态模式 (State Pattern)**：核心模式，通过不同的对象来表示不同的状态，将状态转换和动作封装在状态对象内部。
+- **虚函数表 (Virtual Function Table)**：C语言中模拟面向对象多态性的常用技巧。每个状态对象都有一个指向 `StateVTable` 的指针，其中包含了处理事件和更新定时器的函数指针。
+- **中央注册表 (Central Registry)**：一个全局数组 `g_state_registry`，将 `LightStateId_t` 映射到具体的 `GetStateFunction`。这使得状态切换逻辑与具体的状态实现解耦，所有状态的获取都通过统一的入口进行。
 
-```c
-// 事件处理的核心逻辑
-ctx->current_state = ctx->current_state->vptr->handle_event(ctx, event);
-```
-
-当需要处理事件或更新定时器时，`Context` 通过 `vptr` 调用当前状态的 `vtable` 中对应的函数。由于每个状态的 `vtable` 都不同，这就实现了运行时的动态分派，即**多态**。
-
-**优点：**
-
-- 高内聚低耦合：每个状态的逻辑完全封装在自己的 .c 文件中，互不影响。
-- 易于扩展：要添加新状态，只需创建新的 .c/.h 文件，定义其 StateVTable 和 StateObject，然后在 Context 中引用即可，无需修改现有状态的代码。
-- 清晰的架构：代码结构清晰，职责分明。
-
-### 2. 状态实现：静态数据与内存优化
-
-在传统的面向对象语言中，一个状态对象通常有自己的成员变量来存储其私有数据。在 C 语言中，我们通过一个技巧来实现这一点。
-
-- `OnState` 的数据：`OnState` 需要记录 `last_activity_time` 和 `delay_start_time` 等信息。这些数据被定义为 `OnStateData` 结构体。
-- 内存布局：`OnStateData` 的第一个成员是 `StateObject base`。这意味着 `OnStateData` 实例的内存起始地址与其 `base` 成员的地址是相同的。
-- 指针转换：我们创建一个全局的 `static OnStateData` 实例。在 `get_on_state()` 函数中，我们将其地址强制转换为 `const StateObject*` 返回。当 `Context` 调用 `handle_event` 时，`ctx` 参数会被传入，而 `OnState` 的实现函数内部可以将 `ctx->current_state` 指针安全地转换回 `OnStateData*`，从而访问和修改其私有数据。
-
-```c
-// 在 OnState 的实现中
-OnStateData* self_data = (OnStateData*)ctx->current_state;
-// 现在可以访问 self_data->last_activity_time 等成员
-```
-
-这种技术被称为“继承”或“嵌入式多态”，它使得状态能够拥有自己的数据，同时又能完美融入 `vtable` 模式。
-
-此外，使用 `static const` 来定义状态实例，确保了状态对象在整个程序生命周期内只存在一份，极大地节省了内存。
-
-### 3. 性能权衡：内联状态处理
-
-理论上最快的实现是将所有状态逻辑合并到一个巨大的 switch 语句中
-
-```c
-void handle_event(Context* ctx, Event e) {
-    switch(ctx->current_state_id) {
-        case STATE_OFF:
-            // ... OffState 的所有逻辑 ...
-            break;
-        case STATE_ON:
-            // ... OnState 的所有逻辑 ...
-            break;
-    }
-}
-```
-
-这种方式完全消除了函数指针调用的开销，性能最优。然而，它的代价是巨大的**可维护性**和**可扩展性**损失。每当需要添加或修改状态时，都必须修改这个庞大的 `switch` 块，这严重违反了“开闭原则”（对扩展开放，对修改封闭）。
-
-因此，**`vtable`** 模式是在性能、可维护性和设计优雅性之间取得的最佳平衡。只有在性能要求极端苛刻且状态逻辑几乎不变的特殊领域，才会考虑这种牺牲架构的方案。
-
-## 项目结构
+## 文件结构
 
 ```text
-.
-├── Makefile
+project_root/
 ├── README.md
 └── src/
-    ├── main.c              # 主函数入口，包含 Context 的实现
-    ├── state_common.h      # 所有状态共享的类型定义
-    ├── state_off.c         # OffState 的具体实现
-    ├── state_off.h         # OffState 的头文件
-    ├── state_on.c          # OnState 的具体实现
-    └── state_on.h          # OnState 的头文件
+    ├── main.c                 # 主程序入口和Context实现
+    ├── state_common.h         # 核心定义：StateObject, VTable, Context, 事件, 状态ID枚举, 注册表声明
+    ├── state_off.h            # OFF状态的头文件
+    ├── state_off.c            # OFF状态的实现
+    ├── state_on.h             # ON状态的头文件
+    └── state_on.c             # ON状态的实现
 ```
+
+## 核心概念
+
+- **`StateObject`**：状态的基类，包含一个指向 `StateVTable` 的指针、状态名称和状态ID。
+- **`StateVTable`**：虚函数表，定义了每个状态必须实现的方法，如 `handle_event` 和 `update_timer`。
+- **`LightContext`**：上下文对象，持有一个指向当前 `StateObject` 的指针，并负责驱动状态的流转。
+- **`LightStateId_t`**：一个枚举，定义了系统中所有可用的状态ID。这是整个状态系统的“地图”。
+- **`g_state_registry`**：一个全局的函数指针数组，将 `LightStateId_t` 与 `GetStateFunction` 关联起来。这是状态切换的“路由器”。
+
+## 编译与运行
+
+您可以使用任何标准的C编译器（如 `gcc` 或 `clang`）来编译此项目。
+
+```bash
+cd src
+gcc -o state_machine main.c state_off.c state_on.c
+./state_machine
+```
+
+根据提示输入 `1` 切换状态，输入 `0` 退出程序。
+
+## 如何添加新状态
+
+假设要添加一个 `SLEEPING` 状态：
+
+1. **修改 `state_common.h`**：
+    - 在 `LightStateId_t` 枚举中添加 `LIGHT_STATE_ID_SLEEPING`。
+2. **修改 `main.c`**：
+    - 在 `g_state_registry` 数组中添加 `[LIGHT_STATE_ID_SLEEPING] = get_sleeping_state,` 的条目。
+3. **创建新文件 `state_sleeping.h` 和 `state_sleeping.c`**：
+    - 实现 `get_sleeping_state` 函数，返回一个配置好的 `StateObject`。
+    - 实现 `sleeping_handle_event_impl` 和 `sleeping_update_timer_impl` 函数，并将其地址填入 `StateVTable`。
+    - 在需要切换到睡眠状态时，从 `handle_event` 或 `update_timer` 的实现中返回 `LIGHT_STATE_ID_SLEEPING`。Context会自动通过注册表找到并切换到新状态。

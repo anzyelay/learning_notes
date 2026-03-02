@@ -1,18 +1,20 @@
 #include "state_off.h"
 #include <stdio.h>
+#include "state_common.h" // 引入注册表和ID
 
-extern const StateObject* get_on_state(void);
-
-const StateObject* off_handle_event_impl(struct LightContext* ctx, LightEvent_t event) {
+LightStateId_t off_handle_event_impl(struct LightContext* ctx, LightEvent_t event) {
     if (event == LIGHT_EVENT_TOGGLE) {
         printf("灯亮了！\n");
-        return get_on_state();
+        // 返回下一个状态的ID，而不是状态对象
+        return LIGHT_STATE_ID_ON;
     }
-    return get_off_state();
+    // 保持当前状态
+    return LIGHT_STATE_ID_OFF;
 }
 
-const StateObject* off_update_timer_impl(struct LightContext* ctx) {
-    return get_off_state();
+LightStateId_t off_update_timer_impl(struct LightContext* ctx) {
+    // 保持当前状态
+    return LIGHT_STATE_ID_OFF;
 }
 
 static const StateVTable off_vtable = {
@@ -23,6 +25,6 @@ static const StateVTable off_vtable = {
 const StateObject* get_off_state(void) {
     static const struct {
         StateObject base;
-    } instance = {{&off_vtable, "OFF"}};
+    } instance = {{&off_vtable, "OFF", LIGHT_STATE_ID_OFF}};
     return (const StateObject*)&instance;
 }

@@ -1,4 +1,3 @@
-// state_on.h
 #ifndef STATE_ON_H
 #define STATE_ON_H
 
