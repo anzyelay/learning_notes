@@ -1,0 +1,102 @@
+// main.c
+#include <stdio.h>
+#include <stdbool.h>
+#include <time.h>
+#include <string.h>
+
+#ifdef _WIN32
+    #include <windows.h>
+    #include <conio.h>
+    #define SLEEP(x) Sleep(x)
+#else
+    #include <sys/select.h>
+    #include <unistd.h>
+    #define SLEEP(x) do { \
+        struct timespec ts = {x / 1000, (x % 1000) * 1000000L}; \
+        nanosleep(&ts, NULL); \
+    } while(0)
+#endif
+
+#include "state_common.h"
+#include "state_off.h"
+#include "state_on.h"
+
+int kbhit() {
+#ifdef _WIN32
+    return _kbhit();
+#else
+    fd_set read_fds;
+    struct timeval timeout;
+    FD_ZERO(&read_fds);
+    FD_SET(STDIN_FILENO, &read_fds);
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+    return select(STDIN_FILENO + 1, &read_fds, NULL, NULL, &timeout) > 0;
+#endif
+}
+
+int main() {
+    LightContext light_ctx;
+    light_context_init(&light_ctx);
+
+    printf("带双重定时器的精简版开关模拟器 (0=退出, 1=切换)\n");
+    printf("规则1: 灯开启后，若 %d 分钟内无操作则自动关闭。\n", AUTO_OFF_LONG_DELAY_SECONDS / 60);
+    printf("规则2: 按下关闭键后，灯会延迟 %d 秒后关闭。在此期间按任意键可取消。\n", AUTO_OFF_SHORT_DELAY_SECONDS);
+    printf("当前状态: %s\n", get_current_state_name(&light_ctx));
+
+    int event_input;
+    bool running = true;
+    const char* previous_state_name = get_current_state_name(&light_ctx);
+
+    while (running) {
+        light_context_update_timer(&light_ctx);
+
+        const char* current_state_name = get_current_state_name(&light_ctx);
+        if (strcmp(current_state_name, previous_state_name) != 0) {
+            printf("[系统] 状态已自动切换 -> %s\n", current_state_name);
+            previous_state_name = current_state_name;
+        }
+
+        if (kbhit()) {
+            if (scanf("%d", &event_input) == 1) {
+                if (event_input == 0) {
+                    running = false;
+                } else if (event_input == 1) {
+                    printf("--- 用户操作 ---\n");
+                    light_context_handle_event(&light_ctx, LIGHT_EVENT_TOGGLE);
+                    const char* new_state_name = get_current_state_name(&light_ctx);
+                    printf("当前状态: %s\n", new_state_name);
+                    previous_state_name = new_state_name;
+                }
+            }
+        }
+
+        SLEEP(100);
+    }
+
+    return 0;
+}
+
+void light_context_init(LightContext* ctx) {
+    ctx->current_state = get_off_state();
+}
+
+void light_context_handle_event(LightContext* ctx, LightEvent_t event) {
+    if (ctx->current_state && ctx->current_state->vptr) {
+        // 直接调用处理函数
+        ctx->current_state = ctx->current_state->vptr->handle_event(ctx, event);
+    }
+}
+
+void light_context_update_timer(LightContext* ctx) {
+    if (ctx->current_state && ctx->current_state->vptr && ctx->current_state->vptr->update_timer) {
+        ctx->current_state = ctx->current_state->vptr->update_timer(ctx);
+    }
+}
+
+const char* get_current_state_name(const LightContext* ctx) {
+    if (ctx->current_state) {
+        return ctx->current_state->name;
+    }
+    return "UNKNOWN";
+}
