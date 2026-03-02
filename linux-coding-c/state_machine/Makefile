@@ -13,7 +13,7 @@ TARGET=smart_light
 SRCDIR=src
 
 # 源文件列表
-SOURCES=$(SRCDIR)/main.c $(SRCDIR)/state_off.c $(SRCDIR)/state_on.c
+SOURCES=$(SRCDIR)/main.c $(SRCDIR)/state_off.c $(SRCDIR)/state_on.c $(SRCDIR)/state_machine.c
 
 # 对象文件列表
 OBJECTS=$(SOURCES:.c=.o)

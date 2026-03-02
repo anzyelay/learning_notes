@@ -1,3 +1,4 @@
+// 现在 main.c 只负责用户界面交互和主循环驱动
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
@@ -16,19 +17,12 @@
     } while(0)
 #endif
 
-#include "state_common.h"
-#include "state_off.h"
-#include "state_on.h"
+#include "state_common.h" // 引入状态机接口
 
-// --- 状态注册表的实现 ---
-// 这是将所有状态“注册”到中央位置的关键部分
-GetStateFunction g_state_registry[] = {
-    [LIGHT_STATE_ID_OFF] = get_off_state,
-    [LIGHT_STATE_ID_ON] = get_on_state,
-    // 当添加新状态时，在这里追加，例如：
-    // [LIGHT_STATE_ID_SLEEPING] = get_sleeping_state,
-    // [LIGHT_STATE_ID_ERROR] = get_error_state,
-};
+// 定义一个状态变化回调函数
+void on_light_state_changed(const char* old_state_name, const char* new_state_name) {
+    printf("[系统] 状态已自动切换 -> %s\n", new_state_name);
+}
 
 int kbhit() {
 #ifdef _WIN32
@@ -48,6 +42,9 @@ int main() {
     LightContext light_ctx;
     light_context_init(&light_ctx);
 
+    // 设置状态变化回调
+    light_context_set_on_state_change_callback(&light_ctx, on_light_state_changed);
+
     printf("带双重定时器的精简版开关模拟器 (0=退出, 1=切换)\n");
     printf("规则1: 灯开启后，若 %d 分钟内无操作则自动关闭。\n", AUTO_OFF_LONG_DELAY_SECONDS / 60);
     printf("规则2: 按下关闭键后，灯会延迟 %d 秒后关闭。在此期间按任意键可取消。\n", AUTO_OFF_SHORT_DELAY_SECONDS);
@@ -55,16 +52,10 @@ int main() {
 
     int event_input;
     bool running = true;
-    const char* previous_state_name = get_current_state_name(&light_ctx);
 
     while (running) {
+        // 驱动状态机的定时器更新
         light_context_update_timer(&light_ctx);
-
-        const char* current_state_name = get_current_state_name(&light_ctx);
-        if (strcmp(current_state_name, previous_state_name) != 0) {
-            printf("[系统] 状态已自动切换 -> %s\n", current_state_name);
-            previous_state_name = current_state_name;
-        }
 
         if (kbhit()) {
             if (scanf("%d", &event_input) == 1) {
@@ -72,6 +63,7 @@ int main() {
                     running = false;
                 } else if (event_input == 1) {
                     printf("--- 用户操作 ---\n");
+                    // 驱动状态机处理事件
                     light_context_handle_event(&light_ctx, LIGHT_EVENT_TOGGLE);
                     const char* new_state_name = get_current_state_name(&light_ctx);
                     printf("当前状态: %s\n", new_state_name);
@@ -84,48 +76,4 @@ int main() {
     }
 
     return 0;
-}
-
-void light_context_init(LightContext* ctx) {
-    // 通过注册表初始化
-    ctx->current_state = g_state_registry[LIGHT_STATE_ID_OFF]();
-}
-
-void light_context_handle_event(LightContext* ctx, LightEvent_t event) {
-    if (ctx->current_state && ctx->current_state->vptr) {
-        // 1. 状态实现返回下一个状态的ID
-        LightStateId_t next_state_id = ctx->current_state->vptr->handle_event(ctx, event);
-        // 2. 复用统一的状态切换接口
-        light_context_switch_to_state(ctx, next_state_id);
-    }
-}
-
-void light_context_update_timer(LightContext* ctx) {
-    if (ctx->current_state && ctx->current_state->vptr && ctx->current_state->vptr->update_timer) {
-        // 1. 状态实现返回下一个状态的ID
-        LightStateId_t next_state_id = ctx->current_state->vptr->update_timer(ctx);
-        // 2. 复用统一的状态切换接口
-        light_context_switch_to_state(ctx, next_state_id);
-    }
-}
-
-// 新增：通过ID切换状态的通用接口
-void light_context_switch_to_state(LightContext* ctx, LightStateId_t state_id) {
-    if (state_id < sizeof(g_state_registry) / sizeof(GetStateFunction)) {
-        ctx->current_state = g_state_registry[state_id]();
-    }
-}
-
-const char* get_current_state_name(const LightContext* ctx) {
-    if (ctx->current_state) {
-        return ctx->current_state->name;
-    }
-    return "UNKNOWN";
-}
-
-LightStateId_t get_current_state_id(const LightContext* ctx) {
-    if (ctx->current_state) {
-        return ctx->current_state->id;
-    }
-    return -1; // 或者定义一个无效状态ID
 }

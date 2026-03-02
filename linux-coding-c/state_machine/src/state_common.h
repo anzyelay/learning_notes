@@ -44,20 +44,25 @@ typedef struct StateObject {
     LightStateId_t id; // 每个状态对象都包含自己的ID，方便查询
 } StateObject;
 
+// --- 状态变化回调函数类型 ---
+typedef void (*StateChangeCallback)(const char* old_state_name, const char* new_state_name);
+
 // --- 上下文 (Context) ---
 typedef struct LightContext {
     const StateObject* current_state;
+    StateChangeCallback on_state_change_callback;
 } LightContext;
 
 // 时间常量
 #define AUTO_OFF_LONG_DELAY_SECONDS (30 * 60) // 30 分钟
 #define AUTO_OFF_SHORT_DELAY_SECONDS 5        // 5 秒
 
-// Context 的公共接口
+// Context 的公共接口 (由 state_machine.c 实现)
 void light_context_init(LightContext* ctx);
 void light_context_handle_event(LightContext* ctx, LightEvent_t event);
 void light_context_update_timer(LightContext* ctx);
-void light_context_switch_to_state(LightContext* ctx, LightStateId_t state_id); // 新增接口
+void light_context_switch_to_state(LightContext* ctx, LightStateId_t state_id);
+void light_context_set_on_state_change_callback(LightContext* ctx, StateChangeCallback callback);
 const char* get_current_state_name(const LightContext* ctx);
 LightStateId_t get_current_state_id(const LightContext* ctx);
 
