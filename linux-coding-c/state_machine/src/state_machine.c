@@ -38,21 +38,21 @@ void light_context_update_timer(LightContext* ctx) {
     }
 }
 
-// 通过 current_state_obj->id 获取旧ID，与新ID比较来判断是否切换状态的通用接口
+// 通过 current_state->id 获取旧ID，与新ID比较来判断是否切换状态的通用接口
 void light_context_switch_to_state(LightContext* ctx, LightStateId_t state_id) {
     if (state_id < sizeof(g_state_registry) / sizeof(GetStateFunction)) {
         // 1. 从当前对象中获取旧ID
-        LightStateId_t old_state_id = ctx->current_state_obj->id;
+        LightStateId_t old_state_id = ctx->current_state->id;
 
         // 2. 比较ID，这是最核心的判断
         if (old_state_id != state_id) {
             // 3. 更新对象指针
-            ctx->current_state_obj = g_state_registry[state_id]();
+            ctx->current_state = g_state_registry[state_id]();
 
             // 4. 触发回调
             if (ctx->on_state_change_callback) {
                 const char* old_state_name = g_state_registry[old_state_id]()->name;
-                const char* new_state_name = ctx->current_state_obj->name;
+                const char* new_state_name = ctx->current_state->name;
 
                 ctx->on_state_change_callback(old_state_name, new_state_name);
             }

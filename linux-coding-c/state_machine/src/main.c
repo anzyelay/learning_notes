@@ -1,4 +1,5 @@
 // 现在 main.c 只负责用户界面交互和主循环驱动
+#define _GNU_SOURCE // 在所有其他头文件之前定义，以启用POSIX功能
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
@@ -67,7 +68,6 @@ int main() {
                     light_context_handle_event(&light_ctx, LIGHT_EVENT_TOGGLE);
                     const char* new_state_name = get_current_state_name(&light_ctx);
                     printf("当前状态: %s\n", new_state_name);
-                    previous_state_name = new_state_name;
                 }
             }
         }
