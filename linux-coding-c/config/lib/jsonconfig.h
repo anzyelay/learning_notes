@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef JSONCONFIG_H
+#define JSONCONFIG_H
 /*
  * ============================================================================
  *  Configuration Subsystem Design Overview
@@ -75,6 +75,7 @@
 
 #include <glib.h>
 #include <json-glib/json-glib.h>
+#include <stdio.h>
 
 /* ---------- types ---------- */
 
@@ -98,6 +99,7 @@ typedef int (*cfg_on_change_fn)(
 
 typedef struct cfg_item {
     const char *key;
+    const char *desc;
     cfg_type_t  type;
     void       *storage;
 
@@ -130,45 +132,50 @@ typedef struct cfg_item {
 
 /* ---- Basic cfg item declarations ---- */
 
-#define CFG_INT_ITEM(_key_, _storage_, _flags_)        \
+#define CFG_INT_ITEM(_key_, _storage_, _desc_, _flags_)        \
     {                                            \
         .key = (_key_),                            \
+        .desc = (_desc_),                          \
         .type = CFG_INT,                         \
         .flags = (_flags_),                       \
         .storage = (_storage_),                    \
         .from_json = cfg_from_json_int,          \
     }
 
-#define CFG_BOOL_ITEM(_key_, _storage_, _flags_)       \
+#define CFG_BOOL_ITEM(_key_, _storage_, _desc_, _flags_)       \
     {                                            \
         .key = (_key_),                            \
+        .desc = (_desc_),                          \
         .type = CFG_BOOL,                        \
         .flags = (_flags_),                        \
         .storage = (_storage_),                    \
         .from_json = cfg_from_json_bool,         \
     }
 
-#define CFG_DOUBLE_ITEM(_key_, _storage_, _flags_)     \
+#define CFG_DOUBLE_ITEM(_key_, _storage_, _desc_, _flags_)     \
     {                                            \
         .key = (_key_),                            \
+        .desc = (_desc_),                          \
         .type = CFG_DOUBLE,                      \
         .flags = (_flags_),                        \
         .storage = (_storage_),                    \
         .from_json = cfg_from_json_double,       \
     }
 
-#define CFG_STRING_ITEM(_key_, _storage_, _flags_)     \
+#define CFG_STRING_ITEM(_key_, _storage_, _desc_, _flags_)     \
     {                                            \
         .key = (_key_),                            \
+        .desc = (_desc_),                          \
         .type = CFG_STRING,                      \
         .flags = (_flags_),                        \
         .storage = (_storage_),                    \
         .from_json = cfg_from_json_string,       \
     }
 
-#define CFG_INT_ITEM_V(_key_, _storage_, _flags_, valid_fun)        \
+#define CFG_INT_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)        \
     {                                            \
         .key = (_key_),                            \
+        .desc = (_desc_),                          \
         .type = CFG_INT,                         \
         .flags = (_flags_),                       \
         .storage = (_storage_),                    \
@@ -176,9 +183,10 @@ typedef struct cfg_item {
         .validator = valid_fun,          \
     }
 
-#define CFG_BOOL_ITEM_V(_key_, _storage_, _flags_, valid_fun)       \
+#define CFG_BOOL_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)       \
     {                                            \
         .key = (_key_),                            \
+        .desc = (_desc_),                          \
         .type = CFG_BOOL,                        \
         .flags = (_flags_),                        \
         .storage = (_storage_),                    \
@@ -186,9 +194,10 @@ typedef struct cfg_item {
         .validator = valid_fun,          \
     }
 
-#define CFG_DOUBLE_ITEM_V(_key_, _storage_, _flags_, valid_fun)     \
+#define CFG_DOUBLE_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)     \
     {                                            \
         .key = (_key_),                            \
+        .desc = (_desc_),                          \
         .type = CFG_DOUBLE,                      \
         .flags = (_flags_),                        \
         .storage = (_storage_),                    \
@@ -196,9 +205,10 @@ typedef struct cfg_item {
         .validator = valid_fun,          \
     }
 
-#define CFG_STRING_ITEM_V(_key_, _storage_, _flags_, valid_fun)     \
+#define CFG_STRING_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)     \
     {                                            \
         .key = (_key_),                            \
+        .desc = (_desc_),                          \
         .type = CFG_STRING,                      \
         .flags = (_flags_),                        \
         .storage = (_storage_),                    \
@@ -248,6 +258,13 @@ void cfg_register(cfg_item_t *item);
 int cfg_load_file(const char *path);
 int cfg_save_file(const char *path);
 
+/* ---------- show ----------  */
+int cfg_show_all_json(FILE *out);
+void cfg_show_all(FILE *out);
+int cfg_show_to_buffer(char **out);
+void cfg_show_status(FILE *out);
+void cfg_history_show(FILE *out);
+
 /* ---------- typed get (not used by CLI ) ----------
  * Typed read APIs
  *
@@ -273,7 +290,11 @@ int cfg_commit_bool(const char *key, gboolean value);
 int cfg_commit_double(const char *key, double value);
 int cfg_commit_string(const char *key, const char *value);
 
+/* ---------- CLI commit ---------- */
+int cfg_cli_commit(const char *key, const char *value);
+char *cfg_cli_read(const char *key);
 /* ---------- run for command line---------- */
-void cfg_cli_run(void);
+void cfg_cli_daemon_run(char *listen_name);
+void cfg_cli_client_run(char *server_name);
 
 #endif

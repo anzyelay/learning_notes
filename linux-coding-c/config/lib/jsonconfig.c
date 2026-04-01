@@ -1,5 +1,10 @@
-#include "config.h"
+#include "jsonconfig.h"
 #include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <glib.h>
 
 // command and key autocomplete
 #include <readline/readline.h>
@@ -48,15 +53,16 @@ typedef struct {
 } cli_cmd_desc_t;
 
 static const cli_cmd_desc_t g_cli_cmds[] = {
-    { "get",     "<key>",            "Get config value" },
-    { "set",     "<key> <value>",    "Set config value (runtime)" },
-    { "status",  "",                 "Show system status" },
-    { "history", "",                 "Show config change history" },
-    { "save",    "",                 "Save config to file" },
-    { "show",  "",                   "Show all config values with json style" },
-    { "show_plain",  "",             "Show all config values with plain text" },
-    { "help",    "[cmd]",            "Show help" },
-    { "quit",    "",                 "Exit CLI" },
+    { "get",        "<key>",            "Get config value" },
+    { "set",        "<key> <value>",    "Set config value (runtime)" },
+    { "status",     "",                 "Show system status" },
+    { "history",    "",                 "Show config change history" },
+    { "save",       "",                 "Save config to file" },
+    { "show_json",  "",                 "Show all config values with json style" },
+    { "show",       "",                 "Show all config values with plain text" },
+    { "help",       "[cmd]",            "Show help for special command or all commands" },
+    { "man",        "item",             "Show the description for item" },
+    { "quit",       "",                 "Exit CLI" },
     { NULL, NULL, NULL }
 };
 
@@ -82,6 +88,79 @@ static gboolean g_needs_restart = FALSE;
 static GPtrArray *g_restart_reasons;   // cfg_item_t*
 
 static GQueue cfg_audit_log;   // 有上限，比如 1000
+gboolean is_changed_from_last_save = TRUE;
+
+
+#include <sys/socket.h>
+#include <sys/un.h>
+#define SOCK_PATH_FORMAT "\0/tmp/%s.socket"
+
+typedef struct {
+    int fd;
+    pthread_t pid;
+} client_info_t;
+
+static int listen_fd = -1;
+static char g_sockpath_name[108];
+static gboolean cfg_cli_listening_running = TRUE;
+static void cfg_set_sockpath(const char *name)
+{
+    snprintf(g_sockpath_name, sizeof(g_sockpath_name), SOCK_PATH_FORMAT, name);
+}
+static const char *get_socket_path(void)
+{
+    return g_sockpath_name;
+}
+
+static int connect_daemon()
+{
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    struct sockaddr_un addr;
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", get_socket_path());
+
+    if (connect(fd,
+                (struct sockaddr *)&addr,
+                sizeof(addr)) < 0) {
+        perror("connect");
+        close(fd);
+        return -1;
+    }
+    return fd;
+}
+
+static int create_listen_socket(void)
+{
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) {
+        perror("socket");
+        return -1;
+    }
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", get_socket_path());
+
+    unlink(get_socket_path()); // remove old socket if exists
+
+    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        perror("bind");
+        close(fd);
+        return -1;
+    }
+
+    chmod(addr.sun_path, 0660);
+
+    if (listen(fd, 5) < 0) {
+        perror("listen");
+        close(fd);
+        return -1;
+    }
+    return fd;
+}
 
 /* log audit */
 static void cfg_audit_record(cfg_item_t *it, const void *oldv, const void *newv)
@@ -100,13 +179,15 @@ static void cfg_audit_record(cfg_item_t *it, const void *oldv, const void *newv)
         g_free(old);
     }
     g_queue_push_tail(&cfg_audit_log, e);
+    is_changed_from_last_save = TRUE;
 }
 
-static void cfg_audit_entry_print(cfg_audit_entry_t *entry)
+static void cfg_audit_entry_print(cfg_audit_entry_t *entry, void *user_data)
 {
+    FILE *out = (FILE *)user_data;
     gchar log_time[64];
     strftime(log_time, sizeof(log_time), "%Y-%m-%d %H:%M:%S", localtime(&entry->ts));
-    printf("[%s] %s: %s -> %s\n", log_time, entry->key, entry->old_value, entry->new_value);
+    fprintf(out, "[%s] %s: %s -> %s\n", log_time, entry->key, entry->old_value, entry->new_value);
 }
 
 static void cfg_copy_value(cfg_type_t type,
@@ -138,6 +219,11 @@ static gpointer cfg_change_worker(gpointer data)
     while (cfg_worker_running) {
         cfg_change_task_t *task =
             g_async_queue_pop(cfg_change_queue);
+
+        // Check for quit signal
+        if (!cfg_worker_running)
+            break;
+        // printf("Worker thread processing task for item: %s\n", task->item ? task->item->key : "NULL");
 
         if (!task)
             continue;
@@ -591,7 +677,7 @@ fail:
 }
 
 /* ---------- CLI set ---------- */
-static int cfg_cli_commit(const char *key, const char *value)
+int cfg_cli_commit(const char *key, const char *value)
 {
     int ret = 0;
 
@@ -741,22 +827,19 @@ int cfg_read_node(const char *key, JsonNode **out)
     return ret;
 }
 
-/* ---------- debug ---------- */
 /* ---------- generic get (string form, used by CLI) ---------- */
-static int cfg_cli_read(const char *key, char **out)
+char *cfg_cli_read(const char *key)
 {
     JsonNode *node;
     int ret = cfg_read_node(key, &node);
     if (ret != 0)
-        return ret;
+        return NULL;
 
     /* stringify */
     char *s = json_to_string(node, FALSE);
     json_node_free(node);
 
-    *out = s;
-    return 0;
-
+    return s;
 }
 
 void cfg_foreach_item(cfg_iter_fn fn, void *usr_data)
@@ -773,7 +856,7 @@ static void dump_one(cfg_item_t *it, void *user_data)
 {
     JsonObject *root = user_data;
 
-    #if 0
+    #if 1
     /* dump out with style "key.subkey": "value" */
     JsonNode *node = NULL;
     if (cfg_read_node_from_item(it, &node) == 0) {
@@ -793,7 +876,7 @@ static void dump_one(cfg_item_t *it, void *user_data)
     #endif
 }
 
-int cfg_dump_all_nodes(JsonNode **out)
+static int cfg_dump_all_nodes(JsonNode **out)
 {
     if (!out)
         return -EINVAL;
@@ -812,82 +895,112 @@ int cfg_dump_all_nodes(JsonNode **out)
     return 0;
 }
 
-int cfg_show_all(void)
+int cfg_show_all_json(FILE *out)
 {
+    if (!out)
+        out = stdout;
     JsonNode *root;
     int ret = cfg_dump_all_nodes(&root);
     if (ret != 0)
         return ret;
 
     char *s = json_to_string(root, TRUE);
-    puts(s);
+    fprintf(out, "%s\n", s);
 
     g_free(s);
     json_node_free(root);
     return 0;
 }
 
-static void cli_show_one(cfg_item_t *it, void *unused)
+static void cfg_show_one(cfg_item_t *it, void *user_data)
 {
     JsonNode *node;
+    FILE *out = (FILE *)user_data;
     if (cfg_read_node(it->key, &node) != 0)
         return;
 
     char *s = json_to_string(node, FALSE);
-    printf("%s = %s\n", it->key, s);
+    fprintf(out, "%s = %s\n", it->key, s);
 
     g_free(s);
     json_node_free(node);
 }
 
-void cfg_show_all_plain(void)
+void cfg_show_all(FILE *out)
 {
+    if (!out)
+        out = stdout;
     g_rw_lock_reader_lock(&cfg_lock);
-    cfg_foreach_item(cli_show_one, NULL);
+    cfg_foreach_item(cfg_show_one, out);
     g_rw_lock_reader_unlock(&cfg_lock);
     return;
 }
 
-void cfg_show_status(void)
+int cfg_show_to_buffer(char **out)
 {
-    printf("running\n");
-    printf("restart-required: %s\n",
+    size_t len = 0;
+
+    /* 打开一个“写到内存”的 FILE* */
+    FILE *mem = open_memstream(out, &len);
+    if (!mem) {
+        perror("open_memstream");
+        return len;
+    }
+
+    /* 直接复用现有函数 */
+    cfg_show_all_json(mem);
+
+    /* 必须 flush / fclose 才会更新 buf */
+    fclose(mem);
+
+    return len;
+}
+
+void cfg_show_status(FILE *out)
+{
+    if (!out)
+        out = stdout;
+    fprintf(out, "running\n");
+    fprintf(out, "restart-required: %s\n",
            g_needs_restart ? "yes" : "no");
 
     if (g_needs_restart) {
-        printf("reasons:\n");
+        fprintf(out, "reasons:\n");
         for (guint i = 0; i < g_restart_reasons->len; i++) {
             cfg_item_t *reason = g_ptr_array_index(g_restart_reasons, i);
-            char *v;
-            cfg_cli_read(reason->key, &v);
-            printf("\t%s  - %s\n", reason->key, v);
-            g_free(v);
+            char *v = cfg_cli_read(reason->key);
+            if (v) {
+                fprintf(out, "\t%s  - %s\n", reason->key, v);
+                g_free(v);
+            }
         }
     }
 }
 
-void cfg_history_show(void)
+void cfg_history_show(FILE *out)
 {
-    g_queue_foreach(&cfg_audit_log, (GFunc)cfg_audit_entry_print, NULL);
+    if (!out)
+        out = stdout;
+    g_queue_foreach(&cfg_audit_log, (GFunc)cfg_audit_entry_print, out);
 }
 
-static void cfg_cli_help(const char *cmd)
+static void cfg_cli_help(const char *cmd, FILE *out)
 {
     if (!cmd) {
-        printf("Available commands:\n");
+        fprintf(out, "Available commands:\n");
         for (int i = 0; g_cli_cmds[i].cmd; i++) {
-            printf("  %-10s %-18s %s\n",
+            fprintf(out, "  %-10s %-18s %s\n",
                    g_cli_cmds[i].cmd,
                    g_cli_cmds[i].args,
                    g_cli_cmds[i].desc);
         }
-        printf("\nUse: help <command>\n");
+        fprintf(out, "\nUse: help <command>\n");
         return;
     }
 
     for (int i = 0; g_cli_cmds[i].cmd; i++) {
         if (strcmp(g_cli_cmds[i].cmd, cmd) == 0) {
-            printf("%s %s\n  %s\n",
+            fprintf(out, "%s %s\n  %s\n",
                    g_cli_cmds[i].cmd,
                    g_cli_cmds[i].args,
                    g_cli_cmds[i].desc);
@@ -895,7 +1008,33 @@ static void cfg_cli_help(const char *cmd)
         }
     }
 
-    printf("Unknown command: %s\n", cmd);
+    fprintf(out, "Unknown command: %s\n", cmd);
+}
+
+static void cfg_cli_man(const char *item, FILE *out)
+{
+    if (!item) {
+        fprintf(out, "Usage: man <item>\n");
+        fprintf(out, "Type 'help' for available commands.\n");
+        return;
+    }
+
+    FOREACH_CFG_ITEM(it) {
+        if (strcmp(it->key, item) == 0) {
+            fprintf(out, "%s\n  type: %s\n  flags: %s%s\n  desc: %s\n",
+                   it->key,
+                   (it->type == CFG_INT) ? "int" :
+                   (it->type == CFG_BOOL) ? "bool" :
+                   (it->type == CFG_DOUBLE) ? "double" :
+                   (it->type == CFG_STRING) ? "string" : "unknown",
+                   (it->flags & CFG_FLAG_RUNTIME) ? "runtime " : "",
+                   (it->flags & CFG_FLAG_RESTART) ? "restart " : "",
+                   it->desc ? it->desc : "");
+            return;
+        }
+    }
+
+    fprintf(out, "Unknown item: %s\n", item);
 }
 
 /* cmd autocomplete function */
@@ -913,18 +1052,54 @@ static char *cmd_generator(const char *text, int state)
     return NULL;
 }
 
+static char **request_key_completion(const char *prefix)
+{
+    /* connect socket */
+    int fd = connect_daemon();
+    if (fd < 0)
+        return NULL;
+
+    FILE *in = fdopen(fd, "r");
+    FILE *out = fdopen(dup(fd), "w");
+
+    fprintf(out, "__complete_keys %s\n", prefix);
+    fflush(out);
+
+    /* 读返回，逐行收集 */
+    GPtrArray *list = g_ptr_array_new_with_free_func(free);
+    char line[256];
+
+    while (fgets(line, sizeof(line), in)) {
+        char *nl = strchr(line, '\n');
+        if (nl) *nl = 0;
+
+        if (strcmp(line, "END_OF_FILE") == 0)
+            break;
+
+        g_ptr_array_add(list, strdup(line));
+    }
+
+    fclose(in);
+    fclose(out);
+    close(fd);
+
+    /* readline 需要 NULL 结尾 */
+    g_ptr_array_add(list, NULL);
+
+    return (char **)g_ptr_array_free(list, FALSE);
+}
+
 static char *key_generator(const char *text, int state)
 {
-    static cfg_item_t *it;
-    if (state == 0)
-        it = cfg_list;
-
-    while (it) {
-        const char *k = it->key;
-        it = it->next;
-        if (g_str_has_prefix(k, text))
-            return strdup(k);
+    static char **matches = NULL;
+    if (state == 0) {
+       if (matches)
+            g_strfreev(matches);
+        matches = request_key_completion(text);
     }
+
+    if (matches && matches[state])
+        return strdup(matches[state]);
     return NULL;
 }
 
@@ -939,55 +1114,287 @@ static char **cli_completion(const char *text,
     }
 }
 
-void cfg_cli_run(void)
+#if 0
+/* readline wrapper with support for "?" autocomplete */
+
+static char *cli_complete_command(const char *prefix, char *(p_match_fun)(const char *, int))
+{
+    int match_cnt = 0;
+    char *matches[100]; // 假设不超过 100 个命令
+    do {
+        matches[match_cnt] = p_match_fun(prefix, match_cnt);
+    } while (matches[match_cnt] && ++match_cnt < 100);
+    if (match_cnt == 0) {
+        return NULL;
+    }
+    else if (match_cnt == 1) {
+        return matches[0];
+    } else {
+        printf("\n");
+        for (int i = 0; i < match_cnt; i++) {
+            printf("%s  ", matches[i]);
+            free(matches[i]);
+        }
+        printf("\n");
+    }
+    return NULL;
+}
+
+char *readline(const char *prompt)
 {
     char line[256];
-    /* readline  */
+    int line_start = 0;
+    char *completed_cmd = NULL;
+    do {
+        if (line_start > 0) {
+            printf("%s%s", prompt, line);
+        }
+        else
+            printf(prompt);
+
+        if (!fgets(line+line_start, sizeof(line)-line_start, stdin))
+            break;
+
+        char *cmd = g_strstrip(line);
+        if (strchr(cmd, '?')) {
+            char *q = strchr(cmd, '?');
+            *q = '\0';
+
+            char **tok = g_strsplit(cmd, " ", 2);
+            if (!tok[1]) {
+                completed_cmd = cli_complete_command(tok[0], cmd_generator);
+                if (completed_cmd) {
+                    snprintf(line, sizeof(line), "%s", completed_cmd);
+                    line_start = strlen(line);
+                    g_free(completed_cmd);
+                }
+            }
+            else {
+                completed_cmd = cli_complete_command(tok[1], key_generator);
+                if (completed_cmd) {
+                    snprintf(line, sizeof(line), "%s %s", tok[0], completed_cmd);
+                    line_start = strlen(line);
+                    g_free(completed_cmd);
+                }
+                else {
+                    snprintf(line, sizeof(line), "%s %s", tok[0], tok[1]);
+                    line_start = strlen(line);
+                }
+            }
+
+            g_strfreev(tok);
+            continue;
+        }
+        else {
+            return cmd;
+        }
+    } while (1);
+
+    return NULL;
+}
+#endif
+
+static void cfg_exec_line(const char *line, FILE *out)
+{
+    char cmd[256];
+    strncpy(cmd, line, sizeof(cmd));
+    cmd[sizeof(cmd) - 1] = '\0';
+
+    /* remove newline character */
+    char *nl = strchr(cmd, '\n');
+    if (nl)
+        *nl = '\0';
+
+    if (strncmp(cmd, "__complete_keys ", 16) == 0) {
+        const char *prefix = cmd + 16;
+
+        FOREACH_CFG_ITEM(it) {
+            if (strncmp(it->key, prefix, strlen(prefix)) == 0)
+                fprintf(out, "%s\n", it->key);
+        }
+        return;
+    }
+
+    /* process the command */
+    if (g_str_has_prefix(cmd, "help ")) {
+        cfg_cli_help(cmd + 5, out);
+    } else if (g_str_has_prefix(cmd, "man ")) {
+        cfg_cli_man(cmd + 4, out);
+    }
+    else if (g_str_has_suffix(cmd, "--help") || g_str_has_suffix(cmd, "-h")) {
+        gchar **tokens = g_strsplit(cmd, " ", 2);
+        cfg_cli_help(tokens[0], out);
+        g_strfreev(tokens);
+    }
+    else if (g_str_has_prefix(cmd, "get ")) {
+        char *v = cfg_cli_read(cmd + 4);
+        if (v) {
+            fprintf(out, "%s\n", v);
+            g_free(v);
+        }
+    } else if (g_str_has_prefix(cmd, "set ")) {
+        char **kv = g_strsplit(cmd + 4, " ", 2);
+        if (kv[0] && kv[1]) {
+            if (cfg_cli_commit(kv[0], kv[1]) != 0)
+                fprintf(out, "set failed (maybe restart required)\n");
+        }
+        g_strfreev(kv);
+    } else if (strcmp(cmd, "show") == 0) {
+        cfg_show_all(out);
+    } else if (strcmp(cmd, "show_json") == 0) {
+        cfg_show_all_json(out);
+    } else if (strcmp(cmd, "save") == 0) {
+        cfg_save_file("config.json");
+    } else if (strcmp(cmd, "status") == 0) {
+        cfg_show_status(out);
+    } else if (strcmp(cmd, "history") == 0) {
+        cfg_history_show(out);
+    }
+    else if (strcmp(cmd, "quit") == 0) {
+        fprintf(out, "Bye!\n");
+    } else {
+        cfg_cli_help(NULL, out);
+    }
+}
+
+static int handle_client(void *user_data)
+{
+    client_info_t *info = user_data;
+    FILE *in = fdopen(info->fd, "r");
+    FILE *out = fdopen(dup(info->fd), "w");
+    char line[512];
+
+    if (!in || !out) {
+        close(info->fd);
+        return -1;
+    }
+
+    while (fgets(line, sizeof(line), in)) {
+        cfg_exec_line(line, out);
+        fflush(out);
+
+        /* indicate end of result */
+        fprintf(out, "END_OF_FILE\n");
+        fflush(out);
+
+        if (strncmp(line, "quit", 4) == 0)
+            break;
+    }
+
+    fclose(in);
+    fclose(out);
+    close(info->fd);
+    g_free(info);
+    return 0;
+}
+
+static void cleanup(int signum)
+{
+    cfg_worker_running = FALSE;
+    cfg_cli_listening_running = FALSE;
+    close(listen_fd);
+    listen_fd = -1;
+    // Use a special pointer value to signal the worker thread to exit
+    int quit_signal = 1;
+    g_async_queue_push(cfg_change_queue, &quit_signal); // wake up worker thread
+    g_usleep(100 * 1000); // wait for worker thread to exit
+    exit(0);
+}
+
+void cfg_cli_daemon_run(char *listen_name)
+{
+    if (!listen_name) {
+        fprintf(stderr, "No listen name provided, skipping daemon mode\n");
+        return;
+    }
+
+    signal(SIGINT, cleanup);
+    signal(SIGTERM, cleanup);
+
+    cfg_set_sockpath(listen_name);
+    listen_fd = create_listen_socket();
+    if (listen_fd < 0) {
+        fprintf(stderr, "Failed to create listen socket\n");
+        return;
+    }
+
+    printf("daemon running, socket: %s\n", get_socket_path());
+    while (cfg_cli_listening_running) {
+        int client_fd = accept(listen_fd, NULL, NULL);
+        if (client_fd < 0) {
+             if (errno == EBADF) { // 套接字被关闭了
+                printf("listen socket closed, exiting daemon loop\n");
+                break;
+            }
+            perror("accept");
+            continue;
+        }
+
+        /* handle client in a separate thread or process */
+        // For simplicity, we just close the connection here
+        client_info_t *info = g_new0(client_info_t, 1);
+        info->fd = client_fd;
+        // pthread_t pid;
+        info->pid = g_thread_new("cfg_cli_handle", (GThreadFunc)handle_client, info);
+    }
+}
+
+void cfg_cli_client_run(char *server_name)
+{
+    /*
+    #define HISTORY_FILE "~/.cfg_ctl_history"`
+    // read at startup
+    using_history();
+    read_history(HISTORY_FILE);
+    // save after quit
+    write_history(HISTORY_FILE);
+    */
+    if (!server_name) {
+        fprintf(stderr, "No server name provided, skipping client mode\n");
+        return;
+    }
+
     rl_attempted_completion_function = cli_completion;
+
+    cfg_set_sockpath(server_name);
+    int fd = connect_daemon();
+    if (fd < 0) {
+        fprintf(stderr, "Failed to connect to daemon\n");
+        return;
+    }
+
+    FILE *in = fdopen(fd, "r");
+    FILE *out = fdopen(dup(fd), "w");
+
     while (1) {
         char *line = readline("> ");
         if (!line) break;
         add_history(line);
 
         char *cmd = g_strstrip(line);
+        if (*cmd) {
+            fprintf(out, "%s\n", cmd);
+            fflush(out);
 
-        if (g_str_has_prefix(cmd, "help ")) {
-            cfg_cli_help(cmd + 5);
-        }
-        else if (g_str_has_suffix(cmd, "--help") || g_str_has_suffix(cmd, "-h")) {
-            gchar **tokens = g_strsplit(cmd, " ", 2);
-            cfg_cli_help(tokens[0]);
-            g_strfreev(tokens);
-        }
-        else if (g_str_has_prefix(cmd, "get ")) {
-            char *v;
-            if (cfg_cli_read(cmd + 4, &v) == 0) {
-                printf("%s\n", v);
-                g_free(v);
+            char response[1024];
+            while (fgets(response, sizeof(response), in)) {
+                /* indicate end of result */
+                if (strcmp(response, "END_OF_FILE\n") == 0)
+                    break;
+                printf("%s", response);
             }
-        } else if (g_str_has_prefix(cmd, "set ")) {
-            char **kv = g_strsplit(cmd + 4, " ", 2);
-            if (kv[0] && kv[1]) {
-                if (cfg_cli_commit(kv[0], kv[1]) != 0)
-                    printf("set failed (maybe restart required)\n");
+
+            if (strncmp(cmd, "quit", 4) == 0) {
+                free(line);
+                break;
             }
-            g_strfreev(kv);
-        } else if (strcmp(cmd, "show") == 0) {
-            cfg_show_all();
-        } else if (strcmp(cmd, "show_plain") == 0) {
-            cfg_show_all_plain();
-        } else if (strcmp(cmd, "save") == 0) {
-            cfg_save_file("config.json");
-        } else if (strcmp(cmd, "status") == 0) {
-            cfg_show_status();
-        } else if (strcmp(cmd, "history") == 0) {
-            cfg_history_show();
-        } else if (strcmp(cmd, "quit") == 0) {
-            break;
-        } else {
-            cfg_cli_help(NULL);
         }
+
+        free(line);
     }
+    fclose(in);
+    fclose(out);
+    close(fd);
 }
 
 /* ---------- load / save ---------- */
@@ -1009,11 +1416,96 @@ int cfg_load_file(const char *path)
     g_rw_lock_writer_unlock(&cfg_lock);
 
     g_object_unref(parser);
+
+    is_changed_from_last_save = FALSE;
     return 0;
+}
+
+/*
+ * Atomically write data to `path`.
+ *
+ * Guarantee:
+ *  - Either old file or full new file is visible
+ *  - No partial writes
+ *  - Safe against crashes and power loss
+ *
+ * Return:
+ *  - 0 on success
+ *  - -1 on error
+ */
+static int atomic_write_file(const char *path,
+                             const char *data,
+                             gsize len)
+{
+    int ret = -1;
+    int fd = -1;
+    int dirfd = -1;
+
+    gchar *tmp_path = g_strconcat(path, ".tmp", NULL);
+
+    /* Open temporary file */
+    fd = open(tmp_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) {
+        printf("Failed to open temp file: %s\n", strerror(errno));
+        goto out;
+    }
+
+    /* Write full buffer */
+    ssize_t written = write(fd, data, len);
+    if (written != (ssize_t)len) {
+        printf("Failed to write data: %s\n", strerror(errno));
+        goto out;
+    }
+
+    /* Flush file contents to disk */
+    if (fsync(fd) != 0) {
+        printf("Failed to fsync temp file: %s\n", strerror(errno));
+        goto out;
+    }
+
+    close(fd);
+    fd = -1;
+
+    /* Atomically replace target file */
+    if (rename(tmp_path, path) != 0) {
+        printf("Failed to rename temp file: %s\n", strerror(errno));
+        goto out;
+    }
+
+    /*
+     * fsync parent directory to ensure the rename
+     * is persisted after power loss
+     */
+    gchar *dir = g_path_get_dirname(path);
+    dirfd = open(dir, O_DIRECTORY | O_RDONLY);
+    if (dirfd >= 0) {
+        fsync(dirfd);
+        close(dirfd);
+    }
+    g_free(dir);
+
+    ret = 0;
+
+out:
+    if (fd >= 0) {
+        close(fd);
+    }
+    if (ret != 0) {
+        unlink(tmp_path);
+        printf("Failed to save config file: %s\n", strerror(errno));
+    }
+
+    g_free(tmp_path);
+    return ret;
 }
 
 int cfg_save_file(const char *path)
 {
+    if (!is_changed_from_last_save) {
+        printf("No changes since last save, skipping write.\n");
+        return 0;
+    }
+
     JsonObject *root = json_object_new();
     JsonNode *node = json_node_new(JSON_NODE_OBJECT);
     json_node_take_object(node, root);
@@ -1033,11 +1525,19 @@ int cfg_save_file(const char *path)
     JsonGenerator *gen = json_generator_new();
     json_generator_set_root(gen, node);
     json_generator_set_pretty(gen, TRUE);
-    json_generator_to_file(gen, path, NULL);
 
+    int data_len;
+    char *data = json_generator_to_data(gen, &data_len);
+
+    int ret = atomic_write_file(path, data, data_len);
+    if (ret == 0) {
+        is_changed_from_last_save = FALSE;
+    }
+
+    g_free(data);
     g_object_unref(gen);
     json_node_free(node);
-    return 0;
+    return ret;
 }
 
 /* ---------- system init ---------- */
