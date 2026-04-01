@@ -1,4 +1,3 @@
-# At least this cmake version is needed
 cmake_minimum_required (VERSION 3.8)
 
 project(jsonconf)
@@ -22,23 +21,37 @@ else()
 endif()
 
 include_directories(${PROJECT_SOURCE_DIR}/)
+include_directories(${PROJECT_SOURCE_DIR}/lib)
 link_directories(${PROJECT_BINARY_DIR}/)
 
-set(SRCS)
-file(GLOB SRCS ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.c)
+set(LIBSRCS)
+file(GLOB LIBSRCS ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.c)
 
-add_library(${PACKAGE_NAME}
-    ${SRCS}
+add_library(${PACKAGE_NAME}_shared SHARED
+    ${LIBSRCS}
     )
 
-target_include_directories(${PROJECT_NAME} PUBLIC "${PROJECT_SOURCE_DIR}/lib")
-target_link_libraries(${PACKAGE_NAME}
+add_library(${PACKAGE_NAME}_static
+    ${LIBSRCS}
+    )
+
+set_target_properties(${PACKAGE_NAME}_shared PROPERTIES OUTPUT_NAME ${PACKAGE_NAME})
+set_target_properties(${PACKAGE_NAME}_static PROPERTIES OUTPUT_NAME ${PACKAGE_NAME})
+set_target_properties(${PACKAGE_NAME}_shared PROPERTIES
+    VERSION 1.0.0
+    SOVERSION 1
+)
+
+target_include_directories(${PROJECT_NAME}_shared PUBLIC "${PROJECT_SOURCE_DIR}/include")
+target_include_directories(${PROJECT_NAME}_static PUBLIC "${PROJECT_SOURCE_DIR}/include")
+
+target_link_libraries(${PACKAGE_NAME}_shared
                 pthread gio-2.0 gobject-2.0 gmodule-2.0 gthread-2.0 rt glib-2.0
                 json-glib-1.0
                 readline
                 )
 
-install(TARGETS ${PACKAGE_NAME}
+install(TARGETS ${PACKAGE_NAME}_shared ${PACKAGE_NAME}_static
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
