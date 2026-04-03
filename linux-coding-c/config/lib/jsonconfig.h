@@ -250,13 +250,19 @@ int cfg_to_json_string(const void *, JsonNode *);
 int cfg_read_node(const char *key, JsonNode **out);
 /* ---------- lifecycle ---------- */
 
+// Initialize the configuration system. This function is idempotent and thread-safe.
+// It must be called before any other cfg_* functions are used.
+// This function will initialize internal data structures, start background threads,
+// and perform any necessary setup for the configuration system to operate correctly.
 void cfg_system_init(void);
-void cfg_register(cfg_item_t *item);
+// Register a configuration item. This function should be called during application initialization
+// to register all available configuration items before loading any configuration values.
+int cfg_register(cfg_item_t *item);
 
 /* ---------- load / save ---------- */
 
 int cfg_load_file(const char *path);
-int cfg_save_file(const char *path);
+int cfg_save_file(const char *path, gboolean force);
 
 /* ---------- show ----------  */
 int cfg_show_all_json(FILE *out);
@@ -281,6 +287,9 @@ void cfg_history_show(FILE *out);
 int cfg_read_int(const char *key, int *out);
 int cfg_read_bool(const char *key, gboolean *out);
 int cfg_read_double(const char *key, double *out);
+// the output pointer is set to a string owned by the config system,
+// and should not be modified or freed by the caller.
+// The pointer will be set to NULL if the value is null or error occurs.
 int cfg_read_string(const char *key, const char **out);
 
 /* ---------- typed set (not used by CLI) ---------- */
@@ -291,10 +300,26 @@ int cfg_commit_double(const char *key, double value);
 int cfg_commit_string(const char *key, const char *value);
 
 /* ---------- CLI commit ---------- */
+// cfg_cli_commit: commit a string value from CLI, with parsing and validation
+// returns 0 on success, -1 on failure (e.g. key not found, type mismatch, validation failure)
 int cfg_cli_commit(const char *key, const char *value);
+
+// for CLI read, returns a newly allocated string representation of the value
+// caller must free the returned string with g_free()
 char *cfg_cli_read(const char *key);
-/* ---------- run for command line---------- */
-void cfg_cli_daemon_run(char *listen_name);
+
+/* ---------- run for command line----------
+ These functions are for demonstration purposes and are NOT required for the core configuration system.
+*/
+// This function will block until the server is stopped, handling incoming CLI connections and commands.
+void cfg_cli_server_run_loop(char *listen_name);
+// This function will start the CLI server in a separate thread,
+// allowing the main thread to do other work or wait for signals.
+void cfg_cli_server_run(char *server_name);
+// This function will connect to the server and run a simple CLI loop, allowing the user to input commands.
 void cfg_cli_client_run(char *server_name);
+// This function will stop the CLI server loop and clean up resources.
+// It can be called from a signal handler to gracefully shut down the server.
+void cfg_cli_server_stop(void);
 
 #endif

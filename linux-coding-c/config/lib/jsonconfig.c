@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <glib.h>
+#include <poll.h>
 
 // command and key autocomplete
 #include <readline/readline.h>
@@ -12,7 +13,13 @@
 
 #define FOREACH_CFG_ITEM(it) \
     for (cfg_item_t *it = cfg_list; it; it = it->next)
+
+typedef enum {
+    CFG_TASK_CHANGE,
+    CFG_TASK_QUIT
+} cfg_change_type_t;
 typedef struct {
+    cfg_change_type_t type;
     cfg_item_t *item;
 
     union {
@@ -70,7 +77,6 @@ typedef void (*cfg_iter_fn)(cfg_item_t *it, void *user_data);
 
 void cfg_foreach_item(cfg_iter_fn fn, void *user_data);
 
-
 /* 1. 从“原始值副本” stringify（事务 / rollback / audit） */
 static char *cfg_raw_to_string(cfg_type_t type,
                          const void *value,
@@ -81,31 +87,33 @@ static char *cfg_raw_to_string(cfg_type_t type,
 static cfg_item_t *cfg_list = NULL;
 static GRWLock cfg_lock;
 static GAsyncQueue *cfg_change_queue;
-static GThread *cfg_change_thread;
-static gboolean cfg_worker_running = TRUE;
+static GThread *cfg_change_thread = NULL;
+static gsize cfg_initialized = 0;
 
 static gboolean g_needs_restart = FALSE;
-static GPtrArray *g_restart_reasons;   // cfg_item_t*
+static GPtrArray *g_restart_reasons = NULL;   // cfg_item_t*
 
 static GQueue cfg_audit_log;   // 有上限，比如 1000
 gboolean is_changed_from_last_save = TRUE;
 
+static const char *cfg_file_path = NULL;
 
 #include <sys/socket.h>
 #include <sys/un.h>
-#define SOCK_PATH_FORMAT "\0/tmp/%s.socket"
+#define SOCK_PATH_FORMAT "/tmp/%s.socket"
 
 typedef struct {
     int fd;
-    pthread_t pid;
 } client_info_t;
 
+static GThread *cfg_cli_server_thread = NULL;
 static int listen_fd = -1;
 static char g_sockpath_name[108];
-static gboolean cfg_cli_listening_running = TRUE;
+static volatile gboolean cfg_cli_listening_running = TRUE;
 static void cfg_set_sockpath(const char *name)
 {
-    snprintf(g_sockpath_name, sizeof(g_sockpath_name), SOCK_PATH_FORMAT, name);
+    snprintf(g_sockpath_name+1, sizeof(g_sockpath_name)-1, SOCK_PATH_FORMAT, name);
+    g_sockpath_name[0] = '\0'; // abstract socket
 }
 static const char *get_socket_path(void)
 {
@@ -216,17 +224,19 @@ static void cfg_copy_value(cfg_type_t type,
 /* worker thread */
 static gpointer cfg_change_worker(gpointer data)
 {
-    while (cfg_worker_running) {
+    while (1) {
         cfg_change_task_t *task =
             g_async_queue_pop(cfg_change_queue);
 
-        // Check for quit signal
-        if (!cfg_worker_running)
-            break;
         // printf("Worker thread processing task for item: %s\n", task->item ? task->item->key : "NULL");
 
         if (!task)
             continue;
+
+        if (task->type == CFG_TASK_QUIT) {
+            g_free(task);
+            break;
+        }
 
         cfg_item_t *it = task->item;
 
@@ -242,8 +252,12 @@ static gpointer cfg_change_worker(gpointer data)
             cfg_copy_value(it->type, it->storage, &task->old_value, TRUE);
             g_rw_lock_writer_unlock(&cfg_lock);
 
+            char *old_str = cfg_raw_to_string(it->type, &task->old_value, CFG_FMT_PLAIN);
+            char *new_str = cfg_raw_to_string(it->type, &task->new_value, CFG_FMT_PLAIN);
             g_printerr(
-              "rollback: %s\n", it->key);
+              "rollback: %s %s -> %s\n", it->key, new_str, old_str);
+            g_free(old_str);
+            g_free(new_str);
         }
         else {
             cfg_audit_record(it, &task->old_value, &task->new_value);
@@ -259,6 +273,30 @@ static gpointer cfg_change_worker(gpointer data)
     return NULL;
 }
 
+static void cfg_change_worker_run(void)
+{
+    cfg_change_queue = g_async_queue_new();
+    cfg_change_thread =
+        g_thread_new("cfg-worker",
+                     cfg_change_worker,
+                     NULL);
+}
+
+static void cfg_change_worker_stop(void)
+{
+    if (cfg_change_thread) {
+        cfg_change_task_t *quit_task = g_new0(cfg_change_task_t, 1);
+        quit_task->type = CFG_TASK_QUIT;
+        g_async_queue_push(cfg_change_queue, quit_task);
+        g_thread_join(cfg_change_thread);
+        cfg_change_thread = NULL;
+    }
+    if (cfg_change_queue) {
+        g_async_queue_unref(cfg_change_queue);
+        cfg_change_queue = NULL;
+    }
+}
+
 /* enqueue config change */
 static void cfg_enqueue_change(cfg_item_t *it,
                                const void *oldv,
@@ -266,6 +304,7 @@ static void cfg_enqueue_change(cfg_item_t *it,
 {
     cfg_change_task_t *task = g_new0(cfg_change_task_t, 1);
     task->item = it;
+    task->type = CFG_TASK_CHANGE;
 
     cfg_copy_value(it->type, &task->old_value, oldv, FALSE);
     cfg_copy_value(it->type, &task->new_value, newv, FALSE);
@@ -275,10 +314,17 @@ static void cfg_enqueue_change(cfg_item_t *it,
 
 /* ---------- registry ---------- */
 
-void cfg_register(cfg_item_t *item)
+int cfg_register(cfg_item_t *item)
 {
+    FOREACH_CFG_ITEM(it) {
+        if (g_strcmp0(it->key, item->key) == 0) {
+            g_printerr("Duplicate config key: %s\n", item->key);
+            return -1;
+        }
+    }
     item->next = cfg_list;
     cfg_list = item;
+    return 0;
 }
 
 static cfg_item_t *cfg_find(const char *key)
@@ -578,6 +624,14 @@ int cfg_read_double(const char *key, double *out)
     return 0;
 }
 
+/**
+ * @brief Read a string configuration value
+ *
+ * @param key : config key
+ * @param out : output pointer, must not be NULL, and will be set to NULL if value is null or error occurs.
+ *              Caller should not free *out if return value is 0.
+ * @return * int : 0 on success, -1 if key not found or type mismatch, -2 on other errors
+ */
 int cfg_read_string(const char *key, const char **out)
 {
     CFG_GET_COMMON(CFG_STRING)
@@ -1244,7 +1298,7 @@ static void cfg_exec_line(const char *line, FILE *out)
     } else if (strcmp(cmd, "show_json") == 0) {
         cfg_show_all_json(out);
     } else if (strcmp(cmd, "save") == 0) {
-        cfg_save_file("config.json");
+        cfg_save_file(NULL, FALSE);
     } else if (strcmp(cmd, "status") == 0) {
         cfg_show_status(out);
     } else if (strcmp(cmd, "history") == 0) {
@@ -1269,7 +1323,7 @@ static int handle_client(void *user_data)
         return -1;
     }
 
-    while (fgets(line, sizeof(line), in)) {
+   while (cfg_cli_listening_running && fgets(line, sizeof(line), in)) {
         cfg_exec_line(line, out);
         fflush(out);
 
@@ -1283,59 +1337,126 @@ static int handle_client(void *user_data)
 
     fclose(in);
     fclose(out);
-    close(info->fd);
+    if (info->fd >= 0)
+        close(info->fd);
     g_free(info);
     return 0;
 }
 
-static void cleanup(int signum)
-{
-    cfg_worker_running = FALSE;
-    cfg_cli_listening_running = FALSE;
-    close(listen_fd);
-    listen_fd = -1;
-    // Use a special pointer value to signal the worker thread to exit
-    int quit_signal = 1;
-    g_async_queue_push(cfg_change_queue, &quit_signal); // wake up worker thread
-    g_usleep(100 * 1000); // wait for worker thread to exit
-    exit(0);
-}
-
-void cfg_cli_daemon_run(char *listen_name)
+void cfg_cli_server_run_loop(char *listen_name)
 {
     if (!listen_name) {
         fprintf(stderr, "No listen name provided, skipping daemon mode\n");
         return;
     }
 
-    signal(SIGINT, cleanup);
-    signal(SIGTERM, cleanup);
-
     cfg_set_sockpath(listen_name);
+    g_free(listen_name);
+
     listen_fd = create_listen_socket();
     if (listen_fd < 0) {
         fprintf(stderr, "Failed to create listen socket\n");
         return;
     }
 
-    printf("daemon running, socket: %s\n", get_socket_path());
+    int flags = fcntl(listen_fd, F_GETFL, 0);
+    fcntl(listen_fd, F_SETFL, flags | O_NONBLOCK);
+
+    struct threads_list {
+        GThread *cur;
+        client_info_t *info;
+        struct threads_list *next;
+        struct threads_list *prev;
+    } threads = {0};
+
+    printf("daemon running, socket: %s\n", (char *)get_socket_path()+1);
     while (cfg_cli_listening_running) {
-        int client_fd = accept(listen_fd, NULL, NULL);
-        if (client_fd < 0) {
-             if (errno == EBADF) { // 套接字被关闭了
-                printf("listen socket closed, exiting daemon loop\n");
-                break;
-            }
-            perror("accept");
-            continue;
+        struct pollfd pfd = {
+            .fd = listen_fd,
+            .events = POLLIN
+        };
+
+        int ret = poll(&pfd, 1, 50);  // 50ms timeout
+        if (ret < 0) {
+            if (errno == EINTR)
+                continue;
+            perror("poll");
+            break;
         }
 
-        /* handle client in a separate thread or process */
-        // For simplicity, we just close the connection here
-        client_info_t *info = g_new0(client_info_t, 1);
-        info->fd = client_fd;
-        // pthread_t pid;
-        info->pid = g_thread_new("cfg_cli_handle", (GThreadFunc)handle_client, info);
+        if (ret == 0)
+            continue;  // timeout，go back to check running flag
+
+        if (pfd.revents & POLLIN) {
+            for(;;) {
+                int client_fd = accept(listen_fd, NULL, NULL);
+                if (client_fd < 0) {
+                    if (cfg_cli_listening_running == FALSE) {
+                        break;
+                    }
+                    if (errno == EAGAIN || errno == EWOULDBLOCK)
+                        break;
+                    printf("accept failed: %s\n", strerror(errno));
+                    break;
+                }
+
+                /* handle client in a separate thread or process */
+                // For simplicity, we just close the connection here
+                client_info_t *info = g_new0(client_info_t, 1);
+                info->fd = client_fd;
+                struct threads_list *t = g_new0(struct threads_list, 1);
+                t->cur = g_thread_new("cfg_cli_handle", (GThreadFunc)handle_client, info);
+                t->info = info;
+                t->next = threads.next;
+                t->prev = &threads;
+                if (threads.next)
+                    threads.next->prev = t;
+                threads.next = t;
+            }
+        }
+    }
+
+    printf("Server stopping, waiting for client threads to exit...\n");
+    while (threads.next) {
+        struct threads_list *t = threads.next;
+
+        if (t->info->fd >= 0) {
+            shutdown(t->info->fd, SHUT_RDWR);  // wakeup clients fgets, make client thread to exit
+            close(t->info->fd);                // release fd resource in server side
+            t->info->fd = -1;
+        }
+
+        g_thread_join(t->cur);
+        threads.next = t->next;
+        if (t->next)
+            t->next->prev = &threads;
+
+        g_free(t);
+    }
+    printf("All client threads exited, server stopped\n");
+}
+
+void cfg_cli_server_run(char *listen_name)
+{
+    if (cfg_cli_server_thread) {
+        fprintf(stderr, "Server is already running\n");
+        return;
+    }
+    cfg_cli_server_thread = g_thread_new("cfg_cli_server", (GThreadFunc)cfg_cli_server_run_loop, g_strdup(listen_name));
+}
+
+void cfg_cli_server_stop(void)
+{
+    cfg_cli_listening_running = FALSE;
+    if (listen_fd >= 0) {
+        close(listen_fd);
+        listen_fd = -1;
+    }
+    if (cfg_cli_server_thread) {
+        printf("Waiting for server thread to exit...\n");
+        g_thread_join(cfg_cli_server_thread);
+        cfg_cli_server_thread = NULL;
+        printf("Server thread exited\n");
     }
 }
 
@@ -1359,7 +1480,7 @@ void cfg_cli_client_run(char *server_name)
     cfg_set_sockpath(server_name);
     int fd = connect_daemon();
     if (fd < 0) {
-        fprintf(stderr, "Failed to connect to daemon\n");
+        fprintf(stderr, "Failed to connect to daemon: %s\n", get_socket_path()+1);
         return;
     }
 
@@ -1418,6 +1539,13 @@ int cfg_load_file(const char *path)
     g_object_unref(parser);
 
     is_changed_from_last_save = FALSE;
+
+    if ( cfg_file_path == NULL || g_strcmp0(cfg_file_path, path) != 0) {
+        if (cfg_file_path)
+            g_free(cfg_file_path);
+        cfg_file_path = g_strdup(path);
+    }
+
     return 0;
 }
 
@@ -1499,9 +1627,9 @@ out:
     return ret;
 }
 
-int cfg_save_file(const char *path)
+int cfg_save_file(const char *path, gboolean force)
 {
-    if (!is_changed_from_last_save) {
+    if (!is_changed_from_last_save && !force) {
         printf("No changes since last save, skipping write.\n");
         return 0;
     }
@@ -1526,10 +1654,10 @@ int cfg_save_file(const char *path)
     json_generator_set_root(gen, node);
     json_generator_set_pretty(gen, TRUE);
 
-    int data_len;
+    gsize data_len;
     char *data = json_generator_to_data(gen, &data_len);
 
-    int ret = atomic_write_file(path, data, data_len);
+    int ret = atomic_write_file(path ? path : cfg_file_path, data, data_len);
     if (ret == 0) {
         is_changed_from_last_save = FALSE;
     }
@@ -1541,15 +1669,12 @@ int cfg_save_file(const char *path)
 }
 
 /* ---------- system init ---------- */
-
 void cfg_system_init(void)
 {
-    g_rw_lock_init(&cfg_lock);
-    g_restart_reasons = g_ptr_array_new_with_free_func(g_free);
-
-    cfg_change_queue = g_async_queue_new();
-    cfg_change_thread =
-        g_thread_new("cfg-worker",
-                     cfg_change_worker,
-                     NULL);
+    if (g_once_init_enter(&cfg_initialized)) {
+        g_rw_lock_init(&cfg_lock);
+        g_restart_reasons = g_ptr_array_new_with_free_func(g_free);
+        cfg_change_worker_run();
+        g_once_init_leave(&cfg_initialized, TRUE);
+    }
 }
