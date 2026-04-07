@@ -515,13 +515,13 @@ out:
 
 int cfg_from_json_int(JsonNode *n, void *p)
 {
-    *(int *)p = json_node_get_int(n);
+    *(gint64 *)p = json_node_get_int(n);
     return 0;
 }
 
 int cfg_to_json_int(const void *p, JsonNode *n)
 {
-    json_node_set_int(n, *(int *)p);
+    json_node_set_int(n, *(gint64 *)p);
     return 0;
 }
 
