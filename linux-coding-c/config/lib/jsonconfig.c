@@ -910,7 +910,7 @@ static void dump_one(cfg_item_t *it, void *user_data)
 {
     JsonObject *root = user_data;
 
-    #if 1
+    #if 0
     /* dump out with style "key.subkey": "value" */
     JsonNode *node = NULL;
     if (cfg_read_node_from_item(it, &node) == 0) {
