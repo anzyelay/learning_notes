@@ -262,14 +262,27 @@ int cfg_register(cfg_item_t *item);
 /* ---------- load / save ---------- */
 
 int cfg_load_file(const char *path);
+/**
+ * @brief cfg_save_file saves the current configuration to a file.
+ *
+ * @param path : the file path to save to. If NULL, it will save to the last loaded file path.
+ * @param force : if TRUE, it will save even if there are no changes since the last save. If FALSE, it will skip saving if there are no changes.
+ * @return int : 0 on success, -1 on failure (e.g. file write error)
+ */
 int cfg_save_file(const char *path, gboolean force);
 
 /* ---------- show ----------  */
 int cfg_show_all_json(FILE *out);
 void cfg_show_all(FILE *out);
-int cfg_show_to_buffer(char **out);
 void cfg_show_status(FILE *out);
 void cfg_history_show(FILE *out);
+/**
+ * @brief : Generate a JSON string representing the current configuration.
+ *
+ * @param out : Output pointer, will be set to a newly allocated string containing the JSON data. Caller must free it with g_free().
+ * @return int : 0 on failure, or the length of the generated JSON string on success.
+ */
+int cfg_generate_to_json_data(char **out);
 
 /* ---------- typed get (not used by CLI ) ----------
  * Typed read APIs
@@ -284,7 +297,7 @@ void cfg_history_show(FILE *out);
  * The caller is responsible for using the correct typed API.
  */
 
-int cfg_read_int(const char *key, int *out);
+int cfg_read_int(const char *key, gint64 *out);
 int cfg_read_bool(const char *key, gboolean *out);
 int cfg_read_double(const char *key, double *out);
 // the output pointer is set to a string owned by the config system,
@@ -294,7 +307,7 @@ int cfg_read_string(const char *key, const char **out);
 
 /* ---------- typed set (not used by CLI) ---------- */
 
-int cfg_commit_int(const char *key, int value);
+int cfg_commit_int(const char *key, gint64 value);
 int cfg_commit_bool(const char *key, gboolean value);
 int cfg_commit_double(const char *key, double value);
 int cfg_commit_string(const char *key, const char *value);

@@ -23,14 +23,14 @@ typedef struct {
     cfg_item_t *item;
 
     union {
-        int i;
+        gint64 i;
         gboolean b;
         double d;
         char *s;
     } old_value;
 
     union {
-        int i;
+        gint64 i;
         gboolean b;
         double d;
         char *s;
@@ -205,7 +205,7 @@ static void cfg_copy_value(cfg_type_t type,
 {
     switch (type) {
     case CFG_INT:
-        *(int *)dst = *(const int *)src;
+        *(gint64 *)dst = *(const gint64 *)src;
         break;
     case CFG_BOOL:
         *(gboolean *)dst = *(const gboolean *)src;
@@ -394,7 +394,7 @@ static gboolean cfg_value_equal(cfg_type_t type, const void *a, const void *b)
 {
     switch (type) {
     case CFG_INT:
-        return *(int *)a == *(int *)b;
+        return *(gint64 *)a == *(gint64 *)b;
 
     case CFG_BOOL:
         return *(gboolean *)a == *(gboolean *)b;
@@ -438,7 +438,7 @@ static int cfg_commit_value(cfg_item_t *it, JsonNode *node)
 
     /* backup */
     union {
-        int i;
+        gint64 i;
         gboolean b;
         double d;
         char *s;
@@ -600,10 +600,10 @@ int cfg_to_json_string(const void *p, JsonNode *n)
         return -1;                                \
     }
 
-int cfg_read_int(const char *key, int *out)
+int cfg_read_int(const char *key, gint64 *out)
 {
     CFG_GET_COMMON(CFG_INT)
-    *out = *(int *)it->storage;
+    *out = *(gint64 *)it->storage;
     g_rw_lock_reader_unlock(&cfg_lock);
     return 0;
 }
@@ -642,7 +642,7 @@ int cfg_read_string(const char *key, const char **out)
 
 /* ---------- typed SET (非 CLI) ---------- */
 
-int cfg_commit_int(const char *key, int value)
+int cfg_commit_int(const char *key, gint64 value)
 {
     JsonNode *node = json_node_new(JSON_NODE_VALUE);
     json_node_set_int(node, value);
@@ -764,7 +764,7 @@ static char *cfg_format_value(cfg_type_t type,
     switch (type) {
     case CFG_INT:
         g_snprintf(buf, sizeof(buf),
-                   "%d", *(const int *)v);
+                   "%ld", *(const gint64 *)v);
         break;
 
     case CFG_BOOL:
@@ -832,7 +832,7 @@ static int cfg_read_node_from_item(const cfg_item_t *it, JsonNode **out)
         /* default primitive fallback */
         switch (it->type) {
         case CFG_INT:
-            json_node_set_int(node, *(int *)it->storage);
+            json_node_set_int(node, *(gint64 *)it->storage);
             break;
         case CFG_BOOL:
             json_node_set_boolean(node, *(gboolean *)it->storage);
@@ -990,7 +990,7 @@ void cfg_show_all(FILE *out)
     return;
 }
 
-int cfg_show_to_buffer(char **out)
+int cfg_generate_to_json_data(char **out)
 {
     size_t len = 0;
 
