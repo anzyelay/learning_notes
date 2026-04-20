@@ -38,7 +38,7 @@ add_library(${PACKAGE_NAME}_static
 set_target_properties(${PACKAGE_NAME}_shared PROPERTIES OUTPUT_NAME ${PACKAGE_NAME})
 set_target_properties(${PACKAGE_NAME}_static PROPERTIES OUTPUT_NAME ${PACKAGE_NAME})
 set_target_properties(${PACKAGE_NAME}_shared PROPERTIES
-    VERSION 1.0.0
+    VERSION 1.0.1
     SOVERSION 1
 )
 
