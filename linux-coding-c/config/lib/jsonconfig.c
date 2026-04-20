@@ -75,8 +75,6 @@ static const cli_cmd_desc_t g_cli_cmds[] = {
 
 typedef void (*cfg_iter_fn)(cfg_item_t *it, void *user_data);
 
-void cfg_foreach_item(cfg_iter_fn fn, void *user_data);
-
 /* 1. 从“原始值副本” stringify（事务 / rollback / audit） */
 static char *cfg_raw_to_string(cfg_type_t type,
                          const void *value,
@@ -85,6 +83,7 @@ static char *cfg_raw_to_string(cfg_type_t type,
 /* ---------- globals ---------- */
 
 static cfg_item_t *cfg_list = NULL;
+static GHashTable *cfg_items_map;      // 新增哈希索引
 static GRWLock cfg_lock;
 static GAsyncQueue *cfg_change_queue;
 static GThread *cfg_change_thread = NULL;
@@ -324,16 +323,16 @@ int cfg_register(cfg_item_t *item)
     }
     item->next = cfg_list;
     cfg_list = item;
+
+    // 同步更新哈希索引
+    g_hash_table_insert( cfg_items_map, item->key, item);
+
     return 0;
 }
 
-static cfg_item_t *cfg_find(const char *key)
+static inline cfg_item_t *cfg_find(const char *key)
 {
-    FOREACH_CFG_ITEM(it) {
-        if (g_strcmp0(it->key, key) == 0)
-            return it;
-    }
-    return NULL;
+    return g_hash_table_lookup(cfg_items_map, key);
 }
 
 /* ---------- json helpers ---------- */
@@ -896,13 +895,23 @@ char *cfg_cli_read(const char *key)
     return s;
 }
 
-void cfg_foreach_item(cfg_iter_fn fn, void *usr_data)
+/**
+ * @brief Iterate over all configuration items with a given prefix.
+ *
+ * @param prefix : if not NULL or empty, only iterate over items whose keys start with this prefix. If NULL or empty, iterate over all items.
+ * @param fn : the function to call for each matching item.
+ * @param usr_data : user data to pass to the iteration function.
+ */
+static void cfg_foreach_item_with_prefix(const char *prefix, cfg_iter_fn fn, void *usr_data)
 {
     if (!fn)
         return;
 
     FOREACH_CFG_ITEM(it) {
-        fn(it, usr_data);
+        if (prefix == NULL || strlen(prefix) == 0
+             || g_str_has_prefix(it->key, prefix)) {
+            fn(it, usr_data);
+        }
     }
 }
 
@@ -930,7 +939,7 @@ static void dump_one(cfg_item_t *it, void *user_data)
     #endif
 }
 
-static int cfg_dump_all_nodes(JsonNode **out)
+static int cfg_dump_nodes(const char *parent, JsonNode **out)
 {
     if (!out)
         return -EINVAL;
@@ -942,19 +951,19 @@ static int cfg_dump_all_nodes(JsonNode **out)
     json_node_take_object(root, obj);
 
     g_rw_lock_reader_lock(&cfg_lock);
-    cfg_foreach_item(dump_one, obj);
+    cfg_foreach_item_with_prefix(parent, dump_one, obj);
     g_rw_lock_reader_unlock(&cfg_lock);
 
     *out = root;
     return 0;
 }
 
-int cfg_show_all_json(FILE *out)
+static int cfg_show_sub_json(const char *parent, FILE *out)
 {
     if (!out)
         out = stdout;
     JsonNode *root;
-    int ret = cfg_dump_all_nodes(&root);
+    int ret = cfg_dump_nodes(parent, &root);
     if (ret != 0)
         return ret;
 
@@ -964,6 +973,11 @@ int cfg_show_all_json(FILE *out)
     g_free(s);
     json_node_free(root);
     return 0;
+}
+
+int cfg_show_all_json(FILE *out)
+{
+    return cfg_show_sub_json(NULL, out);
 }
 
 static void cfg_show_one(cfg_item_t *it, void *user_data)
@@ -985,12 +999,12 @@ void cfg_show_all(FILE *out)
     if (!out)
         out = stdout;
     g_rw_lock_reader_lock(&cfg_lock);
-    cfg_foreach_item(cfg_show_one, out);
+    cfg_foreach_item_with_prefix(NULL, cfg_show_one, out);
     g_rw_lock_reader_unlock(&cfg_lock);
     return;
 }
 
-int cfg_generate_to_json_data(char **out)
+int cfg_generate_to_json_data(const char *parent, char **out)
 {
     size_t len = 0;
 
@@ -1002,7 +1016,7 @@ int cfg_generate_to_json_data(char **out)
     }
 
     /* 直接复用现有函数 */
-    cfg_show_all_json(mem);
+    cfg_show_sub_json(parent, mem);
 
     /* 必须 flush / fclose 才会更新 buf */
     fclose(mem);
@@ -1673,6 +1687,8 @@ void cfg_system_init(void)
 {
     if (g_once_init_enter(&cfg_initialized)) {
         g_rw_lock_init(&cfg_lock);
+        cfg_items_map = g_hash_table_new(
+                                g_str_hash, g_str_equal);
         g_restart_reasons = g_ptr_array_new_with_free_func(g_free);
         cfg_change_worker_run();
         g_once_init_leave(&cfg_initialized, TRUE);

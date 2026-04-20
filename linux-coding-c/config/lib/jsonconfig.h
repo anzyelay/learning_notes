@@ -277,12 +277,13 @@ void cfg_show_all(FILE *out);
 void cfg_show_status(FILE *out);
 void cfg_history_show(FILE *out);
 /**
- * @brief : Generate a JSON string representing the current configuration.
+ * @brief : Generate a JSON string representing the current configuration, optionally filtered by a key prefix.
  *
+ * @param prefix : if not NULL or empty, only include configuration items whose keys start with this prefix. If NULL or empty, include all items.
  * @param out : Output pointer, will be set to a newly allocated string containing the JSON data. Caller must free it with g_free().
  * @return int : 0 on failure, or the length of the generated JSON string on success.
  */
-int cfg_generate_to_json_data(char **out);
+int cfg_generate_to_json_data(const char *prefix, char **out);
 
 /* ---------- typed get (not used by CLI ) ----------
  * Typed read APIs
