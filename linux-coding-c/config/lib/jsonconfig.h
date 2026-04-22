@@ -80,10 +80,16 @@
 /* ---------- types ---------- */
 
 typedef enum {
-    CFG_INT,
     CFG_BOOL,
+    CFG_INT8,
+    CFG_INT16,
+    CFG_INT32,
+    CFG_INT64,
+    CFG_INT,
+    CFG_FLOAT,
     CFG_DOUBLE,
-    CFG_STRING
+    CFG_STRING,     // it recommends using char* (pointer to a string) for storage, and the CFG system will manage the memory. The caller should not modify or free the string directly. you'd better keep storage be NULL and not assignment a non-heap-allocated string to initial the storage as CFG will free the storage before give a new string, and also the storage should not be a fixed-size array
+    CFG_TYPE_NUMBER
 } cfg_type_t;
 
 typedef enum {
@@ -98,20 +104,26 @@ typedef int (*cfg_on_change_fn)(
 );
 
 typedef struct cfg_item {
-    const char *key;
-    const char *desc;
-    cfg_type_t  type;
-    void       *storage;
+    const char *key; // unique key, e.g. "server.port", used for lookup and CLI commands
+    const char *desc; // description, can be used for CLI help text
+    cfg_type_t  type; // type of the config item
+    void       *storage; // pointer to the actual variable that holds the value
+    int         storage_size; // size of the storage type, used for validation
 
-    int (*from_json)(JsonNode *, void *); // must implement
-    int (*to_json)(const void *, JsonNode *); // optional
-    int (*validator)(void *);
-    cfg_on_change_fn on_change;
+    int (*from_json)(JsonNode *, struct cfg_item *); // must implement
+    int (*to_json)(const struct cfg_item *, JsonNode *); // optional
+    int (*validator)(void *); // optional, validate the new value before commit, return 0 if valid, -1 if invalid
+    cfg_on_change_fn on_change; // optional, called after value is changed, with old and new value
 
     unsigned flags;
     struct cfg_item *next;
 } cfg_item_t;
 
+typedef struct {
+    const char *key;
+    cfg_type_t  type;
+    void       *target;
+} cfg_parse_map_t;
 
 #define CFG_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
 
@@ -128,104 +140,61 @@ typedef struct cfg_item {
     CFG_STATIC_ASSERT(sizeof(*(storage)) == sizeof(char *), \
                       "CFG_STRING storage must be string")
 
-
-
 /* ---- Basic cfg item declarations ---- */
-
-#define CFG_INT_ITEM(_key_, _storage_, _desc_, _flags_)        \
+#define CFG_ITEM_VC(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, _valid_fun_, _on_change_)        \
     {                                            \
         .key = (_key_),                            \
         .desc = (_desc_),                          \
-        .type = CFG_INT,                         \
+        .type = (_type_),                         \
         .flags = (_flags_),                       \
-        .storage = (_storage_),                    \
-        .from_json = cfg_from_json_int,          \
+        .storage = &(_storage_),                    \
+        .storage_size = sizeof(_storage_),       \
+        .from_json = (_from_json_),          \
+        .validator = _valid_fun_,          \
+        .on_change = _on_change_ \
     }
 
-#define CFG_BOOL_ITEM(_key_, _storage_, _desc_, _flags_)       \
-    {                                            \
-        .key = (_key_),                            \
-        .desc = (_desc_),                          \
-        .type = CFG_BOOL,                        \
-        .flags = (_flags_),                        \
-        .storage = (_storage_),                    \
-        .from_json = cfg_from_json_bool,         \
-    }
+#define CFG_ITEM_V(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, valid_fun)        \
+    CFG_ITEM_VC(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, valid_fun, NULL)
 
-#define CFG_DOUBLE_ITEM(_key_, _storage_, _desc_, _flags_)     \
-    {                                            \
-        .key = (_key_),                            \
-        .desc = (_desc_),                          \
-        .type = CFG_DOUBLE,                      \
-        .flags = (_flags_),                        \
-        .storage = (_storage_),                    \
-        .from_json = cfg_from_json_double,       \
-    }
-
-#define CFG_STRING_ITEM(_key_, _storage_, _desc_, _flags_)     \
-    {                                            \
-        .key = (_key_),                            \
-        .desc = (_desc_),                          \
-        .type = CFG_STRING,                      \
-        .flags = (_flags_),                        \
-        .storage = (_storage_),                    \
-        .from_json = cfg_from_json_string,       \
-    }
+#define CFG_ITEM(_type_, _key_, _storage_, _desc_, _flags_, _from_json_)        \
+    CFG_ITEM_V(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, NULL)
 
 #define CFG_INT_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)        \
-    {                                            \
-        .key = (_key_),                            \
-        .desc = (_desc_),                          \
-        .type = CFG_INT,                         \
-        .flags = (_flags_),                       \
-        .storage = (_storage_),                    \
-        .from_json = cfg_from_json_int,          \
-        .validator = valid_fun,          \
-    }
+    CFG_ITEM_V(CFG_INT, _key_, _storage_, _desc_, _flags_, cfg_from_json_int, valid_fun)
 
 #define CFG_BOOL_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)       \
-    {                                            \
-        .key = (_key_),                            \
-        .desc = (_desc_),                          \
-        .type = CFG_BOOL,                        \
-        .flags = (_flags_),                        \
-        .storage = (_storage_),                    \
-        .from_json = cfg_from_json_bool,         \
-        .validator = valid_fun,          \
-    }
+    CFG_ITEM_V(CFG_BOOL, _key_, _storage_, _desc_, _flags_, cfg_from_json_bool, valid_fun)
 
 #define CFG_DOUBLE_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)     \
-    {                                            \
-        .key = (_key_),                            \
-        .desc = (_desc_),                          \
-        .type = CFG_DOUBLE,                      \
-        .flags = (_flags_),                        \
-        .storage = (_storage_),                    \
-        .from_json = cfg_from_json_double,       \
-        .validator = valid_fun,          \
-    }
+    CFG_ITEM_V(CFG_DOUBLE, _key_, _storage_, _desc_, _flags_, cfg_from_json_double, valid_fun)
 
 #define CFG_STRING_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)     \
-    {                                            \
-        .key = (_key_),                            \
-        .desc = (_desc_),                          \
-        .type = CFG_STRING,                      \
-        .flags = (_flags_),                        \
-        .storage = (_storage_),                    \
-        .from_json = cfg_from_json_string,       \
-        .validator = valid_fun,          \
-    }
+    CFG_ITEM_V(CFG_STRING, _key_, _storage_, _desc_, _flags_, cfg_from_json_string, valid_fun)
+
+#define CFG_INT_ITEM(_key_, _storage_, _desc_, _flags_)        \
+    CFG_INT_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+
+#define CFG_BOOL_ITEM(_key_, _storage_, _desc_, _flags_)       \
+    CFG_BOOL_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+
+#define CFG_DOUBLE_ITEM(_key_, _storage_, _desc_, _flags_)     \
+    CFG_DOUBLE_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+
+#define CFG_STRING_ITEM(_key_, _storage_, _desc_, _flags_)     \
+    CFG_STRING_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+
 
 /* ---------- type handlers ---------- */
 
-int cfg_from_json_int(JsonNode *n, void *p);
-int cfg_to_json_int(const void *, JsonNode *);
-int cfg_from_json_bool(JsonNode *n, void *p);
-int cfg_to_json_bool(const void *, JsonNode *);
-int cfg_from_json_double(JsonNode *n, void *p);
-int cfg_to_json_double(const void *, JsonNode *);
-int cfg_from_json_string(JsonNode *n, void *p);
-int cfg_to_json_string(const void *, JsonNode *);
+int cfg_from_json_int(JsonNode *n, struct cfg_item *p);
+int cfg_to_json_int(const struct cfg_item *p, JsonNode *n);
+int cfg_from_json_bool(JsonNode *n, struct cfg_item *p);
+int cfg_to_json_bool(const struct cfg_item *p, JsonNode *n);
+int cfg_from_json_double(JsonNode *n, struct cfg_item *p);
+int cfg_to_json_double(const struct cfg_item *p, JsonNode *n);
+int cfg_from_json_string(JsonNode *n, struct cfg_item *p);
+int cfg_to_json_string(const struct cfg_item *p, JsonNode *n);
 
 /*
  * cfg_read_node
@@ -255,8 +224,16 @@ int cfg_read_node(const char *key, JsonNode **out);
 // This function will initialize internal data structures, start background threads,
 // and perform any necessary setup for the configuration system to operate correctly.
 void cfg_system_init(void);
-// Register a configuration item. This function should be called during application initialization
-// to register all available configuration items before loading any configuration values.
+/*
+ * Register a configuration item. This function should be called during application initialization
+ * to register all available configuration items before loading any configuration values.
+ *
+ * NOTE:
+ * If a non-NULL initial value is provided for CFG_STRING type:
+ * - The value is duplicated at registration time
+ * - The CFG system takes ownership of the duplicated string
+ * - The original pointer remains owned by the caller, and the caller is responsible for its lifecycle
+ */
 int cfg_register(cfg_item_t *item);
 
 /* ---------- load / save ---------- */
@@ -298,8 +275,13 @@ int cfg_generate_to_json_data(const char *prefix, char **out);
  * The caller is responsible for using the correct typed API.
  */
 
+int cfg_read_int8(const char *key, gint8 *out);
+int cfg_read_int16(const char *key, gint16 *out);
+int cfg_read_int32(const char *key, gint32 *out);
+int cfg_read_int64(const char *key, gint64 *out);
 int cfg_read_int(const char *key, gint64 *out);
 int cfg_read_bool(const char *key, gboolean *out);
+int cfg_read_float(const char *key, float *out);
 int cfg_read_double(const char *key, double *out);
 // the output pointer is set to a string owned by the config system,
 // and should not be modified or freed by the caller.
@@ -335,5 +317,16 @@ void cfg_cli_client_run(char *server_name);
 // This function will stop the CLI server loop and clean up resources.
 // It can be called from a signal handler to gracefully shut down the server.
 void cfg_cli_server_stop(void);
+
+/* ------------ a tool for parsing JSON  ---------------*/
+/**
+ * @brief Parse JSON string and populate configuration variables.
+ *
+ * @param json_str The JSON string to parse.
+ * @param map The mapping of keys to configuration variables.
+ * @param map_len The length of the mapping array.
+ * @return int 0 on success, -1 on failure.
+ */
+int cfg_parse_json_to_vars(const char *json_str, const cfg_parse_map_t *map, size_t map_len);
 
 #endif

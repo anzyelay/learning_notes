@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <glib.h>
 #include <poll.h>
+#include <stdint.h>
 
 // command and key autocomplete
 #include <readline/readline.h>
@@ -95,7 +96,7 @@ static GPtrArray *g_restart_reasons = NULL;   // cfg_item_t*
 static GQueue cfg_audit_log;   // 有上限，比如 1000
 gboolean is_changed_from_last_save = TRUE;
 
-static const char *cfg_file_path = NULL;
+static char *cfg_file_path = NULL;
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -197,17 +198,129 @@ static void cfg_audit_entry_print(cfg_audit_entry_t *entry, void *user_data)
     fprintf(out, "[%s] %s: %s -> %s\n", log_time, entry->key, entry->old_value, entry->new_value);
 }
 
-static void cfg_copy_value(cfg_type_t type,
+static int cfg_set_int_storage(cfg_item_t *item, gint64 v)
+{
+    switch (item->type) {
+    case CFG_INT8:
+        *(gint8 *)item->storage = (gint8)v;
+        break;
+    case CFG_INT16:
+        *(gint16 *)item->storage = (gint16)v;
+        break;
+    case CFG_INT32:
+        *(gint32 *)item->storage = (gint32)v;
+        break;
+    case CFG_INT64:
+        *(gint64 *)item->storage = v;
+        break;
+    case CFG_BOOL:
+        *(gboolean *)item->storage = v ? TRUE : FALSE;
+        break;
+    default:
+        g_printerr("Unsupported type for int storage: %d\n", item->type);
+        return -1;
+    }
+    return 0;
+}
+static gint64 cfg_get_int_value(const cfg_item_t *item)
+{
+    gint64 dst = 0;
+    switch (item->type) {
+    case CFG_INT8:
+        dst = *(const gint8 *)item->storage;
+        break;
+    case CFG_INT16:
+        dst = *(const gint16 *)item->storage;
+        break;
+    case CFG_INT32:
+        dst = *(const gint32 *)item->storage;
+        break;
+    case CFG_INT64:
+        dst = *(const gint64 *)item->storage;
+        break;
+    case CFG_BOOL:
+        dst = *(const gboolean *)item->storage;
+        break;
+    default:
+        g_printerr("Unsupported type for int value: %d\n", item->type);
+        return -1;
+    }
+    return dst;
+}
+
+static gboolean cfg_get_bool_value(const cfg_item_t *item)
+{
+    gboolean dst = FALSE;
+    switch (item->type) {
+    case CFG_BOOL:
+        dst = *(const gboolean *)item->storage;
+        break;
+    }
+    return dst;
+}
+
+static int cfg_set_double_storage(cfg_item_t *item, double v)
+{
+    switch (item->type) {
+    case CFG_FLOAT:
+        *(float *)item->storage = (float)v;
+        break;
+    case CFG_DOUBLE:
+        *(double *)item->storage = v;
+        break;
+    default:
+        g_printerr("Unsupported type for double storage: %d\n", item->type);
+        return -1;
+    }
+    return 0;
+}
+static double cfg_get_double_value(const cfg_item_t *item)
+{
+    double dst = 0;
+    switch (item->type) {
+    case CFG_FLOAT:
+        dst = *(const float *)item->storage;
+        break;
+    case CFG_DOUBLE:
+        dst = *(const double *)item->storage;
+        break;
+    }
+    return dst;
+}
+
+/**
+ * @brief Copy a value of a specific type from src to dst, with optional deep copy for strings.
+ *
+ * @param type
+ * @param dst
+ * @param src
+ * @param need_free : if TRUE and the type is CFG_STRING, it will free the existing string in dst before copying. If FALSE, it will not free dst (used for read operations where dst is an output parameter).
+ * @return int
+ * NOTE: YOU MUST ENSURE THAT dst AND src POINT TO VALID STORAGE, AND THAT THE TYPE MATCHES THE CONFIG ITEM'S TYPE. THIS FUNCTION DOES NOT PERFORM ANY TYPE CHECKING OR VALIDATION.
+ */
+static int cfg_copy_value(cfg_type_t type,
                            void *dst,
                            const void *src,
                            gboolean need_free)
 {
     switch (type) {
-    case CFG_INT:
+    case CFG_INT8:
+        *(gint8 *)dst = *(const gint8 *)src;
+        break;
+    case CFG_INT16:
+        *(gint16 *)dst = *(const gint16 *)src;
+        break;
+    case CFG_INT32:
+        *(gint32 *)dst = *(const gint32 *)src;
+        break;
+    case CFG_INT64:
         *(gint64 *)dst = *(const gint64 *)src;
         break;
     case CFG_BOOL:
         *(gboolean *)dst = *(const gboolean *)src;
+        break;
+    case CFG_FLOAT:
+        *(float *)dst = *(const float *)src;
         break;
     case CFG_DOUBLE:
         *(double *)dst = *(const double *)src;
@@ -217,7 +330,11 @@ static void cfg_copy_value(cfg_type_t type,
             g_free(*(char **)dst);
         *(char **)dst = g_strdup(*(char * const *)src);
         break;
+    default:
+        g_printerr("Unsupported config type: %d\n", type);
+        return -1;
     }
+    return 0;
 }
 
 /* worker thread */
@@ -311,6 +428,102 @@ static void cfg_enqueue_change(cfg_item_t *it,
     g_async_queue_push(cfg_change_queue, task);
 }
 
+/* ---------- type checking and normalization ---------- */
+static int cfg_type_check_normalize(cfg_item_t *item)
+{
+    struct type_size_map {
+        size_t size;
+        char *type_name;
+    } type_size_maps[CFG_TYPE_NUMBER] = {
+        [CFG_BOOL] = { sizeof(gboolean), "CFG_BOOL" },
+        [CFG_INT8] = { sizeof(gint8), "CFG_INT8" },
+        [CFG_INT16] = { sizeof(gint16), "CFG_INT16" },
+        [CFG_INT32] = { sizeof(gint32), "CFG_INT32" },
+        [CFG_INT64] = { sizeof(gint64), "CFG_INT64" },
+        [CFG_FLOAT] = { sizeof(float), "CFG_FLOAT" },
+        [CFG_DOUBLE] = { sizeof(double), "CFG_DOUBLE" },
+        [CFG_STRING] = { sizeof(char *), "CFG_STRING" }
+    };
+
+    /** make sure the storage size matches the type with the maps to normalize*/
+    if (item->storage_size == 0) {
+        g_printerr("Storage size must be specified for item '%s'\n", item->key);
+        return -1;
+    }
+    if (!item->storage) {
+        g_printerr("Storage pointer must be specified for item '%s'\n", item->key);
+        return -1;
+    }
+    if (item->type >= CFG_TYPE_NUMBER) {
+        g_printerr("Invalid config type for item '%s': %d\n", item->key, item->type);
+        return -1;
+    }
+
+    /** normalize the type based on storage size */
+    if (item->type == CFG_INT) {
+        if (item->storage_size == sizeof(gint8)) {
+            item->type = CFG_INT8;
+        }
+        else if (item->storage_size == sizeof(gint16)) {
+            item->type = CFG_INT16;
+        }
+        else if (item->storage_size == sizeof(gint32)) {
+            item->type = CFG_INT32;
+        }
+        else if (item->storage_size == sizeof(gint64)) {
+            item->type = CFG_INT64;
+        }
+        else {
+            g_printerr("Invalid storage size for CFG_INT item '%s': %d\n",
+                       item->key, item->storage_size);
+            return -1;
+        }
+    }
+
+    if (item->type == CFG_DOUBLE) {
+        if (item->storage_size == sizeof(double)) {
+            item->type = CFG_DOUBLE;
+        }
+        else if (item->storage_size == sizeof(float)) {
+            item->type = CFG_FLOAT;
+        }
+        else {
+            g_printerr("Invalid storage size for CFG_DOUBLE item '%s': %d\n",
+                       item->key, item->storage_size);
+            return -1;
+        }
+    }
+
+    /** check storage size against normalized type */
+    if (item->storage_size != type_size_maps[item->type].size) {
+        g_printerr("Warning: Storage size %d does not match expected size %ld for type %s for item '%s'\n",
+                   item->storage_size, type_size_maps[item->type].size
+                   , type_size_maps[item->type].type_name, item->key);
+        return -1;
+    }
+
+    if (item->type == CFG_STRING && item->storage && *(char **)item->storage) {
+        /* ensure string storage is initialized to NULL as storage must always hold heap-allocated string*/
+        g_printerr("Warning: CFG_STRING item '%s' has non-NULL initial storage,"
+             "which may cause issues."
+             "It should be initialized to NULL or a valid heap-allocated string.\n"
+             , item->key);
+        // return -1;
+
+
+        // Note: if the initial value is important, it should be set in code after registration, rather than relying on non-NULL initial storage.
+        // This is a workaround to allow registration of items with non-NULL initial storage, but it is recommended to initialize string storage to NULL before registration to avoid potential issues.
+        // The potential ISSUES include:
+        // 1. If the initial string is a string literal or statically allocated, the g_free() call in cfg_from_json_string will cause a crash.
+        // 2. If the initial string is heap-allocated but not duplicated, it may lead to double free or memory corruption if the same string pointer is shared among multiple items or used elsewhere in the code.
+        // By setting it to NULL first and then strdup the original value, we ensure that the storage holds a heap-allocated string as expected, and avoid potential crashes or memory issues. However, it is still recommended to initialize string storage to NULL before registration to avoid unnecessary overhead and potential confusion.
+        *(char **)item->storage = g_strdup(*(char **)item->storage);
+    }
+
+
+    return 0;
+}
+
 /* ---------- registry ---------- */
 
 int cfg_register(cfg_item_t *item)
@@ -321,11 +534,16 @@ int cfg_register(cfg_item_t *item)
             return -1;
         }
     }
+
+    if (cfg_type_check_normalize(item) != 0) {
+        return -1;
+    }
+
     item->next = cfg_list;
     cfg_list = item;
 
     // 同步更新哈希索引
-    g_hash_table_insert( cfg_items_map, item->key, item);
+    g_hash_table_insert( cfg_items_map, (gpointer)item->key, item);
 
     return 0;
 }
@@ -381,8 +599,12 @@ static JsonObject *json_get_or_create(JsonObject *root,
 static GType cfg_type_to_gtype(cfg_type_t type)
 {
     switch (type) {
-    case CFG_INT:    return G_TYPE_INT64;
+    case CFG_INT8:
+    case CFG_INT16:
+    case CFG_INT32:
+    case CFG_INT64:  return G_TYPE_INT64;
     case CFG_BOOL:   return G_TYPE_BOOLEAN;
+    case CFG_FLOAT:
     case CFG_DOUBLE: return G_TYPE_DOUBLE;
     case CFG_STRING: return G_TYPE_STRING;
     default:         return G_TYPE_INVALID;
@@ -392,12 +614,20 @@ static GType cfg_type_to_gtype(cfg_type_t type)
 static gboolean cfg_value_equal(cfg_type_t type, const void *a, const void *b)
 {
     switch (type) {
-    case CFG_INT:
+    case CFG_INT8:
+        return *(gint8 *)a == *(gint8 *)b;
+    case CFG_INT16:
+        return *(gint16 *)a == *(gint16 *)b;
+    case CFG_INT32:
+        return *(gint32 *)a == *(gint32 *)b;
+    case CFG_INT64:
         return *(gint64 *)a == *(gint64 *)b;
 
     case CFG_BOOL:
         return *(gboolean *)a == *(gboolean *)b;
 
+    case CFG_FLOAT:
+        return *(float *)a == *(float *)b;
     case CFG_DOUBLE:
         return *(double *)a == *(double *)b;
 
@@ -441,12 +671,12 @@ static int cfg_commit_value(cfg_item_t *it, JsonNode *node)
         gboolean b;
         double d;
         char *s;
-    } old;
+    } old = {0};
 
     cfg_copy_value(it->type, &old, it->storage, FALSE);
 
     /* apply */
-    if (it->from_json(node, it->storage) != 0) {
+    if (it->from_json(node, it) != 0) {
         ret = -1;
         goto rollback;
     }
@@ -512,52 +742,55 @@ out:
 }
 /* ---------- type handlers ---------- */
 
-int cfg_from_json_int(JsonNode *n, void *p)
+int cfg_from_json_int(JsonNode *n, cfg_item_t *p)
 {
-    *(gint64 *)p = json_node_get_int(n);
+    gint64 v = json_node_get_int(n);
+    cfg_set_int_storage(p, v);
     return 0;
 }
 
-int cfg_to_json_int(const void *p, JsonNode *n)
+int cfg_to_json_int(const cfg_item_t *p, JsonNode *n)
 {
-    json_node_set_int(n, *(gint64 *)p);
+    gint64 v = cfg_get_int_value(p);
+    json_node_set_int(n, v);
     return 0;
 }
 
-int cfg_from_json_bool(JsonNode *n, void *p)
+int cfg_from_json_bool(JsonNode *n, cfg_item_t *p)
 {
-    *(gboolean *)p = json_node_get_boolean(n);
+    gboolean v = json_node_get_boolean(n);
+    cfg_set_int_storage(p, v);
     return 0;
 }
 
-int cfg_to_json_bool(const void *p, JsonNode *n)
+int cfg_to_json_bool(const cfg_item_t *p, JsonNode *n)
 {
-    json_node_set_boolean(n, *(gboolean *)p);
+    gboolean v = cfg_get_bool_value(p);
+    json_node_set_boolean(n, v);
     return 0;
 }
 
-int cfg_from_json_double(JsonNode *n, void *p)
+int cfg_from_json_double(JsonNode *n, cfg_item_t *p)
 {
-    *(double *)p = json_node_get_double(n);
+    double d = json_node_get_double(n);
+    cfg_set_double_storage(p, d);
     return 0;
 }
 
-int cfg_to_json_double(const void *p, JsonNode *n)
+int cfg_to_json_double(const cfg_item_t *p, JsonNode *n)
 {
-    json_node_set_double(n, *(double *)p);
+    double v = cfg_get_double_value(p);
+    json_node_set_double(n, v);
     return 0;
 }
 
-int cfg_from_json_string(JsonNode *n, void *p)
+int cfg_from_json_string(JsonNode *n, cfg_item_t *p)
 {
-    char **dst = (char **)p;
 
-    /* defensive: free old value first */
-    g_free(*dst);
-    *dst = NULL;
-
-    if (!n)
+    if (!n || !p)
         return -EINVAL;
+
+    cfg_item_t *it = p;
 
     /* JSON null => string = NULL */
     if (json_node_get_node_type(n) == JSON_NODE_NULL) {
@@ -571,15 +804,18 @@ int cfg_from_json_string(JsonNode *n, void *p)
     }
 
     const char *s = json_node_get_string(n);
-    if (s)
-        *dst = g_strdup(s);
+    if (s) {
+        /* defensive: free old value first */
+        return cfg_copy_value(it->type, it->storage, &s, TRUE);
+    }
 
-    return 0;
+    return -1;
 }
 
-int cfg_to_json_string(const void *p, JsonNode *n)
+int cfg_to_json_string(const cfg_item_t *p, JsonNode *n)
 {
-    char *dst = *(char **)p;
+    const cfg_item_t *it = p;
+    char *dst = *(char **)it->storage;
     if (dst) {
         json_node_set_string(n, dst);
     }
@@ -599,10 +835,48 @@ int cfg_to_json_string(const void *p, JsonNode *n)
         return -1;                                \
     }
 
+int cfg_read_int8(const char *key, gint8 *out)
+{
+    CFG_GET_COMMON(CFG_INT8)
+    *out = (gint8)cfg_get_int_value(it);
+    g_rw_lock_reader_unlock(&cfg_lock);
+    return 0;
+}
+
+int cfg_read_int16(const char *key, gint16 *out)
+{
+    CFG_GET_COMMON(CFG_INT16)
+    *out = (gint16)cfg_get_int_value(it);
+    g_rw_lock_reader_unlock(&cfg_lock);
+    return 0;
+}
+
+int cfg_read_int32(const char *key, gint32 *out)
+{
+    CFG_GET_COMMON(CFG_INT32)
+    *out = (gint32)cfg_get_int_value(it);
+    g_rw_lock_reader_unlock(&cfg_lock);
+    return 0;
+}
+
+int cfg_read_int64(const char *key, gint64 *out)
+{
+    CFG_GET_COMMON(CFG_INT64)
+    *out = (gint64)cfg_get_int_value(it);
+    g_rw_lock_reader_unlock(&cfg_lock);
+    return 0;
+}
+
 int cfg_read_int(const char *key, gint64 *out)
 {
-    CFG_GET_COMMON(CFG_INT)
-    *out = *(gint64 *)it->storage;
+    g_rw_lock_reader_lock(&cfg_lock);
+    cfg_item_t *it = cfg_find(key);
+    if (!it || cfg_type_to_gtype(it->type) != G_TYPE_INT64) {
+        g_rw_lock_reader_unlock(&cfg_lock);
+        g_print("Key '%s' not found or not an integer type\n", key);
+        return -1;
+    }
+    *out = cfg_get_int_value(it);
     g_rw_lock_reader_unlock(&cfg_lock);
     return 0;
 }
@@ -610,7 +884,15 @@ int cfg_read_int(const char *key, gint64 *out)
 int cfg_read_bool(const char *key, gboolean *out)
 {
     CFG_GET_COMMON(CFG_BOOL)
-    *out = *(gboolean *)it->storage;
+    *out = cfg_get_bool_value(it);
+    g_rw_lock_reader_unlock(&cfg_lock);
+    return 0;
+}
+
+int cfg_read_float(const char *key, float *out)
+{
+    CFG_GET_COMMON(CFG_FLOAT)
+    *out = (float)cfg_get_double_value(it);
     g_rw_lock_reader_unlock(&cfg_lock);
     return 0;
 }
@@ -618,7 +900,7 @@ int cfg_read_bool(const char *key, gboolean *out)
 int cfg_read_double(const char *key, double *out)
 {
     CFG_GET_COMMON(CFG_DOUBLE)
-    *out = *(double *)it->storage;
+    *out = (double)cfg_get_double_value(it);
     g_rw_lock_reader_unlock(&cfg_lock);
     return 0;
 }
@@ -694,7 +976,10 @@ static JsonNode *cfg_parse_string_to_node(cfg_item_t *it,
     JsonNode *node = json_node_new(JSON_NODE_VALUE);
 
     switch (it->type) {
-    case CFG_INT: {
+    case CFG_INT8:
+    case CFG_INT16:
+    case CFG_INT32:
+    case CFG_INT64: {
         char *end;
         long v = strtol(value, &end, 0);
         if (*end) goto fail;
@@ -709,6 +994,7 @@ static JsonNode *cfg_parse_string_to_node(cfg_item_t *it,
         json_node_set_boolean(node, b);
         break;
     }
+    case CFG_FLOAT:
     case CFG_DOUBLE: {
         char *end;
         double d = g_ascii_strtod(value, &end);
@@ -743,6 +1029,7 @@ int cfg_cli_commit(const char *key, const char *value)
     }
 
     JsonNode *node = cfg_parse_string_to_node(it, value, &ret);
+    // JsonNode *node = json_from_string(value, NULL);
     if (!node)
         goto out;
 
@@ -761,7 +1048,19 @@ static char *cfg_format_value(cfg_type_t type,
     char buf[256];
 
     switch (type) {
-    case CFG_INT:
+    case CFG_INT8:
+        g_snprintf(buf, sizeof(buf),
+                   "%d", *(const gint8 *)v);
+        break;
+    case CFG_INT16:
+        g_snprintf(buf, sizeof(buf),
+                   "%d", *(const gint16 *)v);
+        break;
+    case CFG_INT32:
+        g_snprintf(buf, sizeof(buf),
+                   "%d", *(const gint32 *)v);
+        break;
+    case CFG_INT64:
         g_snprintf(buf, sizeof(buf),
                    "%ld", *(const gint64 *)v);
         break;
@@ -772,7 +1071,10 @@ static char *cfg_format_value(cfg_type_t type,
                    *(const gboolean *)v
                        ? "true" : "false");
         break;
-
+    case CFG_FLOAT:
+         g_snprintf(buf, sizeof(buf),
+                   "%f", *(const float *)v);
+        break;
     case CFG_DOUBLE:
         g_snprintf(buf, sizeof(buf),
                    "%g", *(const double *)v);
@@ -821,37 +1123,66 @@ static int cfg_read_node_from_item(const cfg_item_t *it, JsonNode **out)
     JsonNode *node = json_node_new(JSON_NODE_VALUE);
     if (it->to_json) {
         /* custom representation */
-        int ret = it->to_json(it->storage, node);
+        int ret = it->to_json(it, node);
         if (ret) {
             json_node_free(node);
             return ret;
         }
     }
     else {
-        /* default primitive fallback */
+        /* set JSON node based on type */
         switch (it->type) {
-        case CFG_INT:
-            json_node_set_int(node, *(gint64 *)it->storage);
+        case CFG_INT8:
+        case CFG_INT16:
+        case CFG_INT32:
+        case CFG_INT64:{
+            gint64 v = cfg_get_int_value(it);
+            json_node_set_int(node, v);
             break;
-        case CFG_BOOL:
-            json_node_set_boolean(node, *(gboolean *)it->storage);
+        }
+        case CFG_BOOL: {
+            gboolean v = cfg_get_bool_value(it);
+            json_node_set_boolean(node, v);
             break;
-        case CFG_DOUBLE:
-            json_node_set_double(node, *(double *)it->storage);
+        }
+        case CFG_FLOAT:
+        case CFG_DOUBLE: {
+            double v = cfg_get_double_value(it);
+            json_node_set_double(node, v);
             break;
+        }
         case CFG_STRING: {
-            char *s = *(char **)it->storage;
-            if (s) {
-                json_node_set_string(node, s);
-            } else {
-                json_node_init_null(node);
-            }
+            cfg_to_json_string(it, node);
             break;
         }
         default:
+            g_printerr("Unsupported config type for JSON conversion: %d\n", it->type);
             json_node_free(node);
-            return -EINVAL;
+            return -1;
         }
+        /* default primitive fallback */
+        // switch (it->type) {
+        // case CFG_INT8:
+        // case CFG_INT16:
+        // case CFG_INT32:
+        // case CFG_INT64:
+        //     cfg_to_json_int(it, node);
+        //     break;
+        // case CFG_BOOL:
+        //     cfg_to_json_bool(it, node);
+        //     break;
+        // case CFG_FLOAT:
+        // case CFG_DOUBLE:
+        //     cfg_to_json_double(it, node);
+        //     break;
+        // case CFG_STRING: {
+        //     cfg_to_json_string(it, node);
+        //     break;
+        // }
+        // default:
+        //     json_node_free(node);
+        //     return -EINVAL;
+        // }
     }
 
     *out = node;
@@ -1087,14 +1418,26 @@ static void cfg_cli_man(const char *item, FILE *out)
         return;
     }
 
+    struct type_size_map {
+        size_t size;
+        char *type_name;
+    } type_size_maps[CFG_TYPE_NUMBER] = {
+        [CFG_BOOL] = { sizeof(gboolean), "CFG_BOOL" },
+        [CFG_INT8] = { sizeof(gint8), "CFG_INT8" },
+        [CFG_INT16] = { sizeof(gint16), "CFG_INT16" },
+        [CFG_INT32] = { sizeof(gint32), "CFG_INT32" },
+        [CFG_INT64] = { sizeof(gint64), "CFG_INT64" },
+        [CFG_FLOAT] = { sizeof(float), "CFG_FLOAT" },
+        [CFG_DOUBLE] = { sizeof(double), "CFG_DOUBLE" },
+        [CFG_STRING] = { sizeof(char *), "CFG_STRING" }
+    };
+
     FOREACH_CFG_ITEM(it) {
         if (strcmp(it->key, item) == 0) {
-            fprintf(out, "%s\n  type: %s\n  flags: %s%s\n  desc: %s\n",
+            fprintf(out, ">> key: %s\n  type: %s(%ld)\n  flags: %s%s\n  desc: %s\n",
                    it->key,
-                   (it->type == CFG_INT) ? "int" :
-                   (it->type == CFG_BOOL) ? "bool" :
-                   (it->type == CFG_DOUBLE) ? "double" :
-                   (it->type == CFG_STRING) ? "string" : "unknown",
+                   type_size_maps[it->type].type_name,
+                   type_size_maps[it->type].size,
                    (it->flags & CFG_FLAG_RUNTIME) ? "runtime " : "",
                    (it->flags & CFG_FLAG_RESTART) ? "restart " : "",
                    it->desc ? it->desc : "");
@@ -1545,8 +1888,19 @@ int cfg_load_file(const char *path)
     g_rw_lock_writer_lock(&cfg_lock);
     FOREACH_CFG_ITEM(it) {
         JsonNode *n = json_get_by_path(root, it->key);
-        if (n)
-            it->from_json(n, it->storage);
+        if (n && JSON_NODE_HOLDS_VALUE(n)) {
+            GType expect = cfg_type_to_gtype(it->type);
+            GType actual = json_node_get_value_type(n);
+            if (actual == expect) {
+                it->from_json(n, it);
+            }
+            else {
+                printf("Type mismatch for key '%s': expected %s but got %s\n",
+                       it->key,
+                       g_type_name(expect),
+                       g_type_name(actual));
+            }
+        }
     }
     g_rw_lock_writer_unlock(&cfg_lock);
 
@@ -1582,6 +1936,11 @@ static int atomic_write_file(const char *path,
     int ret = -1;
     int fd = -1;
     int dirfd = -1;
+
+    if (!path || !data) {
+        printf("Invalid arguments to atomic_write_file %p, %p\n", (void*)path, (void*)data);
+        return -1;
+    }
 
     gchar *tmp_path = g_strconcat(path, ".tmp", NULL);
 
@@ -1693,4 +2052,72 @@ void cfg_system_init(void)
         cfg_change_worker_run();
         g_once_init_leave(&cfg_initialized, TRUE);
     }
+}
+
+int cfg_parse_json_to_vars(const char *json_str, const cfg_parse_map_t *map, size_t map_len)
+{
+    JsonParser *parser = json_parser_new();
+    JsonNode *root;
+    int ret = -1;
+
+    GError *error = NULL;
+    if (!json_parser_load_from_data(parser, json_str, -1, &error)) {
+        printf("Failed to parse JSON data: %s\n", error ? error->message : "unknown error");
+        if (error) g_error_free(error);
+        goto out;
+    }
+
+    root = json_parser_get_root(parser);
+    if (!root || json_node_get_node_type(root) != JSON_NODE_OBJECT) {
+        printf("Invalid JSON structure\n");
+        goto out;
+    }
+
+    for (size_t i = 0; i < map_len; i++) {
+        const cfg_parse_map_t *m = &map[i];
+        JsonNode *n = json_get_by_path(root, m->key);
+        if (n && JSON_NODE_HOLDS_VALUE(n)) {
+            if (json_node_get_value_type(n) != cfg_type_to_gtype(m->type)) {
+                printf("Type mismatch for key: %s\n", m->key);
+                continue;
+            }
+            switch (m->type)
+            {
+            case CFG_INT8:
+                *(gint8 *)m->target = json_node_get_int(n);
+                break;
+            case CFG_INT16:
+                *(gint16 *)m->target = json_node_get_int(n);
+                break;
+            case CFG_INT:
+            case CFG_INT32:
+                *(gint32 *)m->target = json_node_get_int(n);
+                break;
+            case CFG_INT64:
+                 *(gint64 *)m->target = json_node_get_int(n);
+                break;
+            case CFG_BOOL:
+                *(gboolean *)m->target = json_node_get_boolean(n);
+                break;
+            case CFG_FLOAT:
+                *(float *)m->target = json_node_get_double(n);
+                break;
+            case CFG_DOUBLE:
+                *(double *)m->target = json_node_get_double(n);
+                break;
+            case CFG_STRING:
+                *(char **)m->target = g_strdup(json_node_get_string(n));
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
+    ret = 0;
+
+out:
+    g_object_unref(parser);
+    return ret;
 }
