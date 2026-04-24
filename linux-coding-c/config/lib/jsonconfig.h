@@ -85,10 +85,10 @@ typedef enum {
     CFG_INT16,
     CFG_INT32,
     CFG_INT64,
-    CFG_INT,
     CFG_FLOAT,
     CFG_DOUBLE,
-    CFG_STRING,     // it recommends using char* (pointer to a string) for storage, and the CFG system will manage the memory. The caller should not modify or free the string directly. you'd better keep storage be NULL and not assignment a non-heap-allocated string to initial the storage as CFG will free the storage before give a new string, and also the storage should not be a fixed-size array
+    CFG_STRING, // it recommends using char* (pointer to a string) for storage, and the CFG system will manage the memory. The caller should not modify or free the string directly. you'd better keep storage be NULL and not assignment a non-heap-allocated string to initial the storage as CFG will free the storage before give a new string, and also the storage should not be a fixed-size array
+    CFG_INT_AUTO, // auto-detect int type based on storage size, must be used with caution as it may lead to unexpected behavior if storage type is not standard int sizes
     CFG_TYPE_NUMBER
 } cfg_type_t;
 
@@ -119,12 +119,6 @@ typedef struct cfg_item {
     struct cfg_item *next;
 } cfg_item_t;
 
-typedef struct {
-    const char *key;
-    cfg_type_t  type;
-    void       *target;
-} cfg_parse_map_t;
-
 #define CFG_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
 
 #define CFG_ASSERT_INT_STORAGE(storage) \
@@ -148,10 +142,11 @@ typedef struct {
         .type = (_type_),                         \
         .flags = (_flags_),                       \
         .storage = &(_storage_),                    \
-        .storage_size = sizeof(_storage_),       \
+        .storage_size = sizeof(typeof(_storage_)),       \
         .from_json = (_from_json_),          \
         .validator = _valid_fun_,          \
-        .on_change = _on_change_ \
+        .on_change = _on_change_,          \
+        .next = NULL                            \
     }
 
 #define CFG_ITEM_V(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, valid_fun)        \
@@ -160,11 +155,14 @@ typedef struct {
 #define CFG_ITEM(_type_, _key_, _storage_, _desc_, _flags_, _from_json_)        \
     CFG_ITEM_V(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, NULL)
 
-#define CFG_INT_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)        \
-    CFG_ITEM_V(CFG_INT, _key_, _storage_, _desc_, _flags_, cfg_from_json_int, valid_fun)
+#define CFG_INT_AUTO_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)        \
+    CFG_ITEM_V(CFG_INT_AUTO, _key_, _storage_, _desc_, _flags_, cfg_from_json_int, valid_fun)
 
 #define CFG_BOOL_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)       \
     CFG_ITEM_V(CFG_BOOL, _key_, _storage_, _desc_, _flags_, cfg_from_json_bool, valid_fun)
+
+#define CFG_FLOAT_ITEM_V(_key_, _storage_, _desc_, _flags_)     \
+    CFG_ITEM_V(CFG_FLOAT, _key_, _storage_, _desc_, _flags_, cfg_from_json_double, valid_fun)
 
 #define CFG_DOUBLE_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)     \
     CFG_ITEM_V(CFG_DOUBLE, _key_, _storage_, _desc_, _flags_, cfg_from_json_double, valid_fun)
@@ -173,10 +171,13 @@ typedef struct {
     CFG_ITEM_V(CFG_STRING, _key_, _storage_, _desc_, _flags_, cfg_from_json_string, valid_fun)
 
 #define CFG_INT_ITEM(_key_, _storage_, _desc_, _flags_)        \
-    CFG_INT_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+    CFG_INT_AUTO_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
 
 #define CFG_BOOL_ITEM(_key_, _storage_, _desc_, _flags_)       \
     CFG_BOOL_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+
+#define CFG_FLOAT_ITEM(_key_, _storage_, _desc_, _flags_)     \
+    CFG_FLOAT_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
 
 #define CFG_DOUBLE_ITEM(_key_, _storage_, _desc_, _flags_)     \
     CFG_DOUBLE_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
@@ -224,23 +225,46 @@ int cfg_read_node(const char *key, JsonNode **out);
 // This function will initialize internal data structures, start background threads,
 // and perform any necessary setup for the configuration system to operate correctly.
 void cfg_system_init(void);
-/*
- * Register a configuration item. This function should be called during application initialization
- * to register all available configuration items before loading any configuration values.
+
+/**
+ * @brief : Register a configuration item. This function should be called during application initialization
+ *          to register all available configuration items before loading any configuration values.
+
+ * @param item : the CFG SYSTEM only focus on the registered item. Unregistered items will be ignored
+ * @return int : 0 on success, -1 on failure
  *
  * NOTE:
- * If a non-NULL initial value is provided for CFG_STRING type:
- * - The value is duplicated at registration time
- * - The CFG system takes ownership of the duplicated string
- * - The original pointer remains owned by the caller, and the caller is responsible for its lifecycle
+ * 1. The caller is responsible for ensuring that the cfg_item_t structure remains valid for the lifetime
+ *   of the application, as the configuration system will reference it directly.
+ *
+ * 2. The register function will check the storage size and type consistency,
+ *    - For CFG_INT_AUTO/CFG_DOUBLE type, it will auto-detect the int type based on storage size,
+ *      and set the item type to the detected int type. If the storage size does
+ *      not match any standard int sizes, it will return an error.
+ *
+ *    - For CFG_STRING type, if the initial storage is non-NULL, it will be duplicated and
+ *      the CFG system will take ownership of the duplicated string. It is recommended
+ *      to initialize string storage to NULL before registration to avoid potential issues,
+ *      but if a non-NULL initial value is provided, the register function will handle it
+ *      by duplicating the string and managing its memory. The caller should not modify or
+ *      free the initial string after registration, as it is the caller's responsibility
+ *      to manage the original pointer, while the CFG system will manage the duplicated string in storage.
  */
 int cfg_register(cfg_item_t *item);
 
 /* ---------- load / save ---------- */
 
+/**
+ * @brief load configuration from a JSON file. The JSON structure should match the expected format for the registered configuration items.
+ *        The function will read the file, parse the JSON, and for each registered configuration item,
+ *        it will look up the corresponding value in the JSON and update the configuration accordingly.
+ *
+ * @param path : the file path to load from. If the file does not exist or cannot be read, an error will be returned.
+ * @return int : 0 on success, -1 on failure (e.g. file not found, JSON parse error, type mismatch)
+ */
 int cfg_load_file(const char *path);
 /**
- * @brief cfg_save_file saves the current configuration to a file.
+ * @brief cfg_save_file saves the current registered items configuration to a file.
  *
  * @param path : the file path to save to. If NULL, it will save to the last loaded file path.
  * @param force : if TRUE, it will save even if there are no changes since the last save. If FALSE, it will skip saving if there are no changes.
@@ -283,9 +307,7 @@ int cfg_read_int(const char *key, gint64 *out);
 int cfg_read_bool(const char *key, gboolean *out);
 int cfg_read_float(const char *key, float *out);
 int cfg_read_double(const char *key, double *out);
-// the output pointer is set to a string owned by the config system,
-// and should not be modified or freed by the caller.
-// The pointer will be set to NULL if the value is null or error occurs.
+// For string, the caller is responsible for freeing the returned string with g_free() when no longer needed
 int cfg_read_string(const char *key, const char **out);
 
 /* ---------- typed set (not used by CLI) ---------- */
@@ -307,15 +329,18 @@ char *cfg_cli_read(const char *key);
 /* ---------- run for command line----------
  These functions are for demonstration purposes and are NOT required for the core configuration system.
 */
-// This function will block until the server is stopped, handling incoming CLI connections and commands.
-void cfg_cli_server_run_loop(char *listen_name);
-// This function will start the CLI server in a separate thread,
-// allowing the main thread to do other work or wait for signals.
-void cfg_cli_server_run(char *server_name);
+
+/**
+ * @brief Start the CLI server in a separate thread. The server will listen for incoming connections and handle CLI commands.
+ *
+ * @param server_name : the name to listen on, which will be used by CLI clients to connect.
+ * @param in_thread : whether to run the server in a separate thread
+ * Note: if in_thread is FALSE, this function will block and run the server loop in the current thread. If TRUE, it will start a new thread for the server and return immediately.
+ */
+void cfg_cli_server_run(char *server_name, gboolean in_thread);
 // This function will connect to the server and run a simple CLI loop, allowing the user to input commands.
 void cfg_cli_client_run(char *server_name);
 // This function will stop the CLI server loop and clean up resources.
-// It can be called from a signal handler to gracefully shut down the server.
 void cfg_cli_server_stop(void);
 
 /* ------------ a tool for parsing JSON  ---------------*/
@@ -323,10 +348,12 @@ void cfg_cli_server_stop(void);
  * @brief Parse JSON string and populate configuration variables.
  *
  * @param json_str The JSON string to parse.
- * @param map The mapping of keys to configuration variables.
- * @param map_len The length of the mapping array.
+ * @param items An array of cfg_item_t that defines the mapping between JSON keys and configuration variables.
+ * @param item_size The size of each cfg_item_t in the array.
  * @return int 0 on success, -1 on failure.
+ * NOTE: This function is a utility for quickly populating configuration variables from a JSON string,
+         and is NOT part of the core configuration system.
  */
-int cfg_parse_json_to_vars(const char *json_str, const cfg_parse_map_t *map, size_t map_len);
+int cfg_parse_json_to_vars(const char *json_str, cfg_item_t *items, size_t item_size);
 
 #endif

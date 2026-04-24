@@ -7,7 +7,8 @@ static int8_t g_data= 80;
 static gboolean g_debug = TRUE;
 static char *g_log_path = "/tmpsadafsdfasd";  // to test initial non-NULL value, to verify that old value is freed and replaced by new value when commit_string is called.
 static char g_ip[16]="192.168.200.2"; // to test string storage with fixed buffer, which will ignore by cfg system
-static float g_version = 1.012f;
+static double g_version = 1.012;
+static float g_float_data = 1.11;
 
 CFG_ASSERT_INT_STORAGE(&g_port);
 CFG_ASSERT_BOOL_STORAGE(&g_debug);
@@ -30,6 +31,12 @@ static cfg_item_t cfg_table[] = {
         , g_version
         , "the version of the log"
         , CFG_FLAG_NONE
+    ),
+    CFG_DOUBLE_ITEM(
+        "server.float_data"
+        , g_float_data
+        , "some float data for test"
+        , CFG_FLAG_RUNTIME
     ),
     CFG_BOOL_ITEM(
         "server.debug"
@@ -61,7 +68,7 @@ int main(int argc, char **argv)
 
     // g_log_path = g_strdup("/tmp/default.log");
 
-    for (int i=0; i < sizeof(cfg_table)/sizeof(cfg_item_t); i++) {
+    for (u_int64_t i=0; i < sizeof(cfg_table)/sizeof(cfg_item_t); i++) {
         if (cfg_register(&cfg_table[i])) {
             printf("Failed to register config item: %s\n", cfg_table[i].key);
         }
@@ -98,13 +105,18 @@ int main(int argc, char **argv)
     printf("server.port = %ld\n", port);
     cfg_read_bool("server.debug", &debug);
     printf("server.debug = %s\n", debug ? "true" : "false");
-    cfg_read_string("log.path", &log_path);
-    printf("log.path = %s\n", log_path);
+    if (!cfg_read_string("log.path", &log_path)) {
+        printf("log.path = %s\n", log_path);
+        g_free((gchar *)log_path);
+        log_path = NULL;
+    }
+
     log_path = "dfasfds";
     log_path = cfg_cli_read("log.path");
     printf("log.path = %s\n", log_path);
     if (log_path) {
         g_free((gchar *)log_path);
+        log_path = NULL;
     }
 
     cfg_generate_to_json_data("server", &ret);
@@ -120,11 +132,11 @@ int main(int argc, char **argv)
     }
 
     printf("after parsing json:\n");
-    cfg_parse_json_to_vars(TEST_JSON_STR, (cfg_parse_map_t[]) {
-        { "server.port", CFG_INT, &port },
-        { "server.debug", CFG_BOOL, &debug },
-        { "log.path", CFG_STRING, &log_path },
-    }, 3);
+    cfg_parse_json_to_vars(TEST_JSON_STR, (cfg_item_t[]) {
+        CFG_INT_ITEM("server.port", port, NULL, CFG_FLAG_RUNTIME),
+        CFG_BOOL_ITEM("server.debug", debug, NULL, CFG_FLAG_RUNTIME),
+        CFG_STRING_ITEM("log.path", log_path, NULL, CFG_FLAG_RUNTIME),
+     }, 3);
 
     printf("port = %ld\n", port);
     printf("debug = %s\n", debug ? "true" : "false");
@@ -132,11 +144,11 @@ int main(int argc, char **argv)
 
 
     if (1) {
-        cfg_cli_server_run_loop(progname);
+        cfg_cli_server_run(progname, FALSE);
     }
     else {
 
-        cfg_cli_server_run(progname);
+        cfg_cli_server_run(progname, TRUE);
 
         sleep(5);
 
