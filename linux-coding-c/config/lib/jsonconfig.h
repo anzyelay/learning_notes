@@ -76,6 +76,11 @@
 #include <glib.h>
 #include <json-glib/json-glib.h>
 #include <stdio.h>
+#include <stdarg.h>
+
+/* log hook struct definition */
+typedef void (*log_hook_t)(unsigned int level, const char *func, int line, const char *fmt, va_list ap);
+void cfg_set_log_hook(log_hook_t handle);
 
 /* ---------- types ---------- */
 
@@ -352,7 +357,7 @@ void cfg_cli_server_stop(void);
  * @param item_size The size of each cfg_item_t in the array.
  * @return int 0 on success, -1 on failure.
  * NOTE: This function is a utility for quickly populating configuration variables from a JSON string,
-         and is NOT part of the core configuration system.
+ *       and is NOT part of the core configuration system.
  */
 int cfg_parse_json_to_vars(const char *json_str, cfg_item_t *items, size_t item_size);
 
