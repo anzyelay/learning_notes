@@ -26,8 +26,8 @@
 #define cfg_error(fmt, ...) \
             cfg_printf_impl(_LOG_LEVEL_ERR, __func__, __LINE__, "%s: "fmt, CFG_TAG, ##__VA_ARGS__)
 
-static log_hook_t g_log_hook = NULL;
-void cfg_set_log_hook(log_hook_t log_handle)
+static cfg_log_hook_t g_log_hook = NULL;
+void cfg_set_log_hook(cfg_log_hook_t log_handle)
 {
     g_log_hook = log_handle;
 }
@@ -37,7 +37,9 @@ static void cfg_printf_impl(unsigned int level, const char *func, int line, cons
     va_start(ap, fmt);
 
     if (g_log_hook) {
-        g_log_hook(level, func, line, fmt, ap);
+        char buf[1024];
+        vsnprintf(buf, sizeof(buf), fmt, ap);
+        g_log_hook(level, func, line, "%s", buf);
     } else {
         // g_logv(0, level<<2, fmt, ap);
         if (level == _LOG_LEVEL_INFO) {

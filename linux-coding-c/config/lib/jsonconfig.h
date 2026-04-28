@@ -78,9 +78,24 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-/* log hook struct definition */
-typedef void (*log_hook_t)(unsigned int level, const char *func, int line, const char *fmt, va_list ap);
-void cfg_set_log_hook(log_hook_t handle);
+/* log hook struct definition
+ * eg:
+ * // implement yourself log handle
+ * void test_log(unsigned int level, const char *func, int line, const char *fmt, ...)
+ * {
+ *     char buf[1024] = {0};
+ *     va_list args;
+ *     va_start(args, fmt);
+ * 	vsnprintf(buf, sizeof(buf), fmt, args);
+ * 	va_end(args);
+ *     printf("[%d:%s:%d]: %s", level, func, line, buf);
+ * }
+ * // apply you log handle
+ * cfg_set_log_hook(test_log);
+ *
+ */
+typedef void (*cfg_log_hook_t)(unsigned int level, const char *func, int line, const char *fmt, ...);
+void cfg_set_log_hook(cfg_log_hook_t handle);
 
 /* ---------- types ---------- */
 

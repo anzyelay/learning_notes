@@ -30,7 +30,7 @@ static cfg_item_t cfg_table[] = {
         "log.version"
         , g_version
         , "the version of the log"
-        , CFG_FLAG_NONE
+        , CFG_FLAG_RUNTIME | CFG_FLAG_TEMPORARY
     ),
     CFG_DOUBLE_ITEM(
         "server.float_data"
@@ -55,6 +55,18 @@ static cfg_item_t cfg_table[] = {
 
 #define TEST_JSON_STR "{ \"server\": { \"port\": 19090, \"debug\": true, \"path\": \"/tmp/test\" }, \"log\": { \"path\": \"/tmp/log/test\" } }"
 
+
+void test_log(unsigned int level, const char *func, int line, const char *fmt, ...)
+{
+    char buf[1024] = {0};
+    va_list args;
+    va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+    printf("[%d:%s:%d]: %s", level, func, line, buf);
+}
+
+
 int main(int argc, char **argv)
 {
     char *progname = g_path_get_basename(argv[0]);
@@ -63,7 +75,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-
+    cfg_set_log_hook(test_log);
     cfg_system_init();
 
     // g_log_path = g_strdup("/tmp/default.log");
