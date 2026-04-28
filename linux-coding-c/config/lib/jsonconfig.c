@@ -40,7 +40,18 @@ static void cfg_printf_impl(unsigned int level, const char *func, int line, cons
         g_log_hook(level, func, line, fmt, ap);
     } else {
         // g_logv(0, level<<2, fmt, ap);
-        g_print("[%s:%d] ", func, line);
+        if (level == _LOG_LEVEL_INFO) {
+            g_print("[Info: %s:%d] ", func, line);
+        }
+        else if (level == _LOG_LEVEL_WARN) {
+            g_print("[Warning: %s:%d] ", func, line);
+        }
+        else if (level == _LOG_LEVEL_ERR) {
+            g_print("[Error: %s:%d] ", func, line);
+        }
+        else {
+            g_print("[Debug: %s:%d] ", func, line);
+        }
         vprintf(fmt, ap);
     }
 
@@ -102,8 +113,8 @@ static const cli_cmd_desc_t g_cli_cmds[] = {
     { "history",    "",                 "Show config change history" },
     { "save",       "",                 "Save config to file" },
     { "save_as",     "<file>",          "Save config to specified file" },
-    { "show_json",  "",                 "Show all config values with json style" },
-    { "show",       "",                 "Show all config values with plain text" },
+    { "show_json",  "[node]",           "Show a specified prefix node or all nodes config values with json style" },
+    { "show",       "[node]",           "Show a specified prefix node or all nodes config values with plain text" },
     { "help",       "[cmd]",            "Show help for special command or all commands" },
     { "man",        "item",             "Show the description for item" },
     { "quit",       "",                 "Exit CLI" },
@@ -1489,7 +1500,7 @@ static void dump_one(cfg_item_t *it, void *user_data)
     #endif
 }
 
-static int cfg_dump_nodes(const char *parent, JsonNode **out)
+static int cfg_dump_nodes(const char *prefix, JsonNode **out)
 {
     if (!out)
         return -EINVAL;
@@ -1501,19 +1512,19 @@ static int cfg_dump_nodes(const char *parent, JsonNode **out)
     json_node_take_object(root, obj);
 
     g_rw_lock_reader_lock(&cfg_lock);
-    cfg_foreach_item_with_prefix(parent, dump_one, obj);
+    cfg_foreach_item_with_prefix(prefix, dump_one, obj);
     g_rw_lock_reader_unlock(&cfg_lock);
 
     *out = root;
     return 0;
 }
 
-static int cfg_show_sub_json(const char *parent, FILE *out)
+static int cfg_show_sub_json(const char *prefix, FILE *out)
 {
     if (!out)
         out = stdout;
     JsonNode *root;
-    int ret = cfg_dump_nodes(parent, &root);
+    int ret = cfg_dump_nodes(prefix, &root);
     if (ret != 0)
         return ret;
 
@@ -1544,17 +1555,22 @@ static void cfg_show_one(cfg_item_t *it, void *user_data)
     json_node_free(node);
 }
 
-void cfg_show_all(FILE *out)
+static void cfg_show_sub_plain(const char *prefix, FILE *out)
 {
     if (!out)
         out = stdout;
     g_rw_lock_reader_lock(&cfg_lock);
-    cfg_foreach_item_with_prefix(NULL, cfg_show_one, out);
+    cfg_foreach_item_with_prefix(prefix, cfg_show_one, out);
     g_rw_lock_reader_unlock(&cfg_lock);
     return;
 }
 
-int cfg_generate_to_json_data(const char *parent, char **out)
+void cfg_show_all(FILE *out)
+{
+    return cfg_show_sub_plain(NULL, out);
+}
+
+int cfg_generate_to_json_data(const char *prefix, char **out)
 {
     size_t len = 0;
 
@@ -1566,7 +1582,7 @@ int cfg_generate_to_json_data(const char *parent, char **out)
     }
 
     /* 直接复用现有函数 */
-    cfg_show_sub_json(parent, mem);
+    cfg_show_sub_json(prefix, mem);
 
     /* 必须 flush / fclose 才会更新 buf */
     fclose(mem);
@@ -1657,12 +1673,13 @@ static void cfg_cli_man(const char *item, FILE *out)
 
     FOREACH_CFG_ITEM(it) {
         if (strcmp(it->key, item) == 0) {
-            fprintf(out, ">> key: %s\n  type: %s(%ld)\n  flags: %s%s\n  desc: %s\n",
+            fprintf(out, ">> key: %s\n  type: %s(%ld)\n  flags: %s | %s | %s\n  desc: %s\n",
                    it->key,
                    type_size_maps[it->type].type_name,
                    type_size_maps[it->type].size,
-                   (it->flags & CFG_FLAG_RUNTIME) ? "runtime " : "",
-                   (it->flags & CFG_FLAG_RESTART) ? "restart " : "",
+                   (it->flags & CFG_FLAG_RUNTIME) ? "runtime" : "fixed",
+                   (it->flags & CFG_FLAG_RESTART) ? "restart" : "immediate",
+                   (it->flags & CFG_FLAG_TEMPORARY) ? "temporary" : "persistent",
                    it->desc ? it->desc : "");
             return;
         }
@@ -1882,10 +1899,13 @@ static void cfg_exec_line(const char *line, FILE *out)
                 fprintf(out, "Set failed (maybe out of type range), 'man %s' for help\n", kv[0]);
         }
         g_strfreev(kv);
-    } else if (strcmp(cmd, "show") == 0) {
-        cfg_show_all(out);
-    } else if (strcmp(cmd, "show_json") == 0) {
-        cfg_show_all_json(out);
+    } else if (strcmp(cmd, "show") == 0 || g_str_has_prefix(cmd, "show ")) {
+        cmd = g_strstrip(cmd + 4);
+        cfg_show_sub_plain(cmd, out);
+    } else if (g_str_has_prefix(cmd, "show_json")) {
+        // cfg_show_all_json(out);
+        cmd = g_strstrip(cmd + 9);
+        cfg_show_sub_json(cmd, out);
     } else if (strcmp(cmd, "save") == 0) {
         if (!cfg_file_path) {
             fprintf(out, "The saved path is NULL, checking whether cfg_load_file failed to executed before\n");
@@ -2139,6 +2159,10 @@ int cfg_load_file(const char *path)
 
     g_rw_lock_writer_lock(&cfg_lock);
     FOREACH_CFG_ITEM(it) {
+        if ((it->flags & CFG_FLAG_TEMPORARY)) {
+            cfg_info("item %s is a temparory config, dont load from file\n", it->key);
+            continue;
+        }
         JsonNode *n = json_get_by_path(root, it->key);
         if (n && JSON_NODE_HOLDS_VALUE(n)) {
             GType expect = cfg_type_to_gtype(it->type);
@@ -2275,7 +2299,7 @@ int cfg_save_file(const char *path, gboolean force)
     g_rw_lock_reader_lock(&cfg_lock);
     FOREACH_CFG_ITEM(it) {
         JsonNode *value;
-        if (cfg_read_node_from_item(it, &value) == 0) {
+        if (!(it->flags & CFG_FLAG_TEMPORARY) && cfg_read_node_from_item(it, &value) == 0) {
             char *leaf;
             JsonObject *obj = json_get_or_create(root, it->key, &leaf);
             json_object_set_member(obj, leaf, value);

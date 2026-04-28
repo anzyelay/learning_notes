@@ -99,8 +99,9 @@ typedef enum {
 
 typedef enum {
     CFG_FLAG_NONE    = 0,
-    CFG_FLAG_RUNTIME = 1 << 0,   /* CLI / runtime 可修改 */
-    CFG_FLAG_RESTART = 1 << 1    /* 需重启生效 */
+    CFG_FLAG_RUNTIME = 1 << 0,   /* CLI / runtime: Can be runtime overrride */
+    CFG_FLAG_RESTART = 1 << 1,   /* Indicating changed value is applied after restart. it just a indicate flag but the coder is responsible to do this function*/
+    CFG_FLAG_TEMPORARY = 1 << 2    /* This parameter will be reset to default (coded) after reboot, won't be saved and loaded from file */
 } cfg_flag_t;
 
 typedef int (*cfg_on_change_fn)(
