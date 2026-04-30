@@ -1,91 +1,150 @@
 #include "state_on.h"
 #include <stdio.h>
-#include "state_common.h" // 引入注册表和ID
+#include <time.h>
 
-// 定义 OnState 的子状态
-typedef enum {
-    ON_SUBSTATE_NORMAL,
-    ON_SUBSTATE_DELAY_TO_OFF
-} OnSubState_t;
-
-// OnState 管理自己的多种模式
 typedef struct {
-    StateObject base;
-    time_t last_activity_time;      // 正常模式下的最后活动时间
-    time_t delay_start_time;        // 延迟模式下的开始时间
-    OnSubState_t substate;          // 使用枚举，意图更明确
+    StateObject_t base;
+    SMContext_t *sub_ctx; // OnState 管理自己的多种模式
+    LightStateID_t next_id;
 } OnStateData;
 
-LightStateId_t on_handle_event_impl(struct LightContext* ctx, LightEvent_t event) {
-    OnStateData* self_data = (OnStateData*)ctx->current_state;
+typedef struct {
+    StateObject_t base;
+    OnStateData *parent;
+    time_t last_activity_time;      // 切入正常模式下的开始时间
+} OnSubNormalStateData;
 
-    if (event == LIGHT_EVENT_TOGGLE) {
-        if(self_data->substate == ON_SUBSTATE_DELAY_TO_OFF) {
-            // 如果正处于延迟模式，按开关会取消关闭
-            printf("延迟关闭被取消，灯继续保持开启！\n");
-            self_data->substate = ON_SUBSTATE_NORMAL;
-            self_data->last_activity_time = time(NULL);
-            // 保持当前状态，返回其ID
-            return LIGHT_STATE_ID_ON;
-        } else {
-            // 如果处于正常模式，按开关则进入延迟模式
-            printf("灯进入关闭延迟...\n");
-            self_data->substate = ON_SUBSTATE_DELAY_TO_OFF;
-            self_data->delay_start_time = time(NULL);
-            // 依然保持在ON状态，只是内部模式变了
-            return LIGHT_STATE_ID_ON;
+typedef struct {
+    StateObject_t base;
+    OnStateData *parent;
+    time_t delay_start_time;        // 切入延迟模式下的开始时间
+} OnSubDelayStateData;
+
+
+SMStateID_t on_n_handle_event_impl(const struct StateObject* obj, SMEvent_t event) {
+    sm_print_dbg("\t%s handle event %d\n", obj->name, ev);
+    OnSubNormalStateData *self_data = (OnSubNormalStateData*)obj;
+    OnStateData *parent = self_data->parent;
+    LightEvent_t ev = (LightEvent_t)event;
+    if (ev == LIGHT_EVENT_TOGGLE) {
+        // 如果处于正常模式，按开关则进入延迟模式
+        sm_print_info("灯进入关闭延迟...\n");
+        parent->next_id = LIGHT_STATE_ID_ON;
+        return ON_SUBSTATE_DELAY_TO_OFF;
+    }
+    else if (ev == LIGHT_EVENT_IDLE) {
+        // 如果处于正常模式，检查是否超时
+        time_t current_time = time(NULL);
+        if(current_time - self_data->last_activity_time > AUTO_OFF_LONG_DELAY_SECONDS) {
+            sm_print_info("\n[OnState 内部定时器: 长时间未操作，灯自动熄灭！]\n");
+            // 返回下一个状态的ID
+            parent->next_id = LIGHT_STATE_ID_OFF;
+        }
+        else {
+            // 定时器未超时，保持当前状态，返回其ID
+            parent->next_id = LIGHT_STATE_ID_ON;
         }
     }
-
-    // 处理其他事件（如果有），并确保活动时间被更新
-    // 只有在 NORMAL 模式下，其他事件才会重置长时间计时器
-    if(self_data->substate == ON_SUBSTATE_NORMAL) {
-        self_data->last_activity_time = time(NULL);
-    }
-    // 保持当前状态，返回其ID
-    return LIGHT_STATE_ID_ON;
+    return ON_SUBSTATE_NORMAL;
 }
 
-LightStateId_t on_update_timer_impl(struct LightContext* ctx) {
-    OnStateData* self_data = (OnStateData*)ctx->current_state;
-    time_t current_time = time(NULL);
+static const StateVTable on_sub_n_vtable = {
+    .handle_event = on_n_handle_event_impl
+};
 
-    if(self_data->substate == ON_SUBSTATE_DELAY_TO_OFF) {
-        // 如果处于延迟模式，检查延迟是否结束
-        if(current_time - self_data->delay_start_time >= AUTO_OFF_SHORT_DELAY_SECONDS) {
-            printf("\n[OnState 内部定时器: 延迟时间到，灯已关闭]\n");
+StateObject_t *get_on_normal_substate(void *parent) {
+    static OnSubNormalStateData instance = {
+        .base = {&on_sub_n_vtable, "NORMAL ON", ON_SUBSTATE_NORMAL},
+        .parent = NULL,
+        .last_activity_time = 0,
+    };
+    // 切入此状态时设置ON开始时间戳
+    instance.parent = (OnStateData *)parent;
+    instance.last_activity_time = time(NULL);
+    return (StateObject_t *)&instance;
+}
+
+SMStateID_t on_d_handle_event_impl(const struct StateObject *obj, SMEvent_t event) {
+    sm_print_dbg("\t%s handle event %d\n", obj->name, ev);
+    OnSubDelayStateData * self_data = (OnSubDelayStateData*)obj;
+    OnStateData *parent = self_data->parent;
+    LightEvent_t ev = (LightEvent_t)event;
+    if (ev == LIGHT_EVENT_TOGGLE) {
+        // 如果正处于延迟模式，按开关会取消关闭
+        sm_print_info("延迟关闭被取消，灯继续保持开启！\n");
+        parent->next_id = LIGHT_STATE_ID_ON;
+        return ON_SUBSTATE_NORMAL;
+    }
+    else if (ev == LIGHT_EVENT_IDLE) {
+        time_t current_time = time(NULL);
+        if (current_time - self_data->delay_start_time >= AUTO_OFF_SHORT_DELAY_SECONDS) {
+            sm_print_info("\n[OnState 内部定时器: 延迟时间到，灯已关闭]\n");
             // 返回下一个状态的ID
-            return LIGHT_STATE_ID_OFF;
+            parent->next_id = LIGHT_STATE_ID_OFF;
         }
-    } else { // ON_SUBSTATE_NORMAL
-        // 如果处于正常模式，检查是否超时
-        if(current_time - self_data->last_activity_time > AUTO_OFF_LONG_DELAY_SECONDS) {
-            printf("\n[OnState 内部定时器: 长时间未操作，灯自动熄灭！]\n");
-            // 返回下一个状态的ID
-            return LIGHT_STATE_ID_OFF;
+        else {
+            parent->next_id = LIGHT_STATE_ID_ON;
         }
     }
-    // 定时器未超时，保持当前状态，返回其ID
-    return LIGHT_STATE_ID_ON;
+    return ON_SUBSTATE_DELAY_TO_OFF;
+}
+static const StateVTable on_sub_d_vtable = {
+    .handle_event = on_d_handle_event_impl
+};
+
+StateObject_t* get_on_delay_substate(void *parent) {
+    static OnSubDelayStateData instance = {
+        .base = {&on_sub_d_vtable, "DELAY TO OFF", ON_SUBSTATE_DELAY_TO_OFF},
+        .parent = NULL,
+        .delay_start_time = 0,
+    };
+    // 切入此状态时设置DELAY开始时间戳
+    instance.delay_start_time = time(NULL);
+    instance.parent = (OnStateData *)parent;
+    return (StateObject_t *)&instance;
+}
+
+static SMStateID_t on_handle_event_impl(const struct StateObject *obj, SMEvent_t event) {
+    sm_print_dbg("%s handle event %d\n", obj->name, event);
+    OnStateData *self_data = (OnStateData *)obj;
+
+    sm_context_handle_event(self_data->sub_ctx, event);
+
+    return self_data->next_id;
+}
+
+static LeaveResult_t on_handle_leave_impl(struct StateObject *obj) {
+    sm_print_info("%s handle leave\n", obj->name);
+    OnStateData *self_data = (OnStateData *)obj;
+    sm_context_destroy(self_data->sub_ctx);
+    return LEAVE_DO_NOTHING;
 }
 
 static const StateVTable on_vtable = {
     .handle_event = on_handle_event_impl,
-    .update_timer = on_update_timer_impl
+    .handle_leave = on_handle_leave_impl
 };
 
-const StateObject* get_on_state(void) {
+static void on_light_state_changed(const char* old_state_name, const char* new_state_name) {
+    printf("[子系统] 状态: %s -> %s\n", old_state_name, new_state_name);
+}
+
+StateObject_t* get_on_state(void *) {
     // 将状态实例定义为 static const 局部变量，优化内存
     static OnStateData instance = {
         .base = {&on_vtable, "ON", LIGHT_STATE_ID_ON},
-        .last_activity_time = 0,
-        .delay_start_time = 0,
-        .substate = ON_SUBSTATE_NORMAL
+        .sub_ctx = NULL
     };
 
-    // 初始化时设置时间戳
-    instance.last_activity_time = time(NULL);
-    instance.substate = ON_SUBSTATE_NORMAL;
+    GetStateFunction sub_state_registry[] = {
+        [ON_SUBSTATE_NORMAL] = get_on_normal_substate,
+        [ON_SUBSTATE_DELAY_TO_OFF] = get_on_delay_substate
+    };
 
-    return (const StateObject*)&instance;
+    instance.sub_ctx = sm_context_create("CLOM", sub_state_registry,
+                            SM_ARRAY_SIZE(sub_state_registry), &instance);
+    sm_context_set_on_state_change_callback(instance.sub_ctx, on_light_state_changed);
+    sm_context_intial_state(instance.sub_ctx, ON_SUBSTATE_NORMAL);
+
+    return (StateObject_t *)&instance;
 }

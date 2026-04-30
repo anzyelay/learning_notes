@@ -1,8 +1,9 @@
 #ifndef STATE_OFF_H
 #define STATE_OFF_H
 
-#include "state_common.h"
+#include "state_machine.h"
+#include "light_state_id.h" // 引入注册表和ID
 
-const StateObject* get_off_state(void);
+StateObject_t* get_off_state(void *);
 
 #endif // STATE_OFF_H

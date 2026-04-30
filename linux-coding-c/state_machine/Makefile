@@ -4,7 +4,7 @@
 CC=gcc
 
 # 编译选项
-CFLAGS=-std=c99 -Wall -Wextra -O2
+CFLAGS=-std=c99 -Wall -Wextra -g
 
 # 目标文件名
 TARGET=smart_light
