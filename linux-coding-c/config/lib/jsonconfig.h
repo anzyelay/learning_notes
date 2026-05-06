@@ -116,13 +116,19 @@ typedef enum {
     CFG_FLAG_NONE    = 0,
     CFG_FLAG_RUNTIME = 1 << 0,   /* CLI / runtime: Can be runtime overrride */
     CFG_FLAG_RESTART = 1 << 1,   /* Indicating changed value is applied after restart. it just a indicate flag but the coder is responsible to do this function*/
-    CFG_FLAG_TEMPORARY = 1 << 2    /* This parameter will be reset to default (coded) after reboot, won't be saved and loaded from file */
+    CFG_FLAG_TEMPORARY = 1 << 2,    /* This parameter will be reset to default (coded) after reboot, won't be saved and loaded from file */
+    CFG_FLAG_DIRTY = 1 << 3
 } cfg_flag_t;
 
 typedef int (*cfg_on_change_fn)(
     const void *oldv,
     const void *newv
 );
+
+struct list {
+    struct list *next;
+    // struct list *prev;
+};
 
 typedef struct cfg_item {
     const char *key; // unique key, e.g. "server.port", used for lookup and CLI commands
@@ -136,8 +142,12 @@ typedef struct cfg_item {
     int (*validator)(void *); // optional, validate the new value before commit, return 0 if valid, -1 if invalid
     cfg_on_change_fn on_change; // optional, called after value is changed, with old and new value
 
-    unsigned flags;
-    struct cfg_item *next;
+    cfg_flag_t flags;
+    struct list list;
+
+    // multiple config file core struct
+    const char *default_file; // declare layer, register; suggest where to save
+    const char *source_file; //  reality layer, runtime; where this item loaded from or saved to. if not loaded, using default to override it for saving
 } cfg_item_t;
 
 #define CFG_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
@@ -156,8 +166,8 @@ typedef struct cfg_item {
                       "CFG_STRING storage must be string")
 
 /* ---- Basic cfg item declarations ---- */
-#define CFG_ITEM_VC(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, _valid_fun_, _on_change_)        \
-    {                                            \
+#define CFG_ITEM_IMPL(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, ...)        \
+    ((cfg_item_t){                                            \
         .key = (_key_),                            \
         .desc = (_desc_),                          \
         .type = (_type_),                         \
@@ -165,46 +175,44 @@ typedef struct cfg_item {
         .storage = &(_storage_),                    \
         .storage_size = sizeof(typeof(_storage_)),       \
         .from_json = (_from_json_),          \
-        .validator = _valid_fun_,          \
-        .on_change = _on_change_,          \
-        .next = NULL                            \
-    }
+        __VA_ARGS__                         \
+    })
 
-#define CFG_ITEM_V(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, valid_fun)        \
-    CFG_ITEM_VC(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, valid_fun, NULL)
+#define CFG_ITEM(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, ...)        \
+    CFG_ITEM_IMPL(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, .validator = NULL,  .on_change = NULL, __VA_ARGS__)
 
-#define CFG_ITEM(_type_, _key_, _storage_, _desc_, _flags_, _from_json_)        \
-    CFG_ITEM_V(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, NULL)
+#define CFG_ITEM_V(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, valid_fun, ...)        \
+    CFG_ITEM_IMPL(_type_, _key_, _storage_, _desc_, _flags_, _from_json_, .validator = valid_fun,  .on_change = NULL, __VA_ARGS__)
 
-#define CFG_INT_AUTO_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)        \
-    CFG_ITEM_V(CFG_INT_AUTO, _key_, _storage_, _desc_, _flags_, cfg_from_json_int, valid_fun)
+#define CFG_INT_AUTO_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun, ...)        \
+    CFG_ITEM_V(CFG_INT_AUTO, _key_, _storage_, _desc_, _flags_, cfg_from_json_int, valid_fun, __VA_ARGS__)
 
-#define CFG_BOOL_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)       \
-    CFG_ITEM_V(CFG_BOOL, _key_, _storage_, _desc_, _flags_, cfg_from_json_bool, valid_fun)
+#define CFG_BOOL_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun, ...)       \
+    CFG_ITEM_V(CFG_BOOL, _key_, _storage_, _desc_, _flags_, cfg_from_json_bool, valid_fun, __VA_ARGS__)
 
-#define CFG_FLOAT_ITEM_V(_key_, _storage_, _desc_, _flags_)     \
-    CFG_ITEM_V(CFG_FLOAT, _key_, _storage_, _desc_, _flags_, cfg_from_json_double, valid_fun)
+#define CFG_FLOAT_ITEM_V(_key_, _storage_, _desc_, _flags_, ...)     \
+    CFG_ITEM_V(CFG_FLOAT, _key_, _storage_, _desc_, _flags_, cfg_from_json_double, valid_fun, __VA_ARGS__)
 
-#define CFG_DOUBLE_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)     \
-    CFG_ITEM_V(CFG_DOUBLE, _key_, _storage_, _desc_, _flags_, cfg_from_json_double, valid_fun)
+#define CFG_DOUBLE_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun, ...)     \
+    CFG_ITEM_V(CFG_DOUBLE, _key_, _storage_, _desc_, _flags_, cfg_from_json_double, valid_fun, __VA_ARGS__)
 
-#define CFG_STRING_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun)     \
-    CFG_ITEM_V(CFG_STRING, _key_, _storage_, _desc_, _flags_, cfg_from_json_string, valid_fun)
+#define CFG_STRING_ITEM_V(_key_, _storage_, _desc_, _flags_, valid_fun, ...)     \
+    CFG_ITEM_V(CFG_STRING, _key_, _storage_, _desc_, _flags_, cfg_from_json_string, valid_fun, __VA_ARGS__)
 
-#define CFG_INT_ITEM(_key_, _storage_, _desc_, _flags_)        \
-    CFG_INT_AUTO_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+#define CFG_INT_ITEM(_key_, _storage_, _desc_, _flags_, ...)        \
+    CFG_INT_AUTO_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL, __VA_ARGS__)
 
-#define CFG_BOOL_ITEM(_key_, _storage_, _desc_, _flags_)       \
-    CFG_BOOL_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+#define CFG_BOOL_ITEM(_key_, _storage_, _desc_, _flags_, ...)       \
+    CFG_BOOL_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL, __VA_ARGS__)
 
-#define CFG_FLOAT_ITEM(_key_, _storage_, _desc_, _flags_)     \
-    CFG_FLOAT_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+#define CFG_FLOAT_ITEM(_key_, _storage_, _desc_, _flags_, ...)     \
+    CFG_FLOAT_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL, __VA_ARGS__)
 
-#define CFG_DOUBLE_ITEM(_key_, _storage_, _desc_, _flags_)     \
-    CFG_DOUBLE_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+#define CFG_DOUBLE_ITEM(_key_, _storage_, _desc_, _flags_, ...)     \
+    CFG_DOUBLE_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL, __VA_ARGS__)
 
-#define CFG_STRING_ITEM(_key_, _storage_, _desc_, _flags_)     \
-    CFG_STRING_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL)
+#define CFG_STRING_ITEM(_key_, _storage_, _desc_, _flags_, ...)     \
+    CFG_STRING_ITEM_V(_key_, _storage_, _desc_, _flags_, NULL, __VA_ARGS__)
 
 
 /* ---------- type handlers ---------- */
@@ -279,19 +287,37 @@ int cfg_register(cfg_item_t *item);
  * @brief load configuration from a JSON file. The JSON structure should match the expected format for the registered configuration items.
  *        The function will read the file, parse the JSON, and for each registered configuration item,
  *        it will look up the corresponding value in the JSON and update the configuration accordingly.
+ *        IF ITEMS FROM MANY CONFIG FILES, THIS METHOD SHOULD BE CALLED RESPECTIVELY FOR EACH ONE, AND
+ *        CALL cfg_save_all LATELY TO SAVE TO DIFFERENT FILES.
  *
  * @param path : the file path to load from. If the file does not exist or cannot be read, an error will be returned.
+ * @param domain: only load the item with domain as the key's prefix. use to filter
  * @return int : 0 on success, -1 on failure (e.g. file not found, JSON parse error, type mismatch)
+ */
+int cfg_load_file_in_domain(const char *path, const char *domain);
+/**
+ * @brief  like cfg_load_file_in_domain, just as the argument domain is NULL. load as much as possible
+ *
+ * @param path
+ * @return int
  */
 int cfg_load_file(const char *path);
 /**
- * @brief cfg_save_file saves the current registered items configuration to a file.
+ * @brief cfg_save_file saves the current registered items, which has 'domain' prefix, to the file 'path'
  *
- * @param path : the file path to save to. If NULL, it will save to the last loaded file path.
+ * @param path : the file path to save to. cannot be NULL
+ * @param domain: the items out of domain will be ignored while saving, make it NULL/EMPTY to save all
+ * @return int : 0 on success, -1 on failure (e.g. file write error)
+ */
+int cfg_save_file(const char *path, const char *domain);
+/**
+ * @brief save the whole(force is true) or changed(force is false) registered items to the source files
+ *        where they are loaded from, or default file if not loaded.
+ *
  * @param force : if TRUE, it will save even if there are no changes since the last save. If FALSE, it will skip saving if there are no changes.
  * @return int : 0 on success, -1 on failure (e.g. file write error)
  */
-int cfg_save_file(const char *path, gboolean force);
+int cfg_save_all(gboolean force);
 
 /* ---------- show ----------  */
 int cfg_show_all_json(FILE *out);
@@ -301,11 +327,11 @@ void cfg_history_show(FILE *out);
 /**
  * @brief : Generate a JSON string representing the current configuration, optionally filtered by a key prefix.
  *
- * @param prefix : if not NULL or empty, only include configuration items whose keys start with this prefix. If NULL or empty, include all items.
+ * @param domain: if not NULL or empty, only include configuration items whose keys start with this domain. If NULL or empty, include all items.
  * @param out : Output pointer, will be set to a newly allocated string containing the JSON data. Caller must free it with g_free().
  * @return int : 0 on failure, or the length of the generated JSON string on success.
  */
-int cfg_generate_to_json_data(const char *prefix, char **out);
+int cfg_generate_to_json_data(const char *domain, char **out);
 
 /* ---------- typed get (not used by CLI ) ----------
  * Typed read APIs

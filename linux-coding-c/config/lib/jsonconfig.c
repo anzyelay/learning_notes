@@ -60,8 +60,23 @@ static void cfg_printf_impl(unsigned int level, const char *func, int line, cons
     va_end(ap);
 }
 
-#define FOREACH_CFG_ITEM(it) \
-    for (cfg_item_t *it = cfg_list; it; it = it->next)
+#define container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - G_STRUCT_OFFSET(type, member)))
+
+
+#define FOREACH_CFG_ITEM(it)                                      \
+    for (cfg_item_t *it = (cfg_list ? container_of(cfg_list, cfg_item_t, list) : NULL);      \
+            it; \
+            it = (it->list.next ?  container_of(it->list.next, cfg_item_t, list) : NULL))
+
+#define IN_DOMAIN_CONDITION(prefix)   \
+        if (prefix == NULL || strlen(prefix) == 0 \
+             || g_str_has_prefix(it->key, prefix))
+
+#define OUT_DOMAIN_CONDITION(prefix)   \
+        if (prefix != NULL && strlen(prefix) != 0 \
+             && !g_str_has_prefix(it->key, prefix))
+
 
 typedef enum {
     CFG_TASK_CHANGE,
@@ -113,8 +128,8 @@ static const cli_cmd_desc_t g_cli_cmds[] = {
     { "set",        "<key> <value>",    "Set config value (runtime)" },
     { "status",     "",                 "Show system status" },
     { "history",    "",                 "Show config change history" },
-    { "save",       "",                 "Save config to file" },
-    { "save_as",     "<file>",          "Save config to specified file" },
+    { "save",       "",                 "Save config to files where they loaded from" },
+    { "save_as",     "<file>",          "Save config to a specified file" },
     { "show_json",  "[node]",           "Show a specified prefix node or all nodes config values with json style" },
     { "show",       "[node]",           "Show a specified prefix node or all nodes config values with plain text" },
     { "help",       "[cmd]",            "Show help for special command or all commands" },
@@ -132,7 +147,8 @@ static char *cfg_raw_to_string(cfg_type_t type,
 
 /* ---------- globals ---------- */
 
-static cfg_item_t *cfg_list = NULL;
+// static cfg_item_t *cfg_list = NULL;
+static struct list *cfg_list = NULL;
 static GHashTable *cfg_items_map;      // 新增哈希索引
 static GRWLock cfg_lock;
 static GAsyncQueue *cfg_change_queue;
@@ -143,9 +159,6 @@ static gboolean g_needs_restart = FALSE;
 static GPtrArray *g_restart_reasons = NULL;   // cfg_item_t*
 
 static GQueue cfg_audit_log;   // 有上限，比如 1000
-gboolean is_changed_from_last_save = TRUE;
-
-static char *cfg_file_path = NULL;
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -236,7 +249,9 @@ static void cfg_audit_record(cfg_item_t *it, const void *oldv, const void *newv)
         g_free(old);
     }
     g_queue_push_tail(&cfg_audit_log, e);
-    is_changed_from_last_save = TRUE;
+
+    if (!(it->flags & CFG_FLAG_TEMPORARY))
+        it->flags |= CFG_FLAG_DIRTY;
 }
 
 static void cfg_audit_entry_print(cfg_audit_entry_t *entry, void *user_data)
@@ -758,8 +773,8 @@ int cfg_register(cfg_item_t *item)
         return -1;
     }
 
-    item->next = cfg_list;
-    cfg_list = item;
+    item->list.next = cfg_list;
+    cfg_list = &item->list;
 
     // 同步更新哈希索引
     g_hash_table_insert( cfg_items_map, (gpointer)item->key, item);
@@ -880,7 +895,7 @@ static int cfg_commit_value(cfg_item_t *it, JsonNode *node)
     GType actual = json_node_get_value_type(node);
 
     if (actual != expect) {
-        cfg_warning("Not expected type for item %s, return -EINVAL\n", it->key);
+        cfg_warning("Not expected type for item '%s', return -EINVAL\n", it->key);
         return -EINVAL;
     }
 
@@ -1471,8 +1486,7 @@ static void cfg_foreach_item_with_prefix(const char *prefix, cfg_iter_fn fn, voi
         return;
 
     FOREACH_CFG_ITEM(it) {
-        if (prefix == NULL || strlen(prefix) == 0
-             || g_str_has_prefix(it->key, prefix)) {
+        IN_DOMAIN_CONDITION(prefix) {
             fn(it, usr_data);
         }
     }
@@ -1572,7 +1586,7 @@ void cfg_show_all(FILE *out)
     return cfg_show_sub_plain(NULL, out);
 }
 
-int cfg_generate_to_json_data(const char *prefix, char **out)
+int cfg_generate_to_json_data(const char *domain, char **out)
 {
     size_t len = 0;
 
@@ -1584,7 +1598,7 @@ int cfg_generate_to_json_data(const char *prefix, char **out)
     }
 
     /* 直接复用现有函数 */
-    cfg_show_sub_json(prefix, mem);
+    cfg_show_sub_json(domain, mem);
 
     /* 必须 flush / fclose 才会更新 buf */
     fclose(mem);
@@ -1594,10 +1608,30 @@ int cfg_generate_to_json_data(const char *prefix, char **out)
 
 void cfg_show_status(FILE *out)
 {
+    char file_paths[FILENAME_MAX*50];
+    memset(file_paths, 0, sizeof(file_paths));
+    gboolean is_changed_from_last_save = FALSE;
+    int index = 0;
+    FOREACH_CFG_ITEM(it) {
+        if (it->flags & CFG_FLAG_DIRTY) {
+            is_changed_from_last_save = TRUE;
+        }
+
+        const char* file = it->source_file ? : it->default_file;
+
+        if (!file)
+            continue;
+
+        if (strstr(file_paths, file) == NULL) {
+            strncpy(&file_paths[index], file, sizeof(file_paths)-2-index);
+            index = strlen(file_paths);
+            file_paths[index++]=';';
+        }
+    }
     if (!out)
         out = stdout;
     fprintf(out, "running\n");
-    fprintf(out, "config-file: %s\n", cfg_file_path ? cfg_file_path : "<none>");
+    fprintf(out, "source-files: %s\n", file_paths);
     fprintf(out, "total-items: %d\n", g_hash_table_size(cfg_items_map));
     fprintf(out, "total-audit-entries: %d\n", g_queue_get_length(&cfg_audit_log));
     fprintf(out, "value-changed: %s\n", is_changed_from_last_save ? "true" : "false");
@@ -1675,14 +1709,17 @@ static void cfg_cli_man(const char *item, FILE *out)
 
     FOREACH_CFG_ITEM(it) {
         if (strcmp(it->key, item) == 0) {
-            fprintf(out, ">> key: %s\n  type: %s(%ld)\n  flags: %s | %s | %s\n  desc: %s\n",
+            fprintf(out, ">> key: %s\n  type: %s(%ld)\n  flags: %s | %s | %s | %s\n  desc: %s\n  source_file: %s\n",
                    it->key,
                    type_size_maps[it->type].type_name,
                    type_size_maps[it->type].size,
                    (it->flags & CFG_FLAG_RUNTIME) ? "runtime" : "fixed",
                    (it->flags & CFG_FLAG_RESTART) ? "restart" : "immediate",
                    (it->flags & CFG_FLAG_TEMPORARY) ? "temporary" : "persistent",
-                   it->desc ? it->desc : "");
+                   (it->flags & CFG_FLAG_DIRTY) ? "changed" : "unchanged",
+                   it->desc ? it->desc : "",
+                   it->source_file ? : it->default_file ? : ""
+                );
             return;
         }
     }
@@ -1909,17 +1946,13 @@ static void cfg_exec_line(const char *line, FILE *out)
         cmd = g_strstrip(cmd + 9);
         cfg_show_sub_json(cmd, out);
     } else if (strcmp(cmd, "save") == 0) {
-        if (!cfg_file_path) {
-            fprintf(out, "The saved path is NULL, checking whether cfg_load_file failed to executed before\n");
-            return;
-        }
-        if (cfg_save_file(NULL, FALSE) == 0)
+        if (cfg_save_all(FALSE) == 0)
             fprintf(out, "Config saved successfully.\n");
         else
-            fprintf(out, "Failed to save config.(maybe no changes to save)\n");
+            fprintf(out, "Failed to save config.(maybe no changes to save or no source file path)\n");
     } else if (g_str_has_prefix(cmd, "save_as ")) {
         cmd = g_strstrip(cmd + strlen("save_as "));
-        if (cfg_save_file(cmd, TRUE) == 0)
+        if (cfg_save_file(cmd, NULL) == 0)
             fprintf(out, "Config saved successfully to %s.\n", cmd);
         else
             fprintf(out, "Failed to save config to %s.\n", cmd);
@@ -2147,8 +2180,7 @@ void cfg_cli_client_run(char *server_name)
 }
 
 /* ---------- load / save ---------- */
-
-int cfg_load_file(const char *path)
+int cfg_load_file_in_domain(const char *path, const char *domain)
 {
     JsonParser *parser = json_parser_new();
     if (!json_parser_load_from_file(parser, path, NULL)) {
@@ -2161,8 +2193,12 @@ int cfg_load_file(const char *path)
 
     g_rw_lock_writer_lock(&cfg_lock);
     FOREACH_CFG_ITEM(it) {
+        OUT_DOMAIN_CONDITION(domain) {
+            cfg_info("ignore item '%s' as not in domain '%s'\n", it->key, domain);
+            continue;
+        }
         if ((it->flags & CFG_FLAG_TEMPORARY)) {
-            cfg_info("item %s is a temparory config, dont load from file\n", it->key);
+            cfg_info("item '%s' is a temparory config, dont load from file\n", it->key);
             continue;
         }
         JsonNode *n = json_get_by_path(root, it->key);
@@ -2170,7 +2206,15 @@ int cfg_load_file(const char *path)
             GType expect = cfg_type_to_gtype(it->type);
             GType actual = json_node_get_value_type(n);
             if (actual == expect) {
-                ret += it->from_json(n, it);
+                int tmp = it->from_json(n, it);
+                if (!it->source_file) {
+                    it->source_file = path;
+                }
+                // means some keys are not match with the file so that let it be overwriting
+                if (tmp) {
+                    it->flags |= CFG_FLAG_DIRTY;
+                }
+                ret += tmp;
             }
             else {
                 cfg_warning("Type mismatch for key '%s': expected %s but got %s\n",
@@ -2185,17 +2229,13 @@ int cfg_load_file(const char *path)
 
     g_object_unref(parser);
 
-    // means some keys are not match with the file so that let it be overwriting
-    if (!ret)
-        is_changed_from_last_save = FALSE;
-
-    if ( cfg_file_path == NULL || g_strcmp0(cfg_file_path, path) != 0) {
-        if (cfg_file_path)
-            g_free(cfg_file_path);
-        cfg_file_path = g_strdup(path);
-    }
-
     return ret;
+
+}
+
+int cfg_load_file(const char *path)
+{
+    return cfg_load_file_in_domain(path, NULL);
 }
 
 /*
@@ -2282,15 +2322,11 @@ out:
     return ret;
 }
 
-int cfg_save_file(const char *path, gboolean force)
-{
-    if (!is_changed_from_last_save && !force) {
-        cfg_info("No changes since last save, skipping write.\n");
-        return -1;
-    }
 
-    if (!path && !cfg_file_path) {
-        cfg_error("check whether cfg_load_file failed to executed if path is NULL!\n");
+int cfg_save_file(const char *path, const char *domain)
+{
+    if (!path) {
+        cfg_error("the path is NULL!\n");
         return -1;
     }
 
@@ -2300,12 +2336,14 @@ int cfg_save_file(const char *path, gboolean force)
 
     g_rw_lock_reader_lock(&cfg_lock);
     FOREACH_CFG_ITEM(it) {
-        JsonNode *value;
-        if (!(it->flags & CFG_FLAG_TEMPORARY) && cfg_read_node_from_item(it, &value) == 0) {
-            char *leaf;
-            JsonObject *obj = json_get_or_create(root, it->key, &leaf);
-            json_object_set_member(obj, leaf, value);
-            g_free(leaf);
+        IN_DOMAIN_CONDITION(domain) {
+            JsonNode *value;
+            if (!(it->flags & CFG_FLAG_TEMPORARY) && cfg_read_node_from_item(it, &value) == 0) {
+                char *leaf;
+                JsonObject *obj = json_get_or_create(root, it->key, &leaf);
+                json_object_set_member(obj, leaf, value);
+                g_free(leaf);
+            }
         }
     }
     g_rw_lock_reader_unlock(&cfg_lock);
@@ -2317,17 +2355,166 @@ int cfg_save_file(const char *path, gboolean force)
     gsize data_len;
     char *data = json_generator_to_data(gen, &data_len);
 
-    int ret = atomic_write_file(path ? path : cfg_file_path, data, data_len);
-    if (ret == 0) {
-        if (!force)
-            is_changed_from_last_save = FALSE;
-    }
+    int ret = atomic_write_file(path, data, data_len);
 
     g_free(data);
     g_object_unref(gen);
     json_node_free(node);
     return ret;
 }
+
+typedef struct cfg_out_file {
+    const char   *filename;
+    JsonObject   *root;
+    struct cfg_out_file *next;
+} cfg_out_file_t;
+
+static cfg_out_file_t *cfg_get_out_file(cfg_out_file_t **list, const char *filename)
+{
+    if (!filename) {
+        cfg_error("the filename is NULL!\n");
+        return NULL;
+    }
+
+    for (cfg_out_file_t *f = *list; f; f = f->next) {
+        if (strcmp(f->filename, filename) == 0)
+            return f;
+    }
+
+    cfg_out_file_t *f = g_new0(cfg_out_file_t, 1);
+    f->filename = filename;
+    f->next     = *list;
+    *list       = f;
+
+    JsonParser *parser = json_parser_new();
+    if (json_parser_load_from_file(parser, filename, NULL)) {
+        // not clear up the file's unload keys, just overwrite the keys which is registered.
+        JsonNode *root = json_parser_get_root(parser);
+        if (!root) {
+            f->root = json_object_new();
+        }
+        else
+            f->root = json_object_ref(json_node_get_object(root));
+        g_object_unref(parser);
+    }
+    else {
+        cfg_warning("a invalid  or empty json file: %s, overwrite it!\n", filename);
+        f->root = json_object_new();
+    }
+
+    return f;
+}
+
+int cfg_save_all(gboolean force)
+{
+    int ret = 0;
+    cfg_out_file_t *out_files = NULL;
+
+    // collect items from same source file
+    g_rw_lock_reader_lock(&cfg_lock);
+    FOREACH_CFG_ITEM(it) {
+        if (it->flags & CFG_FLAG_TEMPORARY) {
+            continue;
+        }
+
+        if (!it->source_file) {
+            it->source_file = it->default_file;
+            if (!it->source_file) {
+                cfg_error("the item '%s' was loaded from nowhere, ALSO NO DEFAULT! \
+                    should set DEFAULT in declare period\n"
+                    , it->key);
+                continue;
+            }
+            cfg_warning("the item '%s' was loaded from nowhere, save it to default: %s!\n"
+                    , it->key, it->source_file);
+        }
+
+        if (!force  && !(it->flags & CFG_FLAG_DIRTY)) {
+            continue;
+        }
+
+        JsonNode *node;
+        if (cfg_read_node_from_item(it, &node) == 0) {
+            cfg_out_file_t *f = cfg_get_out_file(&out_files, it->source_file);
+            if (f) {
+                char *leaf;
+                JsonObject *obj = json_get_or_create(f->root, it->key, &leaf);
+                json_object_set_member(obj, leaf, node);
+                g_free(leaf);
+            }
+        }
+    }
+
+    if (out_files == NULL) {
+        cfg_info("No changes since last save or save to nowhere, skipping write.\n");
+        g_rw_lock_reader_unlock(&cfg_lock);
+        return -1;
+    }
+
+    // write files
+    for (cfg_out_file_t *f = out_files; f; f = f->next) {
+        JsonNode *node = json_node_new(JSON_NODE_OBJECT);
+        json_node_take_object(node, f->root);
+
+        JsonGenerator *gen = json_generator_new();
+        json_generator_set_root(gen, node);
+        json_generator_set_pretty(gen, TRUE);
+
+        gsize data_len;
+        char *data = json_generator_to_data(gen, &data_len);
+
+        if (atomic_write_file(f->filename, data, data_len) != 0) {
+            ret = -1;
+            cfg_error("failed to save %d bytes to file: %s\n", data_len, f->filename);
+        }
+        else {
+            FOREACH_CFG_ITEM(it) {
+                if ((it->flags & CFG_FLAG_DIRTY) &&
+                                it->source_file &&
+                                strcmp(it->source_file, f->filename) == 0) {
+                                it->flags &= ~CFG_FLAG_DIRTY;
+                }
+            }
+        }
+
+        g_free(data);
+        g_object_unref(gen);
+        json_node_free(node);
+    }
+
+    g_rw_lock_reader_unlock(&cfg_lock);
+
+    while(out_files) {
+        cfg_out_file_t *n = out_files->next;
+        g_free(out_files);
+        out_files = n;
+    }
+
+    return ret;
+}
+
+// int cfg_save_all(void)
+// {
+//     GHashTable *files = g_hash_table_new(g_str_hash, g_str_equal);
+
+//     /* collect the files which need be saved*/
+//     FOREACH_CFG_ITEM(it) {
+//         if ((it->flags & CFG_FLAG_DIRTY) && it->source_file)
+//             g_hash_table_add(files, (gpointer)it->source_file);
+//     }
+
+//     /* save file iteral */
+//     GHashTableIter iter;
+//     gpointer key;
+//     g_hash_table_iter_init(&iter, files);
+
+//     while (g_hash_table_iter_next(&iter, &key, NULL)) {
+//         cfg_save_file((const char *)key);
+//     }
+
+//     g_hash_table_destroy(files);
+//     return 0;
+// }
 
 /* ---------- system init ---------- */
 void cfg_system_init(void)

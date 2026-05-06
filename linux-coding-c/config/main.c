@@ -19,12 +19,14 @@ static cfg_item_t cfg_table[] = {
         , g_port
         , "the port to listen on"
         , CFG_FLAG_RUNTIME
+        , .default_file = "/tmp/config.json"
     ),
     CFG_INT_ITEM(
         "server.data"
         , g_data
         , "the data to use"
         , CFG_FLAG_RUNTIME
+        , .default_file = "/tmp/config.json"
     ),
     CFG_DOUBLE_ITEM(
         "log.version"
@@ -37,18 +39,21 @@ static cfg_item_t cfg_table[] = {
         , g_float_data
         , "some float data for test"
         , CFG_FLAG_RUNTIME
+        , .default_file = "/tmp/config.json"
     ),
     CFG_BOOL_ITEM(
         "server.debug"
         , g_debug
         , "enable debug mode"
         , CFG_FLAG_RUNTIME
+        , .default_file = "/tmp/config.json"
     ),
     CFG_STRING_ITEM(
         "log.path"
         , g_log_path
         , "the path to the log file"
         , CFG_FLAG_RESTART | CFG_FLAG_RUNTIME
+        , .default_file = "/tmp/log_config.json"
     ),
     CFG_STRING_ITEM("server.ip", g_ip, "the IP address to bind to", CFG_FLAG_RUNTIME),
 };
@@ -87,8 +92,12 @@ int main(int argc, char **argv)
     }
 
     if (cfg_load_file("/tmp/config.json")) {
-        printf("Failed to load config file\n");
-        return -1;
+        // printf("Failed to load config file\n");
+        // return -1;
+    }
+    if (cfg_load_file("/tmp/log_config.json")) {
+        // printf("Failed to load config file\n");
+        // return -1;
     }
 
     char * ret = cfg_cli_read("server.port");
