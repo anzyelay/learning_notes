@@ -63,20 +63,97 @@ static void cfg_printf_impl(unsigned int level, const char *func, int line, cons
 #define container_of(ptr, type, member) \
     ((type *)((char *)(ptr) - G_STRUCT_OFFSET(type, member)))
 
+#define FOREACH_CFG_LIST(type, var, head) \
+    for (struct list *__p = (head); \
+         __p && ((var) = container_of(__p, type, list) , 1); \
+         __p = __p->next)
 
-#define FOREACH_CFG_ITEM(it)                                      \
-    for (cfg_item_t *it = (cfg_list ? container_of(cfg_list, cfg_item_t, list) : NULL);      \
-            it; \
-            it = (it->list.next ?  container_of(it->list.next, cfg_item_t, list) : NULL))
+#define FOREACH_CFG_ITEM(it)    FOREACH_CFG_LIST(cfg_item_t, it, g_cfg_instance.list_head)
 
-#define IN_DOMAIN_CONDITION(prefix)   \
-        if (prefix == NULL || strlen(prefix) == 0 \
-             || g_str_has_prefix(it->key, prefix))
+static inline void cfg_list_add(struct list **head, struct list *p)
+{
+    p->next = *head;
+    *head = p;
+}
 
-#define OUT_DOMAIN_CONDITION(prefix)   \
-        if (prefix != NULL && strlen(prefix) != 0 \
-             && !g_str_has_prefix(it->key, prefix))
+#if 0
+struct cfg_item_ref {
+    cfg_item_t   *item;  /* 指向原 cfg_item */
+    struct list   list;  /* 影子链表节点 */
+};
 
+static struct list *cfg_list_clone(void)
+{
+    struct list *dst_head = NULL;
+    cfg_item_t *it = NULL;
+    FOREACH_CFG_ITEM(it) {
+        struct cfg_item_ref *ref = malloc(sizeof(*ref));
+        ref->item = it;
+
+        /* 把 ref->list 挂到 dst_head */
+        ref->list.next = dst_head;
+        dst_head = &ref->list;
+    }
+    return dst_head;
+}
+static void cfg_list_free(struct list *head)
+{
+    struct list *c = head;
+    while (c) {
+        struct list *n = c->next;
+        struct cfg_item_ref *ref = container_of(c, struct cfg_item_ref, list);
+        free(ref);
+        c = n;
+    }
+}
+/**
+ * @brief
+ *
+ * @param head : DESTRUCTIVE input, the members filtered will be free inner.
+ * @param fn
+ * @return struct list*
+ */
+static struct list *cfg_list_filter_consume(struct list *head, gboolean (*fn)(cfg_item_t *))
+{
+    struct list *new_lists = NULL;
+    struct list *c = head;
+    while (c) {
+        struct list *n = c->next;
+        struct cfg_item_ref *ref = container_of(c, struct cfg_item_ref, list);
+        if (fn(ref->item)) {
+            c->next = new_lists;
+            new_lists = c;
+        }
+        else {
+            free(ref);
+        }
+        c = n;
+    }
+    return new_lists;
+}
+
+void cfg_list_test(void) {
+    gboolean is_dirty(cfg_item_t *it) {
+        return it->flags & CFG_FLAG_DIRTY;
+    }
+    // gboolean is_temp(cfg_item_t *it) {
+    //     return it->flags & CFG_FLAG_TEMPORARY;
+    // }
+    struct list *view = cfg_list_clone();
+    // destructive reduce on the view
+    view = cfg_list_filter_consume(view, is_dirty);
+    // view = cfg_list_filter_consume(view, is_temp);
+
+    // using view
+    struct cfg_item_ref *ref = NULL;
+    FOREACH_CFG_LIST(struct cfg_item_ref, ref, view) {
+        printf("dirty key=%s\n", ref->item->key);
+    }
+
+    // clear up
+    cfg_list_free(view);
+}
+#endif
 
 typedef enum {
     CFG_TASK_CHANGE,
@@ -147,18 +224,23 @@ static char *cfg_raw_to_string(cfg_type_t type,
 
 /* ---------- globals ---------- */
 
-// static cfg_item_t *cfg_list = NULL;
-static struct list *cfg_list = NULL;
-static GHashTable *cfg_items_map;      // 新增哈希索引
-static GRWLock cfg_lock;
+static struct {
+    struct list *list_head;
+    gboolean needs_restart;
+    GRWLock rwlock;
+    GHashTable *items_map;      // 新增哈希索引
+    GPtrArray *restart_reasons;   // cfg_item_t*
+    GQueue cfg_audit_log;   // 有上限，比如 1000
+} g_cfg_instance = {
+    .list_head = NULL,
+    .needs_restart = FALSE,
+    .items_map = NULL,
+    .restart_reasons = NULL,
+};
+
 static GAsyncQueue *cfg_change_queue;
 static GThread *cfg_change_thread = NULL;
 static gsize cfg_initialized = 0;
-
-static gboolean g_needs_restart = FALSE;
-static GPtrArray *g_restart_reasons = NULL;   // cfg_item_t*
-
-static GQueue cfg_audit_log;   // 有上限，比如 1000
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -241,17 +323,18 @@ static void cfg_audit_record(cfg_item_t *it, const void *oldv, const void *newv)
     e->new_value = cfg_raw_to_string(it->type, newv, CFG_FMT_PLAIN);
     e->ts = time(NULL);
 
-    if (g_queue_get_length(&cfg_audit_log) == 1000) {
-        cfg_audit_entry_t *old = g_queue_pop_head(&cfg_audit_log);
+    if (g_queue_get_length(&g_cfg_instance.cfg_audit_log) == 1000) {
+        cfg_audit_entry_t *old = g_queue_pop_head(&g_cfg_instance.cfg_audit_log);
         g_free(old->key);
         g_free(old->old_value);
         g_free(old->new_value);
         g_free(old);
     }
-    g_queue_push_tail(&cfg_audit_log, e);
+    g_queue_push_tail(&g_cfg_instance.cfg_audit_log, e);
 
-    if (!(it->flags & CFG_FLAG_TEMPORARY))
+    if (!(it->flags & CFG_FLAG_TEMPORARY)) {
         it->flags |= CFG_FLAG_DIRTY;
+    }
 }
 
 static void cfg_audit_entry_print(cfg_audit_entry_t *entry, void *user_data)
@@ -598,9 +681,9 @@ static gpointer cfg_change_worker(gpointer data)
 
         if (ret != 0) {
             /* rollback */
-            g_rw_lock_writer_lock(&cfg_lock);
+            g_rw_lock_writer_lock(&g_cfg_instance.rwlock);
             cfg_copy_value(it->type, it->storage, &task->old_value, TRUE);
-            g_rw_lock_writer_unlock(&cfg_lock);
+            g_rw_lock_writer_unlock(&g_cfg_instance.rwlock);
 
             char *old_str = cfg_raw_to_string(it->type, &task->old_value, CFG_FMT_PLAIN);
             char *new_str = cfg_raw_to_string(it->type, &task->new_value, CFG_FMT_PLAIN);
@@ -762,6 +845,7 @@ static int cfg_type_check_normalize(cfg_item_t *item)
 
 int cfg_register(cfg_item_t *item)
 {
+    cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
         if (g_strcmp0(it->key, item->key) == 0) {
             cfg_info("Duplicate config key: %s\n", item->key);
@@ -773,18 +857,17 @@ int cfg_register(cfg_item_t *item)
         return -1;
     }
 
-    item->list.next = cfg_list;
-    cfg_list = &item->list;
+    cfg_list_add(&g_cfg_instance.list_head, &item->list);
 
     // 同步更新哈希索引
-    g_hash_table_insert( cfg_items_map, (gpointer)item->key, item);
+    g_hash_table_insert( g_cfg_instance.items_map, (gpointer)item->key, item);
 
     return 0;
 }
 
 static inline cfg_item_t *cfg_find(const char *key)
 {
-    return g_hash_table_lookup(cfg_items_map, key);
+    return g_hash_table_lookup(g_cfg_instance.items_map, key);
 }
 
 /* ---------- json helpers ---------- */
@@ -935,8 +1018,8 @@ static int cfg_commit_value(cfg_item_t *it, JsonNode *node)
 
     /* restart */
     if (it->flags & CFG_FLAG_RESTART) {
-        g_needs_restart = TRUE;
-        g_ptr_array_add(g_restart_reasons, it);
+        g_cfg_instance.needs_restart = TRUE;
+        g_ptr_array_add(g_cfg_instance.restart_reasons, it);
     }
 
     if (it->type == CFG_STRING)
@@ -960,7 +1043,7 @@ static int cfg_commit_node_by_key(const char *key, JsonNode *node)
 {
     int ret = 0;
 
-    g_rw_lock_writer_lock(&cfg_lock);
+    g_rw_lock_writer_lock(&g_cfg_instance.rwlock);
 
     cfg_item_t *it = cfg_find(key);
     if (!it || !(it->flags & CFG_FLAG_RUNTIME)) {
@@ -972,7 +1055,7 @@ static int cfg_commit_node_by_key(const char *key, JsonNode *node)
     ret = cfg_commit_value(it, node);
 
 out:
-    g_rw_lock_writer_unlock(&cfg_lock);
+    g_rw_lock_writer_unlock(&g_cfg_instance.rwlock);
     return ret;
 }
 /* ---------- type handlers ---------- */
@@ -1069,10 +1152,10 @@ int cfg_to_json_string(const cfg_item_t *p, JsonNode *n)
 /* ---------- typed GET (非 CLI) ---------- */
 
 #define CFG_GET_COMMON(_type_) \
-    g_rw_lock_reader_lock(&cfg_lock);             \
+    g_rw_lock_reader_lock(&g_cfg_instance.rwlock);             \
     cfg_item_t *it = cfg_find(key);               \
     if (!it || it->type != _type_) {                \
-        g_rw_lock_reader_unlock(&cfg_lock);       \
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);       \
         return -1;                                \
     }
 
@@ -1082,10 +1165,10 @@ int cfg_read_int8(const char *key, gint8 *out)
     gint64 v;
     if (cfg_item_get_int64(it, &v) == 0) {
         *out = (gint8)v;
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         return 0;
     }
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return -1;
 }
 
@@ -1095,10 +1178,10 @@ int cfg_read_int16(const char *key, gint16 *out)
     gint64 v;
     if (cfg_item_get_int64(it, &v) == 0) {
         *out = (gint16)v;
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         return 0;
     }
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return -1;
 }
 
@@ -1108,10 +1191,10 @@ int cfg_read_int32(const char *key, gint32 *out)
     gint64 v;
     if (cfg_item_get_int64(it, &v) == 0) {
         *out = (gint32)v;
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         return 0;
     }
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return -1;
 }
 
@@ -1119,27 +1202,27 @@ int cfg_read_int64(const char *key, gint64 *out)
 {
     CFG_GET_COMMON(CFG_INT64)
     if (cfg_item_get_int64(it, out) == 0) {
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         return 0;
     }
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return -1;
 }
 
 int cfg_read_int(const char *key, gint64 *out)
 {
-    g_rw_lock_reader_lock(&cfg_lock);
+    g_rw_lock_reader_lock(&g_cfg_instance.rwlock);
     cfg_item_t *it = cfg_find(key);
     if (!it || cfg_type_to_gtype(it->type) != G_TYPE_INT64) {
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         cfg_warning("%s: %s\n", key, it ? "Not an integer type" : "Not found");
         return -1;
     }
     if (cfg_item_get_int64(it, out) == 0) {
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         return 0;
     }
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return -1;
 }
 
@@ -1147,10 +1230,10 @@ int cfg_read_bool(const char *key, gboolean *out)
 {
     CFG_GET_COMMON(CFG_BOOL)
     if (cfg_item_get_bool(it, out) == 0) {
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         return 0;
     }
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return -1;
 }
 
@@ -1160,10 +1243,10 @@ int cfg_read_float(const char *key, float *out)
     double v;
     if (cfg_item_get_double(it, &v) == 0) {
         *out = (float)v;
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         return 0;
     }
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return -1;
 }
 
@@ -1171,10 +1254,10 @@ int cfg_read_double(const char *key, double *out)
 {
     CFG_GET_COMMON(CFG_DOUBLE)
     if (cfg_item_get_double(it, out) == 0) {
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         return 0;
     }
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return -1;
 }
 
@@ -1189,7 +1272,7 @@ int cfg_read_string(const char *key, const char **out)
 {
     CFG_GET_COMMON(CFG_STRING)
     *out = g_strdup(*(char **)it->storage);
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return 0;
 }
 
@@ -1295,7 +1378,7 @@ int cfg_cli_commit(const char *key, const char *value)
 {
     int ret = 0;
 
-    g_rw_lock_writer_lock(&cfg_lock);
+    g_rw_lock_writer_lock(&g_cfg_instance.rwlock);
 
     cfg_item_t *it = cfg_find(key);
     if (!it || !(it->flags & CFG_FLAG_RUNTIME)) {
@@ -1313,7 +1396,7 @@ int cfg_cli_commit(const char *key, const char *value)
     json_node_free(node);
 
 out:
-    g_rw_lock_writer_unlock(&cfg_lock);
+    g_rw_lock_writer_unlock(&g_cfg_instance.rwlock);
     return ret;
 }
 
@@ -1442,18 +1525,18 @@ int cfg_read_node(const char *key, JsonNode **out)
 
     *out = NULL;
 
-    g_rw_lock_reader_lock(&cfg_lock);
+    g_rw_lock_reader_lock(&g_cfg_instance.rwlock);
 
     cfg_item_t *it = cfg_find(key);
     if (!it) {
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         cfg_warning("%s: unregistered key\n", key);
         return -ENOENT;
     }
 
     int ret = cfg_read_node_from_item(it, out);
 
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
 
     return ret;
 }
@@ -1473,6 +1556,18 @@ char *cfg_cli_read(const char *key)
     return s;
 }
 
+static inline gboolean cfg_item_has_prefix(cfg_item_t *it, const char *prefix)
+{
+    if (prefix == NULL || strlen(prefix) == 0 \
+            || g_str_has_prefix(it->key, prefix))
+        return TRUE;
+    return FALSE;
+}
+
+static inline gboolean cfg_item_is_dirty(cfg_item_t *it)
+{
+    return (it->flags & CFG_FLAG_DIRTY) ? TRUE : FALSE;
+}
 /**
  * @brief Iterate over all configuration items with a given prefix.
  *
@@ -1485,8 +1580,9 @@ static void cfg_foreach_item_with_prefix(const char *prefix, cfg_iter_fn fn, voi
     if (!fn)
         return;
 
+    cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
-        IN_DOMAIN_CONDITION(prefix) {
+        if (cfg_item_has_prefix(it, prefix)) {
             fn(it, usr_data);
         }
     }
@@ -1527,9 +1623,9 @@ static int cfg_dump_nodes(const char *prefix, JsonNode **out)
     JsonNode *root = json_node_new(JSON_NODE_OBJECT);
     json_node_take_object(root, obj);
 
-    g_rw_lock_reader_lock(&cfg_lock);
+    g_rw_lock_reader_lock(&g_cfg_instance.rwlock);
     cfg_foreach_item_with_prefix(prefix, dump_one, obj);
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
 
     *out = root;
     return 0;
@@ -1575,9 +1671,9 @@ static void cfg_show_sub_plain(const char *prefix, FILE *out)
 {
     if (!out)
         out = stdout;
-    g_rw_lock_reader_lock(&cfg_lock);
+    g_rw_lock_reader_lock(&g_cfg_instance.rwlock);
     cfg_foreach_item_with_prefix(prefix, cfg_show_one, out);
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
     return;
 }
 
@@ -1608,40 +1704,46 @@ int cfg_generate_to_json_data(const char *domain, char **out)
 
 void cfg_show_status(FILE *out)
 {
-    char file_paths[FILENAME_MAX*50];
+    char file_paths[FILENAME_MAX*20];
     memset(file_paths, 0, sizeof(file_paths));
-    gboolean is_changed_from_last_save = FALSE;
     int index = 0;
+    cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
-        if (it->flags & CFG_FLAG_DIRTY) {
-            is_changed_from_last_save = TRUE;
-        }
-
         const char* file = it->source_file ? : it->default_file;
-
         if (!file)
             continue;
-
         if (strstr(file_paths, file) == NULL) {
             strncpy(&file_paths[index], file, sizeof(file_paths)-2-index);
             index = strlen(file_paths);
             file_paths[index++]=';';
+            file_paths[index++]=' ';
         }
     }
     if (!out)
         out = stdout;
     fprintf(out, "running\n");
     fprintf(out, "source-files: %s\n", file_paths);
-    fprintf(out, "total-items: %d\n", g_hash_table_size(cfg_items_map));
-    fprintf(out, "total-audit-entries: %d\n", g_queue_get_length(&cfg_audit_log));
-    fprintf(out, "value-changed: %s\n", is_changed_from_last_save ? "true" : "false");
-    fprintf(out, "restart-required: %s\n",
-           g_needs_restart ? "yes" : "no");
+    fprintf(out, "total-items: %d\n", g_hash_table_size(g_cfg_instance.items_map));
+    fprintf(out, "total-audit-entries: %d\n", g_queue_get_length(&g_cfg_instance.cfg_audit_log));
+    fprintf(out, "value-changed: ");
+    index = 0;
+    FOREACH_CFG_ITEM(it) {
+        if (cfg_item_is_dirty(it)) {
+            if (index && (index % 6) == 0) {
+                fprintf(out, "\n               ");
+            }
+            fprintf(out, "%s, ", it->key);
+            index++;
+        }
+    }
+    fprintf(out, "\n");
 
-    if (g_needs_restart) {
+    fprintf(out, "restart-required: %s\n",
+           g_cfg_instance.needs_restart ? "yes" : "no");
+    if (g_cfg_instance.needs_restart) {
         fprintf(out, "reasons:\n");
-        for (guint i = 0; i < g_restart_reasons->len; i++) {
-            cfg_item_t *reason = g_ptr_array_index(g_restart_reasons, i);
+        for (guint i = 0; i < g_cfg_instance.restart_reasons->len; i++) {
+            cfg_item_t *reason = g_ptr_array_index(g_cfg_instance.restart_reasons, i);
             char *v = cfg_cli_read(reason->key);
             if (v) {
                 fprintf(out, "\t%s  - %s\n", reason->key, v);
@@ -1655,7 +1757,7 @@ void cfg_history_show(FILE *out)
 {
     if (!out)
         out = stdout;
-    g_queue_foreach(&cfg_audit_log, (GFunc)cfg_audit_entry_print, out);
+    g_queue_foreach(&g_cfg_instance.cfg_audit_log, (GFunc)cfg_audit_entry_print, out);
 }
 
 static void cfg_cli_help(const char *cmd, FILE *out)
@@ -1707,6 +1809,7 @@ static void cfg_cli_man(const char *item, FILE *out)
         [CFG_STRING] = { sizeof(char *), "CFG_STRING" }
     };
 
+    cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
         if (strcmp(it->key, item) == 0) {
             fprintf(out, ">> key: %s\n  type: %s(%ld)\n  flags: %s | %s | %s | %s\n  desc: %s\n  source_file: %s\n",
@@ -1716,7 +1819,7 @@ static void cfg_cli_man(const char *item, FILE *out)
                    (it->flags & CFG_FLAG_RUNTIME) ? "runtime" : "fixed",
                    (it->flags & CFG_FLAG_RESTART) ? "restart" : "immediate",
                    (it->flags & CFG_FLAG_TEMPORARY) ? "temporary" : "persistent",
-                   (it->flags & CFG_FLAG_DIRTY) ? "changed" : "unchanged",
+                   cfg_item_is_dirty(it) ? "changed" : "unchanged",
                    it->desc ? it->desc : "",
                    it->source_file ? : it->default_file ? : ""
                 );
@@ -1902,6 +2005,7 @@ static void cfg_exec_line(const char *line, FILE *out)
         cmd = g_strstrip(cmd + 16);
         const char *prefix = cmd;
 
+        cfg_item_t *it = NULL;
         FOREACH_CFG_ITEM(it) {
             if (strncmp(it->key, prefix, strlen(prefix)) == 0)
                 fprintf(out, "%s\n", it->key);
@@ -2191,9 +2295,10 @@ int cfg_load_file_in_domain(const char *path, const char *domain)
     int ret = 0;
     JsonNode *root = json_parser_get_root(parser);
 
-    g_rw_lock_writer_lock(&cfg_lock);
+    g_rw_lock_writer_lock(&g_cfg_instance.rwlock);
+    cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
-        OUT_DOMAIN_CONDITION(domain) {
+        if (!cfg_item_has_prefix(it, domain)) {
             cfg_info("ignore item '%s' as not in domain '%s'\n", it->key, domain);
             continue;
         }
@@ -2225,7 +2330,7 @@ int cfg_load_file_in_domain(const char *path, const char *domain)
             }
         }
     }
-    g_rw_lock_writer_unlock(&cfg_lock);
+    g_rw_lock_writer_unlock(&g_cfg_instance.rwlock);
 
     g_object_unref(parser);
 
@@ -2334,9 +2439,10 @@ int cfg_save_file(const char *path, const char *domain)
     JsonNode *node = json_node_new(JSON_NODE_OBJECT);
     json_node_take_object(node, root);
 
-    g_rw_lock_reader_lock(&cfg_lock);
+    g_rw_lock_reader_lock(&g_cfg_instance.rwlock);
+    cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
-        IN_DOMAIN_CONDITION(domain) {
+        if (cfg_item_has_prefix(it, domain)) {
             JsonNode *value;
             if (!(it->flags & CFG_FLAG_TEMPORARY) && cfg_read_node_from_item(it, &value) == 0) {
                 char *leaf;
@@ -2346,7 +2452,7 @@ int cfg_save_file(const char *path, const char *domain)
             }
         }
     }
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
 
     JsonGenerator *gen = json_generator_new();
     json_generator_set_root(gen, node);
@@ -2411,7 +2517,8 @@ int cfg_save_all(gboolean force)
     cfg_out_file_t *out_files = NULL;
 
     // collect items from same source file
-    g_rw_lock_reader_lock(&cfg_lock);
+    g_rw_lock_reader_lock(&g_cfg_instance.rwlock);
+    cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
         if (it->flags & CFG_FLAG_TEMPORARY) {
             continue;
@@ -2429,7 +2536,7 @@ int cfg_save_all(gboolean force)
                     , it->key, it->source_file);
         }
 
-        if (!force  && !(it->flags & CFG_FLAG_DIRTY)) {
+        if (!force  && !cfg_item_is_dirty(it)) {
             continue;
         }
 
@@ -2447,7 +2554,7 @@ int cfg_save_all(gboolean force)
 
     if (out_files == NULL) {
         cfg_info("No changes since last save or save to nowhere, skipping write.\n");
-        g_rw_lock_reader_unlock(&cfg_lock);
+        g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
         return -1;
     }
 
@@ -2468,6 +2575,7 @@ int cfg_save_all(gboolean force)
             cfg_error("failed to save %d bytes to file: %s\n", data_len, f->filename);
         }
         else {
+            cfg_item_t *it = NULL;
             FOREACH_CFG_ITEM(it) {
                 if ((it->flags & CFG_FLAG_DIRTY) &&
                                 it->source_file &&
@@ -2482,7 +2590,7 @@ int cfg_save_all(gboolean force)
         json_node_free(node);
     }
 
-    g_rw_lock_reader_unlock(&cfg_lock);
+    g_rw_lock_reader_unlock(&g_cfg_instance.rwlock);
 
     while(out_files) {
         cfg_out_file_t *n = out_files->next;
@@ -2498,6 +2606,7 @@ int cfg_save_all(gboolean force)
 //     GHashTable *files = g_hash_table_new(g_str_hash, g_str_equal);
 
 //     /* collect the files which need be saved*/
+//     cfg_item_t *it = NULL;
 //     FOREACH_CFG_ITEM(it) {
 //         if ((it->flags & CFG_FLAG_DIRTY) && it->source_file)
 //             g_hash_table_add(files, (gpointer)it->source_file);
@@ -2520,10 +2629,10 @@ int cfg_save_all(gboolean force)
 void cfg_system_init(void)
 {
     if (g_once_init_enter(&cfg_initialized)) {
-        g_rw_lock_init(&cfg_lock);
-        cfg_items_map = g_hash_table_new(
+        g_rw_lock_init(&g_cfg_instance.rwlock);
+        g_cfg_instance.items_map = g_hash_table_new(
                                 g_str_hash, g_str_equal);
-        g_restart_reasons = g_ptr_array_new_with_free_func(g_free);
+        g_cfg_instance.restart_reasons = g_ptr_array_new_with_free_func(g_free);
         cfg_change_worker_run();
         g_once_init_leave(&cfg_initialized, TRUE);
     }
