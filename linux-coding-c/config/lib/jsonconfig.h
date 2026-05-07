@@ -284,9 +284,11 @@ int cfg_register(cfg_item_t *item);
 /* ---------- load / save ---------- */
 
 /**
- * @brief load configuration from a JSON file. The JSON structure should match the expected format for the registered configuration items.
+ * @brief load configuration from a JSON file. The JSON structure should match the expected format for
+ *        the registered configuration items.
  *        The function will read the file, parse the JSON, and for each registered configuration item,
- *        it will look up the corresponding value in the JSON and update the configuration accordingly.
+ *        it will look up the corresponding value in the JSON and update the item's value accordingly,
+ *        besides, IT WILL ALSO UPDATE THE 'source_file' TO THIS FILE IN THE ITEM.
  *        IF ITEMS FROM MANY CONFIG FILES, THIS METHOD SHOULD BE CALLED RESPECTIVELY FOR EACH ONE, AND
  *        CALL cfg_save_all LATELY TO SAVE TO DIFFERENT FILES.
  *
