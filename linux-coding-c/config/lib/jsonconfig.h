@@ -94,7 +94,7 @@
  * cfg_set_log_hook(test_log);
  *
  */
-typedef void (*cfg_log_hook_t)(unsigned int level, const char *func, int line, const char *fmt, ...);
+typedef int (*cfg_log_hook_t)(unsigned int level, const char *func, int line, const char *fmt, ...);
 void cfg_set_log_hook(cfg_log_hook_t handle);
 
 /* ---------- types ---------- */
@@ -357,7 +357,7 @@ int cfg_read_bool(const char *key, gboolean *out);
 int cfg_read_float(const char *key, float *out);
 int cfg_read_double(const char *key, double *out);
 // For string, the caller is responsible for freeing the returned string with g_free() when no longer needed
-int cfg_read_string(const char *key, const char **out);
+int cfg_read_string(const char *key, char **out);
 
 /* ---------- typed set (not used by CLI) ---------- */
 

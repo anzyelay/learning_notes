@@ -201,14 +201,15 @@ typedef struct {
 } cli_cmd_desc_t;
 
 static const cli_cmd_desc_t g_cli_cmds[] = {
-    { "get",        "<key>",            "Get config value" },
-    { "set",        "<key> <value>",    "Set config value (runtime)" },
+    { "get",        "<key>",            "Get config value of the item <key>" },
+    { "set",        "<key> <value>",    "Set config value for item <key>(runtime), no \" or \' to surround the string" },
+    { "clear",      "<key>",            "clear the item <key>(runtime)'s value to 0, false or empty respectively as key's type" },
     { "status",     "",                 "Show system status" },
     { "history",    "",                 "Show config change history" },
-    { "save",       "",                 "Save config to files where they loaded from" },
-    { "save_as",     "<file>",          "Save config to a specified file" },
-    { "show_json",  "[node]",           "Show a specified prefix node or all nodes config values with json style" },
-    { "show",       "[node]",           "Show a specified prefix node or all nodes config values with plain text" },
+    { "save",       "",                 "Save config to files where they loaded from or default" },
+    { "save_as",     "<file>",          "Save whole configs to a single and special file" },
+    { "show_json",  "[node]",           "Show a special prefix node or all nodes config values with json style" },
+    { "show",       "[node]",           "Show a special prefix node or all nodes config values with plain text" },
     { "help",       "[cmd]",            "Show help for special command or all commands" },
     { "man",        "item",             "Show the description for item" },
     { "quit",       "",                 "Exit CLI" },
@@ -1268,7 +1269,7 @@ int cfg_read_double(const char *key, double *out)
  * @param out : output pointer to receive the string value; the caller is responsible for freeing the string with g_free() when no longer needed
  * @return * int : 0 on success, -1 if key not found or type mismatch, -2 on other errors
  */
-int cfg_read_string(const char *key, const char **out)
+int cfg_read_string(const char *key, char **out)
 {
     CFG_GET_COMMON(CFG_STRING)
     *out = g_strdup(*(char **)it->storage);
@@ -1765,7 +1766,7 @@ static void cfg_cli_help(const char *cmd, FILE *out)
     if (!cmd) {
         fprintf(out, "Available commands:\n");
         for (int i = 0; g_cli_cmds[i].cmd; i++) {
-            fprintf(out, "  %-10s %-18s %s\n",
+            fprintf(out, "  - %-10s %-18s %s\n",
                    g_cli_cmds[i].cmd,
                    g_cli_cmds[i].args,
                    g_cli_cmds[i].desc);
@@ -1990,7 +1991,7 @@ char *readline(const char *prompt)
 
 static void cfg_exec_line(const char *line, FILE *out)
 {
-    char cmdline[256];
+    char cmdline[256] = {0};
     strncpy(cmdline, line, sizeof(cmdline));
     cmdline[sizeof(cmdline) - 1] = '\0';
 
@@ -2042,6 +2043,10 @@ static void cfg_exec_line(const char *line, FILE *out)
                 fprintf(out, "Set failed (maybe out of type range), 'man %s' for help\n", kv[0]);
         }
         g_strfreev(kv);
+    } else if (g_str_has_prefix(cmd, "clear ")) {
+        cmd = g_strstrip(cmd + 6);
+        if (cfg_cli_commit(cmd, "") != 0)
+            fprintf(out, "clear failed, 'man %s' for help, make sure it is runtime for changing\n", cmd);
     } else if (strcmp(cmd, "show") == 0 || g_str_has_prefix(cmd, "show ")) {
         cmd = g_strstrip(cmd + 4);
         cfg_show_sub_plain(cmd, out);
@@ -2176,11 +2181,19 @@ static void *cfg_cli_server_run_loop(char *listen_name)
         }
     }
 
+    if (!threads.next) {
+        cfg_info("Server stopping, exit directly as no clients...\n");
+        return NULL;
+    }
     cfg_info("Server stopping, waiting for client threads to exit...\n");
     while (threads.next) {
         struct threads_list *t = threads.next;
 
         if (t->info->fd >= 0) {
+            int ret = send(t->info->fd, "LEAVE_OF_SERVER\n", strlen("LEAVE_OF_SERVER\n"), 0);
+            if (ret < 0) {
+                cfg_warning("failed to send to client\n");
+            }
             shutdown(t->info->fd, SHUT_RDWR);  // wakeup clients fgets, make client thread to exit
             close(t->info->fd);                // release fd resource in server side
             t->info->fd = -1;
@@ -2225,6 +2238,28 @@ void cfg_cli_server_stop(void)
     }
 }
 
+int try_peer_closed(int fd)
+{
+    char buf[64] = {0};
+    int ret = recv(fd, &buf, sizeof(buf), MSG_PEEK | MSG_DONTWAIT);
+
+    if (ret > 0) {
+        if (strcmp(buf, "LEAVE_OF_SERVER\n") == 0) {
+            return 0;
+        }
+        cfg_debug("the buf is :%s", buf);
+        return 1;   // ✅ 有数据，对端没关
+    } else if (ret == 0) {
+        return 0;   // ✅ 对端关闭
+    } else {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return 1; // ✅ 没数据，但没关闭
+        } else {
+            return 0; // ✅ 错误，当作关闭
+        }
+    }
+}
+
 void cfg_cli_client_run(char *server_name)
 {
     /*
@@ -2257,6 +2292,29 @@ void cfg_cli_client_run(char *server_name)
         if (!line) break;
         add_history(line);
 
+        // 对端关闭？
+        if (!try_peer_closed(fd)) {
+            free(line);
+            cfg_info("the server exited, continue(Y/y)? ");
+            char buf[10];
+            if (fgets(buf, sizeof(buf), stdin) != NULL) {
+                if (buf[0] == 'y' || buf[0] == 'Y') {
+                    fclose(in);
+                    fclose(out);
+                    close(fd);
+                    do {
+                        g_usleep(2000*1000);
+                        cfg_info("try to connect daemon again\n");
+                        fd = connect_daemon();
+                    } while(fd < 0);
+                    in = fdopen(fd, "r");
+                    out = fdopen(dup(fd), "w");
+                    continue;
+                }
+            }
+            break;
+        }
+
         char *cmd = g_strstrip(line);
         if (*cmd) {
             fprintf(out, "%s\n", cmd);
@@ -2281,6 +2339,7 @@ void cfg_cli_client_run(char *server_name)
     fclose(in);
     fclose(out);
     close(fd);
+    cfg_info("client exit here!\n");
 }
 
 /* ---------- load / save ---------- */

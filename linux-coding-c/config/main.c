@@ -61,7 +61,7 @@ static cfg_item_t cfg_table[] = {
 #define TEST_JSON_STR "{ \"server\": { \"port\": 19090, \"debug\": true, \"path\": \"/tmp/test\" }, \"log\": { \"path\": \"/tmp/log/test\" } }"
 
 
-void test_log(unsigned int level, const char *func, int line, const char *fmt, ...)
+int test_log(unsigned int level, const char *func, int line, const char *fmt, ...)
 {
     char buf[1024] = {0};
     va_list args;
@@ -69,6 +69,7 @@ void test_log(unsigned int level, const char *func, int line, const char *fmt, .
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
     printf("[%d:%s:%d]: %s", level, func, line, buf);
+    return 0;
 }
 
 
