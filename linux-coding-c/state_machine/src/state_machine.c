@@ -4,6 +4,15 @@
 #include <string.h>
 #include <stdlib.h>
 
+typedef struct SMContext {
+    StateObject_t* current_state;
+    StateChangeCallback on_state_change_callback;
+    GetStateFunction *state_registry;
+    void *gsf_args; // args for GetStageFunction
+    int  registry_num;
+    const char *name;
+} SMContext_t;
+
 // static char *my_strdup(const char *s)
 // {
 //     if (!s) return NULL;

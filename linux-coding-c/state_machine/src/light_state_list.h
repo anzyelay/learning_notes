@@ -4,6 +4,7 @@
 #include "state_off.h"
 #include "state_on.h"
 
+// --- 状态注册表：将状态ID映射到获取函数 ---
 // --- 状态注册表的实现 ---
 // 这是将所有状态“注册”到中央位置的关键部分
 GetStateFunction g_state_registry[] = {

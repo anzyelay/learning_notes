@@ -69,9 +69,9 @@ gcc -o state_machine main.c state_machine.c state_off.c state_on.c
 
 假设要添加一个 `SLEEPING` 状态：
 
-1. **修改 `state_common.h`**：
+1. **修改 `light_state_id.h`**：
     - 在 `LightStateId_t` 枚举中添加 `LIGHT_STATE_ID_SLEEPING`。
-2. **修改 `light_state_id/list.h`**：
+2. **修改 `light_state_list.h`**：
     - 在 `g_state_registry` 数组中添加 `[LIGHT_STATE_ID_SLEEPING] = get_sleeping_state,` 的条目。
 3. **创建新文件 `state_sleeping.h` 和 `state_sleeping.c`**：
     - 实现 `get_sleeping_state` 函数，返回一个配置好的 `StateObject`。
@@ -99,7 +99,7 @@ gcc -o state_machine main.c state_machine.c state_off.c state_on.c
 - step 3: 初始化状态
 
 ```c
-sm_context_intial_state(light_ctx, LIGHT_STATE_ID_OFF);
+   sm_context_intial_state(light_ctx, LIGHT_STATE_ID_OFF);
 ```
 
 - step 4: 通过EVENT驱动状态机处理事件和状态转移
