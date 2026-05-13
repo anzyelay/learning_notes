@@ -32,6 +32,8 @@ static const StateVTable off_vtable = {
 StateObject_t* get_off_state(void *) {
     static struct {
         StateObject_t base;
-    } instance = {{&off_vtable, "OFF", LIGHT_STATE_ID_OFF}};
+    } instance = {
+        SM_STATE_OBJECT_DEFINE("OFF", LIGHT_STATE_ID_OFF, &off_vtable)
+    };
     return (StateObject_t*)&instance;
 }

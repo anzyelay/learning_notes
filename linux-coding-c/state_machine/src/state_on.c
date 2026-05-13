@@ -54,7 +54,7 @@ static const StateVTable on_sub_n_vtable = {
 
 StateObject_t *get_on_normal_substate(void *parent) {
     static OnSubNormalStateData instance = {
-        .base = {&on_sub_n_vtable, "NORMAL ON", ON_SUBSTATE_NORMAL},
+        .base = SM_STATE_OBJECT_DEFINE("NORMAL ON", ON_SUBSTATE_NORMAL, &on_sub_n_vtable),
         .parent = NULL,
         .last_activity_time = 0,
     };
@@ -94,7 +94,7 @@ static const StateVTable on_sub_d_vtable = {
 
 StateObject_t* get_on_delay_substate(void *parent) {
     static OnSubDelayStateData instance = {
-        .base = {&on_sub_d_vtable, "DELAY TO OFF", ON_SUBSTATE_DELAY_TO_OFF},
+        .base = SM_STATE_OBJECT_DEFINE("DELAY TO OFF", ON_SUBSTATE_DELAY_TO_OFF, &on_sub_d_vtable),
         .parent = NULL,
         .delay_start_time = 0,
     };
@@ -132,7 +132,7 @@ static void on_light_state_changed(const char* old_state_name, const char* new_s
 StateObject_t* get_on_state(void *) {
     // 将状态实例定义为 static const 局部变量，优化内存
     static OnStateData instance = {
-        .base = {&on_vtable, "ON", LIGHT_STATE_ID_ON},
+        .base = SM_STATE_OBJECT_DEFINE("ON", LIGHT_STATE_ID_ON, &on_vtable),
         .sub_ctx = NULL
     };
 
