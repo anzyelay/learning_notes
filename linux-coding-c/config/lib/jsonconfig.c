@@ -2247,7 +2247,6 @@ int try_peer_closed(int fd)
         if (strcmp(buf, "LEAVE_OF_SERVER\n") == 0) {
             return 0;
         }
-        cfg_debug("the buf is :%s", buf);
         return 1;   // ✅ 有数据，对端没关
     } else if (ret == 0) {
         return 0;   // ✅ 对端关闭
