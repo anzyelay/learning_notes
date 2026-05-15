@@ -2744,3 +2744,39 @@ out:
     g_object_unref(parser);
     return ret;
 }
+
+char *cfg_parse_vars_to_jsonstr(cfg_item_t *items, size_t item_size, gboolean pretty)
+{
+    JsonObject *root = json_object_new();
+    JsonNode *root_node = json_node_new(JSON_NODE_OBJECT);
+    json_node_take_object(root_node, root);
+    char *str = NULL;
+
+    if (!root) {
+        cfg_warning("Cant new a valid JSON structure\n");
+        goto out;
+    }
+
+    for (size_t i = 0; i < item_size; i++) {
+        cfg_item_t *it = &items[i];
+        if (cfg_type_check_normalize(it)) {
+            cfg_warning("Validation failed for key '%s'\n", it->key);
+            continue;
+        }
+        JsonNode *node = NULL;
+        if (cfg_read_node_from_item(it, &node) == 0) {
+            char *leaf;
+            JsonObject *obj = json_get_or_create(root, it->key, &leaf);
+            json_object_set_member(obj, leaf, node);
+            /* ownership transferred to object */
+            g_free(leaf);
+        }
+    }
+    str = json_to_string(root_node, pretty);
+
+out:
+    if (root)
+        json_node_free(root_node);
+    return str;
+
+}

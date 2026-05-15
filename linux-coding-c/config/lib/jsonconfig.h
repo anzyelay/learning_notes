@@ -404,5 +404,6 @@ void cfg_cli_server_stop(void);
  *       and is NOT part of the core configuration system.
  */
 int cfg_parse_json_to_vars(const char *json_str, cfg_item_t *items, size_t item_size);
+char *cfg_parse_vars_to_jsonstr(cfg_item_t *items, size_t item_size, gboolean pretty);
 
 #endif
