@@ -18,7 +18,10 @@
 #define _LOG_LEVEL_ERR            (0x1 << 1)
 #define _LOG_LEVEL_WARN           (0x1 << 2)
 #define _LOG_LEVEL_INFO           (0x1 << 3)
+#define _LOG_LEVEL_DEBUG          (0x1 << 4)
 
+#define cfg_debug(fmt, ...) \
+            cfg_printf_impl(_LOG_LEVEL_DEBUG, __func__, __LINE__, "%s: "fmt, CFG_TAG, ##__VA_ARGS__)
 #define cfg_info(fmt, ...) \
             cfg_printf_impl(_LOG_LEVEL_INFO, __func__, __LINE__, "%s: "fmt, CFG_TAG, ##__VA_ARGS__)
 #define cfg_warning(fmt, ...) \
@@ -59,6 +62,17 @@ static void cfg_printf_impl(unsigned int level, const char *func, int line, cons
 
     va_end(ap);
 }
+
+#define TYPE_SIZE_MAP_ARRAY         {                       \
+        [CFG_BOOL] = { sizeof(gboolean), "CFG_BOOL" },      \
+        [CFG_INT8] = { sizeof(gint8), "CFG_INT8" },         \
+        [CFG_INT16] = { sizeof(gint16), "CFG_INT16" },      \
+        [CFG_INT32] = { sizeof(gint32), "CFG_INT32" },      \
+        [CFG_INT64] = { sizeof(gint64), "CFG_INT64" },      \
+        [CFG_FLOAT] = { sizeof(float), "CFG_FLOAT" },       \
+        [CFG_DOUBLE] = { sizeof(double), "CFG_DOUBLE" },    \
+        [CFG_STRING] = { sizeof(char *), "CFG_STRING" }     \
+        }
 
 #define container_of(ptr, type, member) \
     ((type *)((char *)(ptr) - G_STRUCT_OFFSET(type, member)))
@@ -332,10 +346,6 @@ static void cfg_audit_record(cfg_item_t *it, const void *oldv, const void *newv)
         g_free(old);
     }
     g_queue_push_tail(&g_cfg_instance.cfg_audit_log, e);
-
-    if (!(it->flags & CFG_FLAG_TEMPORARY)) {
-        it->flags |= CFG_FLAG_DIRTY;
-    }
 }
 
 static void cfg_audit_entry_print(cfg_audit_entry_t *entry, void *user_data)
@@ -688,8 +698,7 @@ static gpointer cfg_change_worker(gpointer data)
 
             char *old_str = cfg_raw_to_string(it->type, &task->old_value, CFG_FMT_PLAIN);
             char *new_str = cfg_raw_to_string(it->type, &task->new_value, CFG_FMT_PLAIN);
-            cfg_info(
-              "rollback: %s %s -> %s\n", it->key, new_str, old_str);
+            cfg_debug("rollback: %s %s -> %s\n", it->key, new_str, old_str);
             g_free(old_str);
             g_free(new_str);
         }
@@ -754,28 +763,19 @@ static int cfg_type_check_normalize(cfg_item_t *item)
     struct type_size_map {
         int size;
         char *type_name;
-    } type_size_maps[CFG_TYPE_NUMBER] = {
-        [CFG_BOOL] = { sizeof(gboolean), "CFG_BOOL" },
-        [CFG_INT8] = { sizeof(gint8), "CFG_INT8" },
-        [CFG_INT16] = { sizeof(gint16), "CFG_INT16" },
-        [CFG_INT32] = { sizeof(gint32), "CFG_INT32" },
-        [CFG_INT64] = { sizeof(gint64), "CFG_INT64" },
-        [CFG_FLOAT] = { sizeof(float), "CFG_FLOAT" },
-        [CFG_DOUBLE] = { sizeof(double), "CFG_DOUBLE" },
-        [CFG_STRING] = { sizeof(char *), "CFG_STRING" }
-    };
+    } type_size_maps[CFG_TYPE_NUMBER] = TYPE_SIZE_MAP_ARRAY;
 
     /** make sure the storage size matches the type with the maps to normalize*/
     if (item->storage_size == 0) {
-        cfg_warning("Storage size must be specified for item '%s'\n", item->key);
+        cfg_error("Storage size must be specified for item '%s'\n", item->key);
         return -1;
     }
     if (!item->storage) {
-        cfg_warning("Storage pointer must be specified for item '%s'\n", item->key);
+        cfg_error("Storage pointer must be specified for item '%s'\n", item->key);
         return -1;
     }
     if (item->type >= CFG_TYPE_NUMBER) {
-        cfg_warning("Invalid config type for item '%s': %d\n", item->key, item->type);
+        cfg_error("Invalid config type for item '%s': %d\n", item->key, item->type);
         return -1;
     }
 
@@ -794,7 +794,7 @@ static int cfg_type_check_normalize(cfg_item_t *item)
             item->type = CFG_INT64;
         }
         else {
-            cfg_warning("Invalid storage size for CFG_INT_AUTO item '%s': %d\n",
+            cfg_error("Invalid storage size for CFG_INT_AUTO item '%s': %d\n",
                        item->key, item->storage_size);
             return -1;
         }
@@ -808,7 +808,7 @@ static int cfg_type_check_normalize(cfg_item_t *item)
             item->type = CFG_FLOAT;
         }
         else {
-            cfg_warning("Invalid storage size for CFG_DOUBLE item '%s': %d\n",
+            cfg_error("Invalid storage size for CFG_DOUBLE item '%s': %d\n",
                        item->key, item->storage_size);
             return -1;
         }
@@ -824,7 +824,7 @@ static int cfg_type_check_normalize(cfg_item_t *item)
 
     if (item->type == CFG_STRING && item->storage && *(char **)item->storage) {
         /* ensure string storage is initialized to NULL as storage must always hold heap-allocated string*/
-        cfg_info("CFG_STRING item '%s' has non-NULL initial storage which may cause issues."
+        cfg_debug("CFG_STRING item '%s' has non-NULL initial storage which may cause issues."
              "It should be initialized to NULL or a valid heap-allocated string.\n"
              , item->key);
         // return -1;
@@ -849,7 +849,7 @@ int cfg_register(cfg_item_t *item)
     cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
         if (g_strcmp0(it->key, item->key) == 0) {
-            cfg_info("Duplicate config key: %s\n", item->key);
+            cfg_info("Duplicate config key: %s, register skip\n", item->key);
             return -1;
         }
     }
@@ -881,13 +881,16 @@ static JsonNode *json_get_by_path(JsonNode *root, const char *path)
 
     for (int i = 0; tokens[i]; i++) {
         if (!JSON_NODE_HOLDS_OBJECT(node)) {
+            cfg_debug("%s: is not object node\n", path);
             node = NULL;
             break;
         }
         obj = json_node_get_object(node);
         node = json_object_get_member(obj, tokens[i]);
-        if (!node)
+        if (!node) {
+            cfg_debug("%s: fail to get node\n", path);
             break;
+        }
     }
 
     g_strfreev(tokens);
@@ -995,18 +998,21 @@ static int cfg_commit_value(cfg_item_t *it, JsonNode *node)
 
     /* apply */
     if (it->from_json(node, it) != 0) {
+        cfg_warning("fail to apply for key '%s'\n", it->key);
         ret = -1;
         goto rollback;
     }
 
     /* check whether the value has changed */
     if (cfg_value_equal(it->type, &old, it->storage)) {
+        cfg_debug("value of the key '%s' not changed\n", it->key);
         ret = 0; // OK, no changed
         goto rollback;
     }
 
     /* validate */
     if (it->validator && it->validator(it->storage) != 0) {
+        cfg_warning("fail to validator for key '%s'\n", it->key);
         ret = -2;
         goto rollback;
     }
@@ -1017,10 +1023,15 @@ static int cfg_commit_value(cfg_item_t *it, JsonNode *node)
     else
         cfg_audit_record(it, &old, it->storage);
 
-    /* restart */
+    /* tag restart */
     if (it->flags & CFG_FLAG_RESTART) {
         g_cfg_instance.needs_restart = TRUE;
         g_ptr_array_add(g_cfg_instance.restart_reasons, it);
+    }
+
+    /* tag dirty for save*/
+    if (!(it->flags & CFG_FLAG_TEMPORARY)) {
+        it->flags |= CFG_FLAG_DIRTY;
     }
 
     if (it->type == CFG_STRING)
@@ -1799,16 +1810,7 @@ static void cfg_cli_man(const char *item, FILE *out)
     struct type_size_map {
         size_t size;
         char *type_name;
-    } type_size_maps[CFG_TYPE_NUMBER] = {
-        [CFG_BOOL] = { sizeof(gboolean), "CFG_BOOL" },
-        [CFG_INT8] = { sizeof(gint8), "CFG_INT8" },
-        [CFG_INT16] = { sizeof(gint16), "CFG_INT16" },
-        [CFG_INT32] = { sizeof(gint32), "CFG_INT32" },
-        [CFG_INT64] = { sizeof(gint64), "CFG_INT64" },
-        [CFG_FLOAT] = { sizeof(float), "CFG_FLOAT" },
-        [CFG_DOUBLE] = { sizeof(double), "CFG_DOUBLE" },
-        [CFG_STRING] = { sizeof(char *), "CFG_STRING" }
-    };
+    } type_size_maps[CFG_TYPE_NUMBER] = TYPE_SIZE_MAP_ARRAY;
 
     cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
@@ -2217,7 +2219,7 @@ void cfg_cli_server_run(char *listen_name, gboolean in_thread)
         return;
     }
     if (cfg_cli_server_thread) {
-        cfg_info("Server is already running\n");
+        cfg_warning("Server is already running\n");
         return;
     }
     cfg_cli_server_thread = g_thread_new("cfg_cli_server", (GThreadFunc)cfg_cli_server_run_loop, g_strdup(listen_name));
@@ -2350,6 +2352,8 @@ int cfg_load_file_in_domain(const char *path, const char *domain)
         return -1;
     }
 
+    cfg_info("load data from file: %s, the filter domain is \"%s\"\n", path, domain ? domain: "");
+
     int ret = 0;
     JsonNode *root = json_parser_get_root(parser);
 
@@ -2357,11 +2361,11 @@ int cfg_load_file_in_domain(const char *path, const char *domain)
     cfg_item_t *it = NULL;
     FOREACH_CFG_ITEM(it) {
         if (!cfg_item_has_prefix(it, domain)) {
-            cfg_info("ignore item '%s' as not in domain '%s'\n", it->key, domain);
+            cfg_debug("ignore item '%s' as not in domain '%s'\n", it->key, domain);
             continue;
         }
         if ((it->flags & CFG_FLAG_TEMPORARY)) {
-            cfg_info("item '%s' is a temparory config, dont load from file\n", it->key);
+            cfg_debug("item '%s' is a temparory config, dont load from file\n", it->key);
             continue;
         }
         JsonNode *n = json_get_by_path(root, it->key);
@@ -2422,7 +2426,7 @@ static int atomic_write_file(const char *path,
     int dirfd = -1;
 
     if (!path || !data) {
-        cfg_warning("Invalid arguments to atomic_write_file (path: %s, data: %p)\n"
+        cfg_error("Invalid arguments to atomic_write_file (path: %s, data: %p)\n"
             , path ? path : "null", (void*)data);
         return -1;
     }
@@ -2562,7 +2566,7 @@ static cfg_out_file_t *cfg_get_out_file(cfg_out_file_t **list, const char *filen
         g_object_unref(parser);
     }
     else {
-        cfg_warning("a invalid  or empty json file: %s, overwrite it!\n", filename);
+        cfg_warning("a invalid or empty json file: %s, overwrite it!\n", filename);
         f->root = json_object_new();
     }
 
@@ -2585,12 +2589,12 @@ int cfg_save_all(gboolean force)
         if (!it->source_file) {
             it->source_file = it->default_file;
             if (!it->source_file) {
-                cfg_error("the item '%s' was loaded from nowhere, ALSO NO DEFAULT! \
+                cfg_warning("save error for item '%s',as it's loaded from nowhere, ALSO NO DEFAULT! \
                     should set DEFAULT in declare period\n"
                     , it->key);
                 continue;
             }
-            cfg_warning("the item '%s' was loaded from nowhere, save it to default: %s!\n"
+            cfg_info("the item '%s' was loaded from nowhere, save it to default: %s!\n"
                     , it->key, it->source_file);
         }
 
@@ -2704,14 +2708,14 @@ int cfg_parse_json_to_vars(const char *json_str, cfg_item_t *items, size_t item_
 
     GError *error = NULL;
     if (!json_parser_load_from_data(parser, json_str, -1, &error)) {
-        cfg_warning("Failed to parse JSON data: %s\n", error ? error->message : "unknown error");
+        cfg_error("Failed to parse JSON data: %s\n", error ? error->message : "unknown error");
         if (error) g_error_free(error);
         goto out;
     }
 
     root = json_parser_get_root(parser);
     if (!root || json_node_get_node_type(root) != JSON_NODE_OBJECT) {
-        cfg_warning("Invalid JSON structure\n");
+        cfg_error("Invalid JSON structure\n");
         goto out;
     }
 
@@ -2753,13 +2757,15 @@ char *cfg_parse_vars_to_jsonstr(cfg_item_t *items, size_t item_size, gboolean pr
     char *str = NULL;
 
     if (!root) {
-        cfg_warning("Cant new a valid JSON structure\n");
+        cfg_error("Cant new a valid JSON structure\n");
         goto out;
     }
 
     for (size_t i = 0; i < item_size; i++) {
         cfg_item_t *it = &items[i];
-        if (cfg_type_check_normalize(it)) {
+        // if string, no need to check as the item must has a valid string pointer to get later
+        // or it will be leak of memory as duplicate but no free old string
+        if (it->type != CFG_STRING && cfg_type_check_normalize(it)) {
             cfg_warning("Validation failed for key '%s'\n", it->key);
             continue;
         }
