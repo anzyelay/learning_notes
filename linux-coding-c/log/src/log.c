@@ -6,7 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <time.h>
 
+#include "parse_cmdline.h"
 #include "common.h"
 #include "log.h"
 
@@ -49,7 +51,6 @@ static int log_attr_set(char * buf, int attr)
 	const char * mode;
 
 	switch (attr) {
-		default: return 0;
 		case __LOG_ATTR_RESET:  mode = "0"; break;
 		case __LOG_BOLD:        mode = "1"; break;
 		case __LOG_DIM:         mode = "2"; break;
@@ -58,6 +59,7 @@ static int log_attr_set(char * buf, int attr)
 		case __LOG_REVERSE:     mode = "7"; break;
 		case __LOG_HIDE:        mode = "8"; break;
 		case __LOG_CLR_SCREEN:  return sprintf(buf, "\033[2J");
+		default: return 0;
 	}
 
 	return __log_set_attr(buf, mode);
@@ -73,7 +75,6 @@ static int log_attr_set_fg_color(char * buf, int color)
 	const char * mode;
 
 	switch (color) {
-		default: return 0;
 		case __LOG_BLACK:    mode = "30"; break;
 		case __LOG_RED:      mode = "31"; break;
 		case __LOG_GREEN:    mode = "32"; break;
@@ -82,6 +83,7 @@ static int log_attr_set_fg_color(char * buf, int color)
 		case __LOG_MAGENTA:  mode = "35"; break;
 		case __LOG_CYAN:     mode = "36"; break;
 		case __LOG_WHITE:    mode = "37"; break;
+		default: return 0;
 	}
 
 	return __log_set_attr(buf, mode);
@@ -92,7 +94,6 @@ static int log_attr_set_bg_color(char * buf, int color)
 	const char * mode;
 
 	switch (color) {
-		default: return 0;
 		case __LOG_BLACK:    mode = "40"; break;
 		case __LOG_RED:      mode = "41"; break;
 		case __LOG_GREEN:    mode = "42"; break;
@@ -101,6 +102,7 @@ static int log_attr_set_bg_color(char * buf, int color)
 		case __LOG_MAGENTA:  mode = "45"; break;
 		case __LOG_CYAN:     mode = "46"; break;
 		case __LOG_WHITE:    mode = "47"; break;
+		default: return 0;
 	}
 
 	return __log_set_attr(buf, mode);
@@ -284,6 +286,28 @@ static int log_timestamp(char * buf, int level)
 	return len;
 }
 
+static int log_rl_timestamp(char *buf, int level)
+{
+	long timestamp, ms;
+	struct tm * tm_info;
+	int len = 0;
+
+	if (!(log_verbose_level & _LOG_LEVEL_TIMESTAMP))
+		return 0;
+
+	timestamp = get_rl_time_ms();
+	ms = timestamp % 1000;
+	timestamp /= 1000;
+	tm_info = localtime(&timestamp);
+	if (tm_info == NULL) {
+		len = sprintf(buf, "[0000-00-00 00:00:00.000] ");
+		return len;
+	}
+
+	len = sprintf(buf, "[%d-%02d-%02d %02d:%02d:%02d.%03ld] ", (tm_info->tm_year + 1900), (tm_info->tm_mon + 1), tm_info->tm_mday, tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec, ms);
+	return len;
+}
+
 void log_set_option_color(int color_en)
 {
 	if (color_en)
@@ -315,7 +339,12 @@ int do_log_common(unsigned int request_level, const char *func, int line, const 
 	prefix_i += log_color_start(buf + prefix_i, request_level);
 	buf_start_of_no_color = prefix_i;
 
-	prefix_i += log_timestamp(buf + prefix_i, request_level);
+	if (log_no_real_time) {
+		prefix_i += log_timestamp(buf + prefix_i, request_level);
+	} else {
+		prefix_i += log_rl_timestamp(buf + prefix_i, request_level);
+	}
+
 	prefix_i += log_prefix(buf + prefix_i, request_level, func, line);
 
 	va_start(args, log_fmt);
@@ -327,7 +356,7 @@ int do_log_common(unsigned int request_level, const char *func, int line, const 
 
 	// Print to kernel message for Error and Emergency log
 	if (log_to_kmsg_allowed && (request_level & (_LOG_LEVEL_ERR | _LOG_LEVEL_EMERG))) {
-		write_file_quiet("/dev/kmsg", buf, strlen(buf), 1, 0);
+		write_file_quiet("/dev/kmsg", (const char *)buf + buf_start_of_no_color, buf_end_of_no_color - buf_start_of_no_color, 1, 0);
 	}
 
 	if (prefix_i >= sizeof(buf) - 1) {
@@ -350,12 +379,10 @@ int do_log_common(unsigned int request_level, const char *func, int line, const 
 
 	if (0) {
 		static long log_bytes = 0;
-		long k, m;
 		log_bytes += prefix_i;
-		k = log_bytes / 1024;
-		m = k / 1024;
 		if (request_level & (_LOG_LEVEL_ERR | _LOG_LEVEL_EMERG)) {
-			printf(">>>>>> Log total bytes: %ld bytes, %ld KB, %ld MB\n", log_bytes, k, m);
+			printf(">>>>>> Log total bytes: %ld bytes, %ld KB, %ld MB\n",
+				log_bytes, log_bytes / 1024, (log_bytes / 1024) / 1024);
 			fflush(stdout);
 		}
 	}
@@ -376,17 +403,19 @@ void start_log_service(void)
 */
 int log_run()
 {
-	setup_signals();
+	// setup_signals();
+	const char *name = me ? me : "null"
 
-	if (logcat_mode()){
-		log_info("====log client====\n");
+	if (logcat_mode()) {
+		log_info("====%s log client====\n", name);
 		logcat_main();
 		exit(EXIT_SUCCESS);
 	}
 
-	log_info("log server!\n");
+	log_info("%s log server!\n", name);
 	start_log_service();
-	usleep(10000);
+
+	msleep(10);
 	return 0;
 }
 
@@ -410,36 +439,35 @@ int log_init(int argc, char *argv[], int (*p_parse_fun)(int, char**))
 
 int logall_run(int argc, char *argv[])
 {
-       int ret = 0;
+	int ret = 0;
 
-       setup_signals();
+	setup_signals();
 
-       ret = parse_args(argc, argv);
-       if (ret < 0) {
-               log_err("parse args in log parse failed\n");
-               return -1;
-       }
+	ret = parse_args(argc, argv);
+	if (ret < 0) {
+		log_err("parse args in log parse failed\n");
+		return -1;
+	}
 
-       if (ret == 0) {
-               usage(NULL, NULL);
-               return -1;
-       }
+	if (ret == 0) {
+		usage(NULL, NULL);
+		return -1;
+	}
 
-       if (logcat_mode()) {
-               if (me != NULL) {
-                       log_info("====%s log client====\n", me);
-               }
-               logcat_main();
-               exit(EXIT_SUCCESS);
-       }
+	const char *name = me ? me : "null"
+	if (logcat_mode()) {
+		log_info("====%s log client====\n", name);
+		logcat_main();
+		exit(EXIT_SUCCESS);
+	}
 
-       if (me != NULL) {
-               log_info("%s log server!\n", me);
-       }
+	log_info("====%s log server====\n", name);
 
-       has_log_logall_service = 1;
+	has_log_logall_service = 1;
 
-       start_log_service();
+	start_log_service();
 
-       return logall_main();
+	logall_main();
+
+	return 0;
 }

@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/uio.h>
@@ -29,13 +30,16 @@
 
 void msleep(int msec)
 {
-	int sec = msec / 1000;
-	int usec = (msec % 1000) * 1000;
+	if (msec <= 0)
+		return;
 
-	if (sec > 0)
-		sleep(sec);
-	if (usec > 0)
-		usleep(usec);
+    struct timespec ts;
+    ts.tv_sec = msec / 1000;
+    ts.tv_nsec = (msec % 1000) * 1000000;
+
+    while (nanosleep(&ts, &ts) == -1 && errno == EINTR) {
+        continue;
+    }
 }
 
 int my_atoi(char * s)
@@ -85,6 +89,18 @@ long get_time_ms(void)
 
 	memset(&ts, 0, sizeof(ts));
 	clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+	ms = (ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+
+	return ms;
+}
+
+long get_rl_time_ms(void)
+{
+	struct timespec ts;
+	long ms;
+
+	memset(&ts, 0, sizeof(ts));
+	clock_gettime(CLOCK_REALTIME, &ts);
 	ms = (ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
 
 	return ms;
@@ -232,6 +248,15 @@ int write_file_quiet(const char * filename, const void * data, int data_len, int
 	return ret;
 }
 
+int has_suffix(const char *filename, const char *suffix)
+{
+    size_t len = strlen(filename);
+    size_t suffix_len = strlen(suffix);
+    if (len < suffix_len)
+		return 0;
+    return strcmp(filename + len - suffix_len, suffix) == 0;
+}
+
 int remove_file(const char * filename)
 {
 	int ret;
@@ -239,20 +264,27 @@ int remove_file(const char * filename)
 	return ret;
 }
 
-
-size_t get_file_size(const char * filename, int quiet)
+int get_file_size(const char *filename)
 {
 	struct stat s;
 	int ret;
+	int fd;
 
-	ret = stat(filename, &s);
-	if (ret < 0) {
-		if (!quiet)
-			log_err("Stat file failed: %s, err = %d (%s)\n", filename, errno, strerror(errno));
-		return ret;
-	}
+    fd = open(filename, O_RDONLY);
+    if (fd < 0) {
+        log_warn("%s: open %s failed, errno = %d (%s)\n", tag, filename, errno, strerror(errno));
+        return 0;
+    }
 
-	return s.st_size;
+    ret = fstat(fd, &s);
+    if (ret < 0) {
+        log_warn("%s: fstat %s failed, errno = %d (%s)\n", tag, filename, errno, strerror(errno));
+        close(fd);
+        return 0;
+    }
+
+    close(fd);
+    return s.st_size;
 }
 
 /*int ll_send_cmd_common(const char * filename, char * buf, int non_block)
@@ -383,12 +415,12 @@ static unsigned int * crc32_init(void)
 static unsigned int crc32_table_reflect(const unsigned char *buf, int len)
 {
 	unsigned int * table = crc32_init();
-	unsigned int crc = -1;
+	int crc = -1;
 
 	while (len-- > 0)
 		crc = table[ (crc ^ *buf++) & 0xFF ] ^ (crc >> 8); // reflect: >> 8
 
-	return ~crc;
+	return (unsigned int)(~crc);
 }
 
 unsigned int crc32(const unsigned char * buf, int len)
@@ -541,8 +573,10 @@ void service_sock_close(int sock, const char * private_tag)
 	if (!private_tag)
 		private_tag = tag;
 
-	if (sock >= 0)
+	if (sock >= 0) {
 		close(sock);
+		log_info("%s: Service Closed (sock = %d) ......\n", private_tag, sock);
+	}
 }
 
 int service_try_connect_self(int port, const char * private_tag)

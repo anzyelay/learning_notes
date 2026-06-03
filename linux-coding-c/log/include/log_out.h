@@ -1,6 +1,10 @@
 #ifndef _LOG_OUT_H
 #define _LOG_OUT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif  //__cplusplus
+
 #define CONFIG_BASIC_LOG_LEVEL    (_LOG_LEVEL_EMERG | \
                                    _LOG_LEVEL_ERR | \
                                    _LOG_LEVEL_WARN | \
@@ -77,9 +81,16 @@ const char * log_get_version(void);
 
 const char * log_get_help_info(void);
 
-int do_log_common(unsigned int request_level, const char * func, int line, const char * log_fmt, ...);
+int do_log_common(unsigned int request_level,
+                  const char *func,
+                  int line,
+                  const char * log_fmt,
+                  ...)
+    __attribute__((format(printf, 4, 5)));
 
 void set_log_dir(char * dir_path);
+
+const char * get_log_dir();
 
 /**
  * log_init: init the log service, you can use log_get_help_info
@@ -97,6 +108,7 @@ void set_log_dir(char * dir_path);
 */
 int log_init(int argc, char *argv[], int (*p_parse_fun)(int, char**));
 
+void log_quit();
 /**
  * @brief  logall_run: run the log all service, which will collect all logs, and block here
  * This function is used when the log service is running as a daemon or service.
@@ -106,5 +118,11 @@ int log_init(int argc, char *argv[], int (*p_parse_fun)(int, char**));
  * @return int
  */
 int logall_run(int argc, char *argv[]);
+
+void log_file_sync();
+
+#ifdef __cplusplus
+}
+#endif  //__cplusplus
 
 #endif /* _LOG_OUT_H */

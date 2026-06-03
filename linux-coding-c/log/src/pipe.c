@@ -13,7 +13,6 @@
 #include "common.h"
 #include "pipe.h"
 
-#define basic_sleep()  usleep(1000 * 10)
 #define configTICK_RATE_HZ  1000
 
 /*
@@ -73,7 +72,7 @@ void pipe_close(pipe_t * p)
 	pipe_stop_read(p);
 	pipe_stop_write(p);
 	while (p->user > 0) {
-		basic_sleep();
+		msleep(10);
 	}
 
 	p->opened = 0; // set close first, then free buffer
@@ -142,7 +141,7 @@ int pipe_peek(pipe_t * p, char * buf, unsigned int size, unsigned int least, uns
 			return PIPE_ERR_WRITE_STOPPED; // No data any more!
 		}
 		if (p->sync) {
-			basic_sleep();
+			msleep(10);
 			if (p->read_sync_timeout > 0) {
 				now = get_time_ms();
 				if (now - start >= p->read_sync_timeout) {
@@ -168,7 +167,7 @@ int pipe_peek(pipe_t * p, char * buf, unsigned int size, unsigned int least, uns
 	while (p->bytes < least) {
 		if (p->stop_write)
 			break;
-		basic_sleep();
+		msleep(10);
 	}
 
 	// Has data
@@ -215,7 +214,7 @@ int pipe_read(pipe_t * p, char * buf, unsigned int size, unsigned int least, uns
 			return PIPE_ERR_WRITE_STOPPED; // No data any more!
 		}
 		if (p->sync) {
-			basic_sleep();
+			msleep(10);
 			if (p->read_sync_timeout > 0) {
 				now = get_time_ms();
 				if (now - start >= p->read_sync_timeout) {
@@ -241,7 +240,7 @@ int pipe_read(pipe_t * p, char * buf, unsigned int size, unsigned int least, uns
 	while (p->bytes < least) {
 		if (p->stop_write)
 			break;
-		basic_sleep();
+		msleep(10);
 	}
 
 	// Has data
@@ -315,7 +314,7 @@ int pipe_write(pipe_t * p, const char * buf, unsigned int bytes)
 			return PIPE_ERR_READ_STOPPED; // No reader!
 		}
 		if (p->sync) {
-			basic_sleep();
+			msleep(10);
 			if (p->write_sync_timeout > 0) {
 				now = get_time_ms();
 				if (now - start >= p->write_sync_timeout) {
@@ -638,3 +637,4 @@ int pipe_set_loop_overwrite(pipe_t * p, int loop_overwrite)
 
 	return PIPE_ERR_OK;
 }
+

@@ -52,11 +52,10 @@ extern "C" {
 #define parse_arg_string_cpy(cmd, var, check_null) \
 	else if (!strncmp(arg, (cmd), strlen((cmd)))) { \
 		char *tmp = arg + strlen((cmd)); \
-		memset(var,0,sizeof(var));\
-		memcpy(var,tmp,strlen(tmp));\
-		if (check_null && strlen(tmp) == 0) { \
-			usage(cmd " should NOT be empty!", NULL); \
-			return -1; \
+		if (check_null && strlen(tmp) != 0) { \
+			memset(var,0,sizeof(var));\
+			strncpy(var, tmp, sizeof(var)-1); \
+			var[sizeof(var) - 1] = '\0'; \
 		} \
 	}
 

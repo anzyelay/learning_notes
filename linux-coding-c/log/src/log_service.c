@@ -27,7 +27,7 @@
 #define LOGCAT_SERVICE_PORT   2112	// 日志服务端口号
 #define LOGCAT_CLIENTS_NR     16	// 最大客户端数量
 
-#define LOG_PIPE_SIZE         (1024 * 1024 * 2)	// 日志管道的大小
+#define LOG_PIPE_SIZE         (1024 * 1024 * 1)	// 日志管道的大小
 static int log_logcat_ready = 0;
 static pipe_t logcat_pipe, * logcat_clients_pipe[LOGCAT_CLIENTS_NR];
 
@@ -41,8 +41,18 @@ static pthread_mutexattr_t logcat_service_mutex_attr;
 	pthread_mutexattr_settype(&logcat_service_mutex_attr, PTHREAD_MUTEX_RECURSIVE); \
 	pthread_mutex_init(&logcat_service_mutex, &logcat_service_mutex_attr); } while (0)
 #define logcat_service_mutex_destroy() do { pthread_mutex_destroy(&logcat_service_mutex); } while (0)
-#define logcat_service_mutex_lock() do { pthread_mutex_lock(&logcat_service_mutex); } while (0)
-#define logcat_service_mutex_unlock() do { pthread_mutex_unlock(&logcat_service_mutex); } while(0)
+#define logcat_service_mutex_lock() do { \
+    int lock_ret = pthread_mutex_lock(&logcat_service_mutex); \
+    if (lock_ret != 0) { \
+        log_err("Failed to lock logcat_service_mutex: %s\n", strerror(lock_ret)); \
+    } \
+} while (0)
+#define logcat_service_mutex_unlock() do { \
+    int unlock_ret = pthread_mutex_unlock(&logcat_service_mutex); \
+    if (unlock_ret != 0) { \
+        log_err("Failed to unlock logcat_service_mutex: %s\n", strerror(unlock_ret)); \
+    } \
+} while (0)
 
 /*
  * Logcat clients manager
@@ -183,7 +193,7 @@ static void inject_to_logcat_pipes(unsigned int request_level, const char * extr
 	inject_to_pipe(&logcat_pipe, extra_prefix, log, log_bytes);
 	for (i = 0; i < LOGCAT_CLIENTS_NR; i++) {
 		if (!logcat_clients_pipe[i])
-			continue; // logcat clients pipe may be free, so it break down the continueos
+			break;
 		inject_to_pipe(logcat_clients_pipe[i], extra_prefix, log, log_bytes);
 	}
 	logcat_service_mutex_unlock();
@@ -195,7 +205,7 @@ void log_logcat_inject(unsigned int request_level, const char * log, int log_byt
 	const char * extra_tag = log_get_extra_prefix(request_level);
 	char extra_prefix[32];
 
-	sprintf(extra_prefix, "<%s>", extra_tag);
+	snprintf(extra_prefix, 32, "<%s>", extra_tag);
 
 	if (cached_early_log_bytes >= 0) {
 		int extra_prefix_len, log_len, len;
@@ -204,10 +214,10 @@ void log_logcat_inject(unsigned int request_level, const char * log, int log_byt
 		log_len = log_bytes;
 		len = cached_early_log_bytes + extra_prefix_len + log_len;
 
-		if (len < EARLY_LOG_SIZE) {
-			strcpy(cached_early_log_buf + cached_early_log_bytes, extra_prefix);
+		if (len < EARLY_LOG_SIZE && log_len >= 0) {
+			strncpy(cached_early_log_buf + cached_early_log_bytes, extra_prefix, EARLY_LOG_SIZE-cached_early_log_bytes);
 			cached_early_log_bytes += extra_prefix_len;
-			strncpy(cached_early_log_buf + cached_early_log_bytes, log, log_len);
+			strncpy(cached_early_log_buf + cached_early_log_bytes, log, EARLY_LOG_SIZE-cached_early_log_bytes);
 			cached_early_log_bytes += log_len;
 		}
 	}
@@ -227,13 +237,14 @@ void log_logcat_clear(void)
 	logcat_service_mutex_lock();
 	while (1) {
 		bytes = pipe_read(&logcat_pipe, buf, sizeof(buf), 0, 0);
+		log_info("%s: clear logcat pipe, %d bytes\n", tag, bytes);
 		if (bytes <= 0)
 			break;
 	}
 	logcat_service_mutex_unlock();
 }
 
-static int server_logcat_to_logall(void)
+static void* server_logcat_to_logall(void *pdata)
 {
 	pipe_t * pipe;
 	char buf[1024];
@@ -243,7 +254,7 @@ static int server_logcat_to_logall(void)
 
 	pipe = logcat_clients_get_new_pipe();
 	if (!pipe)
-		return -1;
+		return (void *)1;
 	// log_debug_v2("%s: new client connected, socket: %d\n", tag, client_sock);
 	int local_socket = socket(AF_INET, SOCK_DGRAM, 0);
 	struct sockaddr_in logall_addr;
@@ -256,11 +267,10 @@ static int server_logcat_to_logall(void)
 		if (bytes < 0)
 			break;
 		if (bytes > 0) {
-			ret = sendto(local_socket, buf, bytes, NULL, &logall_addr, sizeof(logall_addr));
+			ret = sendto(local_socket, buf, bytes, 0, (const struct sockaddr *)&logall_addr, sizeof(logall_addr));
 			if (ret < 0) {
 				msleep(100);
-				log_debug_vv("%s: send to logall service failed, %d bytes, error = %d (%s)\n", tag, bytes, errno, strerro
-(errno));
+				log_debug_vv("%s: send to logall service failed, %d bytes, error = %d (%s)\n", tag, bytes, errno, strerror(errno));
 			}
 		} else {
 			msleep(100);
@@ -268,8 +278,9 @@ static int server_logcat_to_logall(void)
 	}
 	close(local_socket);
 	logcat_clients_free_pipe(pipe);
-	return 0;
+	return (void *)0;
 }
+
 /*
  * Logcat clients process
  * Each client has a thread
@@ -286,7 +297,7 @@ static int serve_logcat_client(int client_sock, void * private_data)
 		return -1;
 	log_debug_v2("%s: new client connected, socket: %d\n", tag, client_sock);
 
-	while(1) {
+	while(!log_get_exit_flag()) {
 		bytes = pipe_read(pipe, buf, sizeof(buf), 0, 0);
 		if (bytes < 0)
 			break;
@@ -360,7 +371,7 @@ static void * log_logcat_service_thread(void *param)
 
 	pthread_detach(pthread_self()); // Need NO pthread_join()
 	logcat_clients_init();
-	while (1) {
+	while(!log_get_exit_flag()){
 		int ret = 0;
 		ret = do_logcat_service();
 		log_info("%s: service exited (ret = %d), restart after %d seconds!\n", tag, ret, restart_seconds);
@@ -369,7 +380,7 @@ static void * log_logcat_service_thread(void *param)
 		sleep(restart_seconds);
 	}
 	logcat_clients_exit();
-
+	log_info("%s: logcat service thread exit.\n", tag);
 	return NULL;
 }
 

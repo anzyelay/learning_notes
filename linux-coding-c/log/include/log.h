@@ -14,17 +14,18 @@ extern "C" {
 #if CONFIG_LOGCAT_ONLY_LOCAL
 #define LOG_SERVICE_NAME_FMT          "/dev/%s_log_interface"
 #endif
+#define LOGCAT_LOGALL_SERVICE_PORT  8259	// logall服务端口
 
-#define LOGCAT_LOGALL_SERVICE_PORT  8259       // logall服务端口
-
+extern int g_timezone_offset;
+extern int log_readout_once_time;
+extern int log_no_real_time;
 extern unsigned int log_verbose_level;
 extern int has_log_file_service;
 extern int has_log_logcat_service;
 extern int has_log_logall_service;
 extern int log_to_kmsg_allowed;
 extern const char * me;
-extern char * log_dir;
-extern char default_log_dir[64];
+extern char log_dir[128];
 extern char log_service_name[128];
 
 void log_set_option_color(int color_en);
@@ -40,6 +41,7 @@ void start_log_logcat_service(void);
 #define logcat_usage(me, me_copyright, err, err_param) mifi_main_usage(me, me_copyright, err, err_param)
 int logcat_mode();
 void logcat_main(void);
+void logall_main(void);
 void set_logcat_mode();
 void set_logcat_mode_host(const char * host);
 void set_logcat_mode_port(int port);

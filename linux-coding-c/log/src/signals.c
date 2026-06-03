@@ -18,10 +18,23 @@
 
 #define tag "Signal"
 
+static int log_exit_flag = 0;
+
 static void quit_by_user(int signo)
 {
-	printf("%s: Quit by Signal: %d\n", tag, signo);
-	safely_quit("Signal", 0);
+	log_emerg("%s: Quit by Signal: %d\n", tag, signo);
+	log_safely_quit("Signal");
+	exit(0);
+}
+
+void log_set_exit_flag()
+{
+    log_exit_flag = 1;
+}
+
+int log_get_exit_flag()
+{
+    return log_exit_flag;
 }
 
 static void stop_by_user(int signo)
@@ -30,15 +43,16 @@ static void stop_by_user(int signo)
 		return;
 
 	if (signo == SIGTSTP) {
-		log_emerg("%s: Stopped by SIGTSTP, WDT stopped!\n", tag);
+		// log_emerg("%s: Stopped by SIGTSTP, WDT stopped!\n", tag);
 		// wdt_stop();
 		raise(SIGSTOP);   // Let the SIGSTOP to suspend myself
-	} else if (signo == SIGCONT) {
-		log_emerg("%s: Continued by SIGCONT, WDT started!\n", tag);
-		// wdt_start();
-	} else {
-		log_err("%s: Unknown Signal: %d\n", tag, signo);
-	}
+    }
+	// } else if (signo == SIGCONT) {
+	// 	log_emerg("%s: Continued by SIGCONT, WDT started!\n", tag);
+	// 	// wdt_start();
+	// } else {
+	// 	log_err("%s: Unknown Signal: %d\n", tag, signo);
+	// }
 }
 
 static void pipe_broken(int signo)
@@ -70,7 +84,7 @@ static void handle_exited_subprocess(int signo)
 		pid = waitpid(-1, &stat, WNOHANG);
 		if (pid <= 0)
 			break;
-		log_emerg("%s: Child quitted: %d, stat = %d\n", tag, pid, stat);
+		// log_debug("%s: Child quitted: %d, stat = %d\n", tag, pid, stat);
 	}
 }
 
@@ -92,3 +106,4 @@ void setup_signals(void)
 
 	log_debug("%s: signals are ready.\n", tag);
 }
+

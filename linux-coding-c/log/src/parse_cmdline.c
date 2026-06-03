@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "common.h"
 #include "log.h"
@@ -15,7 +16,7 @@
 static const char * me_copyright = "JBD-CAR-1. 2024.";
 // static const char * name_for_logcat = "fx-log";
 
-static const char * conf_file = "/etc/tbox-cmdline.conf";
+static const char * conf_file = "/data/etc/log.conf";
 
 static int do_save_config = 0;
 
@@ -24,7 +25,7 @@ extern char * logcat_cat_log_file;
 
 const char * firmware_get_version(void)
 {
-	return "1.0.0";
+	return "2.0.0";
 }
 
 const char * log_get_version(void)
@@ -35,28 +36,34 @@ const char * log_get_version(void)
 char output_buf[1024];
 const char * log_get_help_info(void)
 {
-	sprintf(output_buf,
+	snprintf(output_buf, 1024,
 			"\t[--verbose=log-level]\n"
 			"\t[--logcat]\n"
 			"\t[--save-config] [--config-file=conf-file-path]\n"
 			"\n"
-			"\t[--log-write-file=0/1] [--logcat-service=0/1]\n"
-			"\t[--log-no-color] [--log-no-timestamp] [--log-prefix]\n"
+			"\t[--log-write-file=0/1]\n"
+			"\t[--logcat-service=0/1]\n"
+			"\n"
+			"\t[--log-no-color | -nc]\n"
+			"\t[--log-no-timestamp | -nt]\n"
+			"\t[--log-no-realtime | -nr]\n"
+			"\t[--log-prefix | -p]\n"
 			"\t[--log-error-only]\n"
 			"\t[--log-verbose] [--log-no-verbose]\n"
-			"\t[--log-debug] [--log-debug1] [--log-debug2] [--log-debugv]\n"
-			"\t[--log-all]\n"
+			"\t[--log-debug | -db] [--log-debug1 | -db1] [--log-debug2 | -db2] [--log-debugv | -dbv]\n"
+			"\t[--log-all | -a]\n"
 			"\n"
 			"\t[--log-dir=<log-file-dir>]\n"
 			"\n"
-			"\t[--logcat-file=<log-file>]\n"
-			"\t[--logcat-clear | -c ]\n"
+			"\t[--logcat-file=<log-file> --tz=<n>]\n"
+			"\t[--logcat-clear | -c]\n"
+			"\t[--readout-once=<unit: 100ms>]\n"
 			"\n"
 			"Default Values:\n"
 			"  Verbose:               0x%x\n"
 			"  Log File:              %s\n"
 			"  Logcat Service:        %s\n"
-			"  Config file:           %s\n"
+			"  Log config file:       %s\n"
 			"\n"
 			"Notes:\n"
 			"  Option '--save-config' Will exit the program after the configs saved!\n"
@@ -116,20 +123,32 @@ static int parse_arg_common(char * arg)
 	parse_arg_xint("--log-write-file=",          has_log_file_service,    0,       1)
 	parse_arg_xint("--logcat-service=",          has_log_logcat_service,  0,       1)
 	parse_arg_set("--log-no-color",              log_no_color,            1)
+	parse_arg_set("-nc",                         log_no_color,            1)
 	parse_arg_set("--log-no-timestamp",          log_no_timestamp,        1)
+	parse_arg_set("-nt",                         log_no_timestamp,        1)
 	parse_arg_set("--log-prefix",                log_prefix,              1)
+	parse_arg_set("-p",                          log_prefix,              1)
 	parse_arg_set("--log-error-only",            log_error_only,          1)
 	parse_arg_set("--log-verbose",               log_verbose,             1)
 	parse_arg_set("--log-no-verbose",            log_no_verbose,          1)
 	parse_arg_set("--log-debug",                 log_debug,               1)
+	parse_arg_set("-db",                         log_debug,               1)
 	parse_arg_set("--log-debug1",                log_debug1,              1)
+	parse_arg_set("-db1",                        log_debug1,              1)
 	parse_arg_set("--log-debug2",                log_debug2,              1)
+	parse_arg_set("-db2",                        log_debug2,              1)
 	parse_arg_set("--log-debugv",                log_debugv,              1)
+	parse_arg_set("-dbv",                        log_debugv,              1)
 	parse_arg_set("--log-all",                   log_all,                 1)
-	parse_arg_string_cpy("--log-dir=",           default_log_dir,         1)
+	parse_arg_set("-a",                          log_all,                 1)
+	parse_arg_string_cpy("--log-dir=",           log_dir,                 1)
 	parse_arg_string("--logcat-file=",           logcat_cat_log_file,     1)
+	parse_arg_int("--tz=",                       g_timezone_offset,      -12,       12)
 	parse_arg_set("--logcat-clear",              logcat_clear_logs,       1)
 	parse_arg_set("-c",                          logcat_clear_logs,       1)
+	parse_arg_set("--log-no-realtime",           log_no_real_time,        1)
+	parse_arg_set("-nr",                         log_no_real_time,        1)
+	parse_arg_int("--readout-once=",             log_readout_once_time,   0,       INT_MAX)
 	else { return 0; /* Not found */ }
 
 	if (log_no_color)
@@ -155,6 +174,8 @@ static int parse_arg_common(char * arg)
 	if (log_all)
 		log_verbose_level = CONFIG_LOG_ALL_LEVEL;
 
+	if (logcat_cat_log_file)
+		set_logcat_mode();
 	return 1;
 }
 /*
@@ -215,13 +236,15 @@ static int read_conf_file(const char* filename, char* buf, int bytes)
 
 	fd = open(filename, O_RDONLY);
 	if(fd < 0) {
-		log_verbose("Config file: open file failed: %s, err = %d\n", filename, errno);
+		log_warn("Log config file: open %s failed, errno = %d (%s)\n", filename, errno, strerror(errno));
 		return fd;
 	}
 
 	ret = read(fd, buf, bytes);
+	buf [bytes] = '\0';
 	if(ret < 0) {
-		log_verbose("Config file: read file failed: %s, err = %d\n", filename, errno);
+		log_warn("Log config file: read %s failed, errno = %d (%s)\n", filename, errno, strerror(errno));
+		close(fd);
 		return ret;
 	}
 
@@ -236,13 +259,14 @@ static int write_conf_file(const char * filename, const char * data)
 
 	fd = open(filename, O_WRONLY | O_TRUNC | O_CREAT, 0666);
 	if (fd < 0) {
-		log_err("Config file: open file failed: %s, err = %d(%s)\n", filename, errno, strerror(errno));
+		log_warn("Log config file: open %s failed, errno = %d (%s)\n", filename, errno, strerror(errno));
 		return fd;
 	}
 
 	ret = write(fd, data, strlen(data));
 	if (ret < 0) {
-		log_err("Config file: write file failed: %s, err = %d, data =\n%s\n", filename, errno, data);
+		log_warn("Log config file: write %s failed, errno = %d, data =\n%s\n", filename, errno, data);
+		close(fd);
 		return ret;
 	}
 
@@ -256,7 +280,7 @@ int read_from_conf_file(void)
 	char buf[1024], *head, *next = buf;
 	int ret;
 
-	log_debug("Config file: %s\n", conf_file);
+	log_debug("Log config file: %s\n", conf_file);
 
 	memset(buf, 0, sizeof(buf));
 	ret = read_conf_file(conf_file, buf, sizeof(buf) - 1);
@@ -310,7 +334,7 @@ int write_to_conf_file(void)
 	int ret;
 
 	memset(buf, 0, sizeof(buf));
-	sprintf(buf,
+	snprintf(buf, 1024,
 		"--verbose=0x%x\n"
 		"--log-write-file=%d\n"
 		"--logcat-service=%d\n"
@@ -319,7 +343,7 @@ int write_to_conf_file(void)
 		log_verbose_level,
 		!!has_log_file_service,
 		!!has_log_logcat_service,
-		default_log_dir,
+		log_dir,
 		"\n");
 
 	ret = write_conf_file(conf_file, buf);
@@ -366,13 +390,9 @@ int parse_args(int argc, char **argv)
 
 	// Get the configs from file
 	if(read_from_conf_file()) {
-		log_info("read config file failed: %s\n", conf_file);
+		log_info("read %s failed, rewrite it\n", conf_file);
 		write_to_conf_file();
 	}
-
-	// Set the log dir path
-	if (strlen(default_log_dir) > 0)
-		set_log_dir(default_log_dir);
 
 	// Overwrite the configs with command line
 	ret = parse_args_once(argc, argv);

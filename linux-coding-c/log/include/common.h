@@ -23,6 +23,8 @@ typedef unsigned int    uint32_t;
 
 #define set_single_called(return_statement) do { static int __called = 0; if (__called) return_statement; __called = 1; } while (0)
 
+
+long get_rl_time_ms(void);
 long get_time_ms(void);
 long get_realtime_sec(void);
 long get_timestamp_start(void);
@@ -35,7 +37,8 @@ int read_file(const char * filename, char * buf, int buf_size, int non_block);
 int write_file(const char * filename, const char * data, int non_block);
 int write_raw_data(const char * filename, const void * data, int data_len, int non_block, int may_create);
 int write_file_quiet(const char * filename, const void * data, int data_len, int non_block, int may_create);
-size_t get_file_size(const char * filename, int quiet);
+int has_suffix(const char *filename, const char *suffix);
+int get_file_size(const char * filename);
 
 int service_sock_open(int port, const char * private_tag);
 void service_sock_close(int sock, const char * private_tag);
@@ -47,7 +50,9 @@ int service_unix_sock_open(const char * socket_name, const int socket_name_len);
 void service_unix_sock_close(int sock);
 const char * get_printable_unix_socket_name(const char * socket_name);
 
+void log_set_exit_flag();
+int log_get_exit_flag();
 void setup_signals(void);
-void safely_quit(const char * reason, int need_watchdog_fire);
+void log_safely_quit(const char * reason);
 
 #endif

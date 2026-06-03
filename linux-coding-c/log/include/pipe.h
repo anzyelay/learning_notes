@@ -36,8 +36,20 @@ typedef void (*pipe_rw_hook_cb)(struct pipe_struct * pipe, const char * buf, int
 	pthread_mutexattr_settype(&x.mutex_attr, PTHREAD_MUTEX_RECURSIVE); \
 	pthread_mutex_init(&x.mutex, &x.mutex_attr); } while (0)
 #define pipe_lock_destroy(x) do { pthread_mutex_destroy(&x.mutex); } while (0)
-#define pipe_lock(x) do { pthread_mutex_lock(&x.mutex); } while (0)
-#define pipe_unlock(x) do { pthread_mutex_unlock(&x.mutex); } while(0)
+
+#define pipe_lock(x) do { \
+    int lock_ret = pthread_mutex_lock(&(x).mutex); \
+    if (lock_ret != 0) { \
+        log_err("Failed to lock pipe_mutex: %s\n", strerror(lock_ret)); \
+    } \
+} while (0)
+#define pipe_unlock(x) do { \
+    int unlock_ret = pthread_mutex_unlock(&(x).mutex); \
+    if (unlock_ret != 0) { \
+        log_err("Failed to unlock pipe_mutex: %s\n", strerror(unlock_ret)); \
+    } \
+} while (0)
+
 #else // Use variable, Only for RTOS or No OS
 #define pipe_lock_define() int mutex
 #define pipe_lock_init(x) do { x = 0; } while (0)
@@ -47,7 +59,7 @@ typedef void (*pipe_rw_hook_cb)(struct pipe_struct * pipe, const char * buf, int
 			while (x == 1) { \
 				if (nr++ >= 1000) break; \
 				log_debug("pipe_lock() in %s(), mutex:1\n", __FUNCTION__); \
-				basic_sleep(); \
+				msleep(10); \
 			} \
 			x = 1; \
 		} while (0)
