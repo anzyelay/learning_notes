@@ -186,6 +186,8 @@ PROVIDES | 主要是为了起别名
     1. 可针对某个recipe寻找变量信息
 
        `bitbake -e recipe-name | grep -e '\bKERNEL_VERSION\b'`
+       `bitbake -e android-tools | grep '^S='`:  找源码目录
+       `bitbake -e android-tools | grep '^PV='` : 找版本号
 
 ### [从基础出发构建自己的recipes](https://wiki.yoctoproject.org/wiki/Building_your_own_recipes_from_first_principles)
 
