@@ -23,12 +23,8 @@ MARKER:
 EOF
     tar czf - "$dir" | \
         openssl enc -aes-256-cbc -pbkdf2 -salt >> output_script.sh
-    #payload.tar.gz.enc
-    #cat payload.tar.gz.enc >> output_script.sh
 
     chmod +x output_script.sh
-
-    rm -f payload.tar.gz.enc
 
     base64 -w 0 output_script.sh > output_script.sh.b64
     # base64 -d output_script.sh.b64 > output_script.sh
