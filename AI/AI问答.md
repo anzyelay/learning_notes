@@ -141,3 +141,15 @@
 3. 注册一个大模型 API 密钥（比如 Google AI Studio 提供的免费 Gemini API），用 Python 写一个 10 行以内的脚本，实现一个在终端里能和你连续对话的 Chatbot。
 
 你打算先从第二阶段（用 PyTorch 啃深度学习底层）**开始，还是直接从**第三阶段（直接用现成 API 和 LangChain 边做应用边补基础）切入呢？
+
+---
+
+## Q & A
+
+### 1. AI中几个python库的关系
+
+- NumPy → 数值计算
+- Pandas → 数据处理
+- ScikitLearn→ 传统机器学习
+- PyTorch → 深度学习
+- TensorFlow → 深度学习
