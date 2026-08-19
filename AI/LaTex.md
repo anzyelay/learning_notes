@@ -119,7 +119,7 @@ $$公式$$
 | `\left( x \right)` | $\left( x \right)$ |
 | `\left[ x \right]` | $\left[ x \right]$ |
 | `\left\{ x \right\}` | $\left\{ x \right\}$ |
-| `\left| x \right|` | $\left| x \right|$ |
+| `\left\| x \right\|` | $\left\| x \right\|$ |
 
 > 💡 用 `\left` 和 `\right` 括号会自动匹配内容高度。
 
