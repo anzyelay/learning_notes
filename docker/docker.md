@@ -34,7 +34,7 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 
 ## docker 配置
 
-1. Add user to docker group
+1. Add user to docker grou codespaces that use Debian-based imagesp
 
     ```sh
     sudo groupadd docker
@@ -57,7 +57,7 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 1. 列出镜像: `docker images`
 
    ```sh
-   runoob@runoob:~$ docker images           
+   runoob@runoob:~$ docker images
     REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
     ubuntu              14.04               90d5884b1ee0        5 days ago          188 MB
     php                 5.6                 f40e9e0f10c8        9 days ago          444.8 MB
@@ -83,7 +83,7 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
     [dockerfile格式](https://www.runoob.com/docker/docker-dockerfile.html)：
 
     ```sh
-    runoob@runoob:~$ cat Dockerfile 
+    runoob@runoob:~$ cat Dockerfile
     FROM    centos:6.7
     MAINTAINER      Fisher "fisher@sudops.com"
 
@@ -108,7 +108,7 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
       2. 第一条FROM，指定使用哪个镜像源
       3. **RUN** 指令告诉docker 在镜像内执行命令，安装了什么。。。
       4. **WORKDIR**: 指示Dockerfile中后续RUN， CMD， ENTRYPOINT， COPY和ADD指令执行时的目录所在
-      5. **CMD**:启动容器后提供默认执行的命令,会被`docker run`命令中给出的参数所覆盖。 多个CMD时最后一个有效, 
+      5. **CMD**:启动容器后提供默认执行的命令,会被`docker run`命令中给出的参数所覆盖。 多个CMD时最后一个有效,
       6. **ENTRYPOINT**: 用于定义容器启动时要执行的命令或程序同，相当于直接将其指令append到`docker run <image>`后面, 与**CMD**不同，不会被`docker run`命令中给出的参数所覆盖, 相反，这些参数会被作为传递给ENTRYPOINT命令apppend的参数。多个ENTRYPOINT时最后一个有效, 可以使用`docker run --entrypoint`覆盖创建时的ENTRYPOINT
       7. **ENV**: 环境变量设置生效不只在dockerfile中，后续创建的容器也生效
       8. **ARG**: 环境变量只在dockerfile中有效，后续创建容器无效
@@ -153,7 +153,7 @@ curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 
     1. 重启容器:`docker restart container_id`
 
-1. 进入容器  
+1. 进入容器
     在使用 -d 参数时，容器启动后会进入后台。此时想要进入容器，可以通过以下指令进入:
     - `docker attach container_id`: 退出容器时会停止容器
     - `docker exec -it container_id /bin/bash`：从这个容器退出，容器不会停止
@@ -258,50 +258,111 @@ CMD     /usr/sbin/sshd -D
 #ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 ```
 
-1. 使用Dockerfile生成 "**ubuntu:rk3588**" 镜像：
+### 使用Dockerfile生成 "**ubuntu:rk3588**" 镜像：
 
-    ```sh
-    docker build -t ubuntu:rk3588 /your/dockerfile/path（不是文件名，只是路径名，会自动搜索Dockerfile）
+```sh
+docker build -t ubuntu:rk3588 /your/dockerfile/path（不是文件名，只是路径名，会自动搜索Dockerfile）
+```
+
+- 镜像基于ubuntu 21.04构建，包含一个缺省用户root，密码123，编译rk3588需要的基本环境
+- 建议修改Dockerfile中customize部分，添加一个与host主机上用户同名的用户和uid，否则下面共享文件会出现权限问题，可以创建自己需要的用于共享的目录
+- 可以将所有RUN命令写到一个脚本中执行一次RUN即可,这样达到layer层次最小化的目的
+
+    ```Dockerfile
+    ADD run.sh /tmp/run.sh
+    RUN cd /tmp && chmod +x run.sh && run.sh && rm run.sh
     ```
 
-    - 镜像基于ubuntu 21.04构建，包含一个缺省用户root，密码123，编译rk3588需要的基本环境
-    - 建议修改Dockerfile中customize部分，添加一个与host主机上用户同名的用户和uid，否则下面共享文件会出现权限问题，可以创建自己需要的用于共享的目录
-    - 可以将所有RUN命令写到一个脚本中执行一次RUN即可,这样达到layer层次最小化的目的
+- 在Docker镜像中创建一个用户，我们可以在Dockerfile使用`ARG`指定变量, `RUN`和 `USER` 指令达成目的:
 
-        ```Dockerfile
-        ADD run.sh /tmp/run.sh
-        RUN cd /tmp && chmod +x run.sh && run.sh && rm run.sh
-        ```
+    ```sh
+    FROM alpine:latest
+    ARG DOCKER_USER=default_user
+    RUN addgroup -S $DOCKER_USER && adduser -S $DOCKER_USER -G $DOCKER_USER
+    USER $DOCKER_USER
+    CMD ["whoami"]
+    ```
 
-    - 在Docker镜像中创建一个用户，我们可以在Dockerfile使用`ARG`指定变量, `RUN`和 `USER` 指令达成目的:
+    在创建时也可以方便的修改用户名:
+    `$ docker build --build-arg DOCKER_USER=baeldung -t dynamicuser .`
 
-        ```sh
-        FROM alpine:latest
-        ARG DOCKER_USER=default_user
-        RUN addgroup -S $DOCKER_USER && adduser -S $DOCKER_USER -G $DOCKER_USER
-        USER $DOCKER_USER
-        CMD ["whoami"]
-        ```
+    有一些默认的`ARG`变量设置代理如下：
 
-        在创建时也可以方便的修改用户名:
-        `$ docker build --build-arg DOCKER_USER=baeldung -t dynamicuser .`
+    ```sh
+    HTTP_PROXY
+    http_proxy
+    HTTPS_PROXY
+    https_proxy
+    FTP_PROXY
+    ftp_proxy
+    NO_PROXY
+    no_proxy
+    ALL_PROXY
+    all_proxy
+    ```
 
-        有一些默认的`ARG`变量设置代理如下：
+- path里面的所有内容在创建时都要发送给docker daemon,所以不要放太多无关的文件在path目录下，不然影响创建效率
 
-        ```sh
-        HTTP_PROXY
-        http_proxy
-        HTTPS_PROXY
-        https_proxy
-        FTP_PROXY
-        ftp_proxy
-        NO_PROXY
-        no_proxy
-        ALL_PROXY
-        all_proxy
-        ```
+### 多阶段构建（Multi-stage Build
 
-    - path里面的所有内容在创建时都要发送给docker daemon,所以不要放太多无关的文件在path目录下，不然影响创建效率
+语法:
+
+> 命名阶段
+> From ubuntu:20.04 AS builder
+>
+> 传递阶段产物
+> COPY --from=<阶段名> <源路径> <目标路径>
+
+其中
+
+```txt
+ubuntu:20.04   -> 基础镜像
+AS builder     -> 给当前阶段起个名字, 名字可以随便起，后面引用指定即可`--from=bias_name`
+```
+
+意思是：
+
+> 创建一个名为 builder 的构建阶段，后面可以从这个阶段复制文件。
+
+示例
+
+```Dockerfile
+# stage 1:
+FROM ubuntu:20.04 AS builder
+
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
+    qtbase5-dev \
+    qt5-qmake
+
+WORKDIR /src
+
+COPY . .
+
+#编译后得到：/src/app
+RUN qmake app.pro && make -j4
+
+# stage 2:
+FROM ubuntu:20.04
+
+COPY --from=builder /src/app /usr/local/bin/app
+
+CMD ["/usr/local/bin/app"]
+```
+
+第一阶段：编译得到 `src/app`
+第二阶段：从 builder 阶段拷贝文件运行, stage2的镜像才是最终生成的image
+
+作用：
+
+> 以上面为例，使用多阶段构建，最终镜像不会包含前面阶段为编译而安装下载的东西和以及编译中间产物，只有你copy的src/app
+> 这样可以缩小最终镜像大小
+
+1. 减少镜像尺寸
+1. 隐藏源码
+1. 不带开发工具，减少攻击面
+1. 分离开发环境和运行环境
 
 ## 示例
 
@@ -472,5 +533,5 @@ CMD     /usr/sbin/sshd -D
     COPY <<-EOT /script.sh
     echo "hello ${FOO}"
     EOT
-    ENTRYPOINT ash /script.sh
+    ENTRYPOINT bash /script.sh
     ```
